@@ -208,3 +208,111 @@ select.input-glass option:checked {
     background-clip: text;
   }
 }
+
+/* =============================================================================
+   WCAG 2.1 â€“ Accesibilidad base
+   Agregar al FINAL de globals.css
+============================================================================= */
+
+/* â”€â”€ Focus visible (AA: 3:1 contraste mÃ­nimo) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+:focus-visible {
+  outline: 2px solid #5dade2;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Quitar outline por defecto solo cuando hay :focus-visible */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* â”€â”€ Skip navigation (oculto hasta focus) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sr-only:focus,
+.focus\:not-sr-only:focus {
+  position: fixed;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 1rem;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* â”€â”€ Reducir movimiento (WCAG 2.3 â€“ Seizures) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* â”€â”€ Contraste de texto â€“ ratios mÃ­nimos AA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/*
+  Dark mode: text-primary #e2e8f0 sobre #060d1c = ~14:1 âœ“
+  Dark mode: text-secondary #94a3b8 sobre #060d1c = ~7:1 âœ“
+  Light mode: text-primary #0a1628 sobre #5a8fd0 = ~5.2:1 âœ“
+*/
+
+/* â”€â”€ TamaÃ±o mÃ­nimo de targets interactivos (WCAG 2.5.5 â€“ 44Ã—44px) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+button,
+a,
+[role="button"],
+input[type="checkbox"],
+input[type="radio"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* ExcepciÃ³n para inputs de texto (no necesitan 44px de ancho mÃ­nimo) */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+textarea,
+select {
+  min-width: unset;
+}
+
+/* â”€â”€ Indicadores de estado para lectores de pantalla â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+[aria-busy="true"] {
+  cursor: progress;
+}
+
+[aria-disabled="true"],
+[disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* â”€â”€ Alto contraste (sistema) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+@media (forced-colors: active) {
+  .glass,
+  .glass-strong {
+    border: 2px solid ButtonText;
+    background: Canvas;
+  }
+
+  .btn-primary {
+    border: 2px solid ButtonText;
+    background: ButtonFace;
+    color: ButtonText;
+  }
+}
+

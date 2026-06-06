@@ -1,4 +1,5 @@
-import { Controller, Get, Put, Patch, Body, Param, UseGuards, IsArray, IsString } from '@nestjs/common';
+﻿import { IsArray, IsString } from 'class-validator'
+import { Controller, Get, Put, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -16,7 +17,7 @@ export class CompanyController {
   constructor(private readonly svc: CompanyService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Obtener información de la empresa' })
+  @ApiOperation({ summary: 'Obtener informaciÃ³n de la empresa' })
   findOne(@GetUser() user: JwtUser) {
     return this.svc.findOne(user.companyId);
   }
@@ -36,7 +37,7 @@ export class CompanyController {
 
   @Get('stats')
   @Roles('admin', 'coordinator')
-  @ApiOperation({ summary: 'Estadísticas generales del sistema' })
+  @ApiOperation({ summary: 'EstadÃ­sticas generales del sistema' })
   getStats(@GetUser() user: JwtUser) {
     return this.svc.getStats(user.companyId);
   }
@@ -61,7 +62,7 @@ export class CompanyController {
 
   @Patch('configs/:key')
   @Roles('admin')
-  @ApiOperation({ summary: 'Actualizar una configuración del sistema' })
+  @ApiOperation({ summary: 'Actualizar una configuraciÃ³n del sistema' })
   upsertConfig(
     @GetUser() user: JwtUser,
     @Param('key') key: string,
@@ -70,3 +71,4 @@ export class CompanyController {
     return this.svc.upsertConfig(user.companyId, key, value);
   }
 }
+

@@ -1,7 +1,8 @@
-import {
+﻿import {
   Injectable, NotFoundException, ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { PaginationDto, paginate, buildMeta } from '../common/dto/pagination.dto';
 import {
   CreateClientDto, UpdateClientDto, CreateStaffDto, UpdateStaffDto,
@@ -21,7 +22,7 @@ export class ClientsService {
 
   async findAll(companyId: string, dto: PaginationDto) {
     const { take, skip } = paginate(dto.page, dto.limit);
-    const where: any = { companyId };
+    const where: Prisma.ClientWhereInput = { companyId };
     if (dto.search) {
       where.OR = [
         { businessName:   { contains: dto.search } },
@@ -80,7 +81,7 @@ export class ClientsService {
     });
   }
 
-  // ── USUARIOS DEL CLIENTE ──────────────────────────────────────────────────
+  // â”€â”€ USUARIOS DEL CLIENTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async findUsers(companyId: string, clientId: string) {
     await this.findOne(companyId, clientId);
     return this.prisma.user.findMany({
@@ -95,7 +96,7 @@ export class ClientsService {
     });
   }
 
-  // ── PERSONAL DEL CLIENTE ───────────────────────────────────────────────────
+  // â”€â”€ PERSONAL DEL CLIENTE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async findStaff(companyId: string, clientId: string) {
     await this.findOne(companyId, clientId);
     return this.prisma.clientStaff.findMany({
@@ -126,3 +127,4 @@ export class ClientsService {
     return { message: 'Funcionario eliminado' };
   }
 }
+

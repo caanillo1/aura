@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller, Post, Get, Body, UseGuards, Req,
   HttpCode, HttpStatus, UnauthorizedException,
 } from '@nestjs/common';
@@ -16,6 +16,10 @@ class RefreshDto {
 
 @ApiTags('Auth')
 @Controller('auth')
+
+interface AuthRequest {
+  user: { id: string; sub: string; email: string; companyId: string; role: string };
+}
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -24,7 +28,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Iniciar sesión' })
+  @ApiOperation({ summary: 'Iniciar sesiÃ³n' })
   @ApiResponse({ status: 200, description: 'Login exitoso con tokens JWT' })
   @ApiResponse({ status: 401, description: 'Credenciales incorrectas' })
   login(@Body() dto: LoginDto) {
@@ -34,7 +38,7 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Registrar nuevo usuario (agente o cliente)' })
   @ApiResponse({ status: 201, description: 'Usuario registrado exitosamente' })
-  @ApiResponse({ status: 409, description: 'El correo ya está registrado' })
+  @ApiResponse({ status: 409, description: 'El correo ya estÃ¡ registrado' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -43,7 +47,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener perfil del usuario autenticado' })
-  getMe(@Req() req: any) {
+  getMe(@Req() req: AuthRequest) {
     return this.authService.getMe(req.user.id);
   }
 
@@ -51,8 +55,8 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cerrar sesión' })
-  logout(@Req() req: any) {
+  @ApiOperation({ summary: 'Cerrar sesiÃ³n' })
+  logout(@Req() req: AuthRequest) {
     return this.authService.logout(req.user.id);
   }
 
@@ -60,15 +64,15 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refrescar access token con refresh token' })
   @ApiResponse({ status: 200, description: 'Nuevos tokens generados' })
-  @ApiResponse({ status: 401, description: 'Refresh token inválido o expirado' })
+  @ApiResponse({ status: 401, description: 'Refresh token invÃ¡lido o expirado' })
   async refresh(@Body() dto: RefreshDto) {
     try {
       const payload = this.jwtService.verify(dto.refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
       });
-      return this.authService.refreshTokens(payload.sub, dto.refreshToken);
+      return this.authService.refreshTokens((payload as { sub: string }).sub, dto.refreshToken);
     } catch {
-      throw new UnauthorizedException('Sesión expirada. Por favor inicia sesión nuevamente.');
+      throw new UnauthorizedException('SesiÃ³n expirada. Por favor inicia sesiÃ³n nuevamente.');
     }
   }
 
@@ -78,3 +82,4 @@ export class AuthController {
     return { status: 'ok', timestamp: new Date().toISOString(), service: 'AURA ERP API v1' };
   }
 }
+

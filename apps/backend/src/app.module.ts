@@ -7,6 +7,8 @@ import { AuthModule } from './auth/auth.module';
 import { CompanyModule } from './company/company.module';
 import { UsersModule } from './users/users.module';
 import { ClientsModule } from './clients/clients.module';
+import { QueuesModule } from './queues/queues.module';
+import { GatewayModule } from './gateway/gateway.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -18,6 +20,8 @@ import { AppService } from './app.service';
     CompanyModule,
     UsersModule,
     ClientsModule,
+    QueuesModule,
+    GatewayModule,
   ],
   controllers: [AppController],
   providers: [

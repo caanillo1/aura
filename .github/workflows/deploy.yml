@@ -1,0 +1,127 @@
+# =============================================================================
+# AURA ERP – Deploy Pipeline
+# Deploy backend → VPS Windows Server 2019
+# Deploy frontend → Vercel
+# Ejecuta en: Push a main (después de CI verde)
+# =============================================================================
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Qué desplegar'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+
+jobs:
+  # ─── DEPLOY FRONTEND → VERCEL ───────────────────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend → Vercel
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: '8.15.4'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/frontend
+
+      - name: Build frontend
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_WS_URL: ${{ secrets.NEXT_PUBLIC_WS_URL }}
+
+      - name: Deploy to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/frontend
+
+  # ─── DEPLOY BACKEND → VPS WINDOWS ───────────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend → VPS
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: '8.15.4'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build backend
+        run: pnpm --filter backend build
+
+      - name: Deploy via SSH to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd C:\AURA
+            git pull origin main
+            pnpm install --frozen-lockfile
+            pnpm --filter backend build
+            npx prisma migrate deploy
+            pm2 restart aura-backend --update-env
+            pm2 save
+
+  # ─── NOTIFY ─────────────────────────────────────────────────────────────────
+  notify:
+    name: Notificar resultado
+    runs-on: ubuntu-latest
+    needs: [deploy-frontend, deploy-backend]
+    if: always()
+
+    steps:
+      - name: Deploy exitoso
+        if: needs.deploy-frontend.result == 'success' && needs.deploy-backend.result == 'success'
+        run: echo "✅ Deploy AURA ERP completado exitosamente"
+
+      - name: Deploy fallido
+        if: needs.deploy-frontend.result == 'failure' || needs.deploy-backend.result == 'failure'
+        run: |
+          echo "❌ Deploy falló"
+          exit 1

@@ -1,0 +1,123 @@
+# =============================================================================
+# AURA ERP – CI Pipeline
+# Ejecuta en: Push a main/develop y Pull Requests
+# Pasos: lint · typecheck · build · tests
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8.15.4'
+
+jobs:
+  # ─── BACKEND ────────────────────────────────────────────────────────────────
+  backend:
+    name: Backend (NestJS)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint backend
+        run: pnpm --filter backend lint
+
+      - name: Typecheck backend
+        run: pnpm --filter backend exec tsc --noEmit
+
+      - name: Build backend
+        run: pnpm --filter backend build
+
+      - name: Unit tests
+        run: pnpm --filter backend test --passWithNoTests
+        env:
+          DATABASE_URL: 'sqlserver://localhost:1433;database=AuraERP_Test;user=sa;password=Test@2024!;encrypt=false;trustServerCertificate=true'
+          JWT_SECRET: 'ci-test-secret-key-aura-erp'
+          JWT_EXPIRES_IN: '15m'
+          JWT_REFRESH_SECRET: 'ci-test-refresh-secret-aura-erp'
+          JWT_REFRESH_EXPIRES_IN: '7d'
+          NODE_ENV: 'test'
+
+  # ─── FRONTEND ───────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint frontend
+        run: pnpm --filter frontend lint
+
+      - name: Typecheck frontend
+        run: pnpm --filter frontend exec tsc --noEmit
+
+      - name: Build frontend
+        run: pnpm --filter frontend build
+        env:
+          NEXT_PUBLIC_API_URL: 'http://localhost:3001/api/v1'
+          NEXT_PUBLIC_WS_URL: 'http://localhost:3001'
+
+  # ─── SECURITY SCAN ──────────────────────────────────────────────────────────
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+        continue-on-error: true

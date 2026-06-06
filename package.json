@@ -1,0 +1,13 @@
+{
+  "name": "aura-erp",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:backend":    "pnpm --filter backend dev",
+    "dev:frontend":   "pnpm --filter frontend dev",
+    "build:backend":  "pnpm --filter backend build",
+    "build:frontend": "pnpm --filter frontend build",
+    "start:backend":  "pnpm --filter backend start:prod"
+  },
+  "packageManager": "pnpm@8.15.4"
+}

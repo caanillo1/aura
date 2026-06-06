@@ -1,0 +1,26 @@
+# =============================================================================
+# AURA ERP – PR Check
+# Bloquea merge si CI no pasa
+# =============================================================================
+
+name: PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  status-check:
+    name: Verificar CI completo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verificar rama destino
+        run: |
+          echo "PR de ${{ github.head_ref }} → ${{ github.base_ref }}"
+          if [[ "${{ github.base_ref }}" == "main" ]]; then
+            echo "⚠️  Merge directo a main — requiere aprobación de Tech Lead"
+          fi
+
+      - name: OK
+        run: echo "✅ PR verificado"

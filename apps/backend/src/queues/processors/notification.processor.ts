@@ -1,8 +1,8 @@
-import { Process, Processor, OnQueueFailed, OnQueueCompleted } from '@nestjs/bull';
+﻿import { Process, Processor, OnQueueFailed, OnQueueCompleted } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import type { Job } from 'bull';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NOTIFICATION_QUEUE } from '../queues.module';
+import { NOTIFICATION_QUEUE } from '../queues.constants';
 import { NotificationJobData } from '../services/queue.service';
 
 @Processor(NOTIFICATION_QUEUE)
@@ -27,7 +27,7 @@ export class NotificationProcessor {
       },
     });
 
-    this.logger.log(`✓ Notificación [${type}] enviada a usuario ${userId}: "${title}"`);
+    this.logger.log(`âœ“ NotificaciÃ³n [${type}] enviada a usuario ${userId}: "${title}"`);
   }
 
   @OnQueueCompleted()
@@ -38,7 +38,9 @@ export class NotificationProcessor {
   @OnQueueFailed()
   onFailed(job: Job, error: Error) {
     this.logger.error(
-      `Job #${job.id} falló (intento ${job.attemptsMade}/${job.opts.attempts}): ${error.message}`,
+      `Job #${job.id} fallÃ³ (intento ${job.attemptsMade}/${job.opts.attempts}): ${error.message}`,
     );
   }
 }
+
+

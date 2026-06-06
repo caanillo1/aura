@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { NOTIFICATION_QUEUE, REPORT_QUEUE } from '../queues.module';
+import type { Queue } from 'bull';
+import { NOTIFICATION_QUEUE, REPORT_QUEUE } from '../queues.constants';
 
 export interface NotificationJobData {
   userId:      string;
@@ -31,14 +31,14 @@ export class QueueService {
     @InjectQueue(REPORT_QUEUE)       private readonly reportQueue: Queue,
   ) {}
 
-  // ── Notificaciones ──────────────────────────────────────────────────────────
+  // â”€â”€ Notificaciones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async sendNotification(data: NotificationJobData) {
     const job = await this.notificationQueue.add('send', data, {
       attempts: 3,
       backoff: { type: 'exponential', delay: 2000 },
     });
-    this.logger.debug(`Notificación encolada [job:${job.id}] para usuario ${data.userId}`);
+    this.logger.debug(`NotificaciÃ³n encolada [job:${job.id}] para usuario ${data.userId}`);
     return job;
   }
 
@@ -47,7 +47,7 @@ export class QueueService {
     return this.notificationQueue.addBulk(jobs);
   }
 
-  // ── Reportes ────────────────────────────────────────────────────────────────
+  // â”€â”€ Reportes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async scheduleReport(data: ReportJobData, delayMs?: number) {
     const job = await this.reportQueue.add('generate', data, {
@@ -59,7 +59,7 @@ export class QueueService {
     return job;
   }
 
-  // ── Estado de colas ─────────────────────────────────────────────────────────
+  // â”€â”€ Estado de colas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getQueueStatus() {
     const [nActive, nWaiting, nFailed, rActive, rWaiting, rFailed] = await Promise.all([
@@ -83,3 +83,5 @@ export class QueueService {
     ]);
   }
 }
+
+

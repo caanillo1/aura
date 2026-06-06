@@ -14,12 +14,12 @@ class RefreshDto {
   @IsString() @IsNotEmpty() refreshToken: string;
 }
 
-@ApiTags('Auth')
-@Controller('auth')
-
 interface AuthRequest {
   user: { id: string; sub: string; email: string; companyId: string; role: string };
 }
+
+@ApiTags('Auth')
+@Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -28,7 +28,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Iniciar sesiÃ³n' })
+  @ApiOperation({ summary: 'Iniciar sesion' })
   @ApiResponse({ status: 200, description: 'Login exitoso con tokens JWT' })
   @ApiResponse({ status: 401, description: 'Credenciales incorrectas' })
   login(@Body() dto: LoginDto) {
@@ -38,7 +38,7 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Registrar nuevo usuario (agente o cliente)' })
   @ApiResponse({ status: 201, description: 'Usuario registrado exitosamente' })
-  @ApiResponse({ status: 409, description: 'El correo ya estÃ¡ registrado' })
+  @ApiResponse({ status: 409, description: 'El correo ya esta registrado' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -55,7 +55,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cerrar sesiÃ³n' })
+  @ApiOperation({ summary: 'Cerrar sesion' })
   logout(@Req() req: AuthRequest) {
     return this.authService.logout(req.user.id);
   }
@@ -64,15 +64,15 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refrescar access token con refresh token' })
   @ApiResponse({ status: 200, description: 'Nuevos tokens generados' })
-  @ApiResponse({ status: 401, description: 'Refresh token invÃ¡lido o expirado' })
+  @ApiResponse({ status: 401, description: 'Refresh token invalido o expirado' })
   async refresh(@Body() dto: RefreshDto) {
     try {
       const payload = this.jwtService.verify(dto.refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
-      });
-      return this.authService.refreshTokens((payload as { sub: string }).sub, dto.refreshToken);
+      }) as { sub: string };
+      return this.authService.refreshTokens(payload.sub, dto.refreshToken);
     } catch {
-      throw new UnauthorizedException('SesiÃ³n expirada. Por favor inicia sesiÃ³n nuevamente.');
+      throw new UnauthorizedException('Sesion expirada. Por favor inicia sesion nuevamente.');
     }
   }
 
@@ -82,4 +82,3 @@ export class AuthController {
     return { status: 'ok', timestamp: new Date().toISOString(), service: 'AURA ERP API v1' };
   }
 }
-

@@ -1,8 +1,8 @@
-import { Process, Processor, OnQueueFailed } from '@nestjs/bull';
+﻿import { Process, Processor, OnQueueFailed } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
-import { Job } from 'bull';
+import type { Job } from 'bull';
 import { PrismaService } from '../../prisma/prisma.service';
-import { REPORT_QUEUE } from '../queues.module';
+import { REPORT_QUEUE } from '../queues.constants';
 import { ReportJobData } from '../services/queue.service';
 
 @Processor(REPORT_QUEUE)
@@ -24,14 +24,16 @@ export class ReportProcessor {
 
     // TODO F7: generar PDF/Excel/PPT y enviar por M365
     this.logger.log(
-      `✓ Informe [${reportId}] generado. Destinatarios: ${recipients.join(', ')}`,
+      `âœ“ Informe [${reportId}] generado. Destinatarios: ${recipients.join(', ')}`,
     );
   }
 
   @OnQueueFailed()
   onFailed(job: Job, error: Error) {
     this.logger.error(
-      `Reporte job #${job.id} falló (intento ${job.attemptsMade}): ${error.message}`,
+      `Reporte job #${job.id} fallÃ³ (intento ${job.attemptsMade}): ${error.message}`,
     );
   }
 }
+
+

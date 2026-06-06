@@ -1,13 +1,11 @@
-import { BullModule } from '@nestjs/bull';
+﻿import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { NOTIFICATION_QUEUE, REPORT_QUEUE } from './queues.constants';
 import { NotificationProcessor } from './processors/notification.processor';
 import { ReportProcessor } from './processors/report.processor';
 import { QueueService } from './services/queue.service';
 import { PrismaModule } from '../prisma/prisma.module';
-
-export const NOTIFICATION_QUEUE = 'notifications';
-export const REPORT_QUEUE      = 'reports';
 
 @Module({
   imports: [
@@ -36,3 +34,4 @@ export const REPORT_QUEUE      = 'reports';
   exports: [QueueService, BullModule],
 })
 export class QueuesModule {}
+

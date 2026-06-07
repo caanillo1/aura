@@ -1,0 +1,216 @@
+'use client';
+import { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { useTheme } from 'next-themes';
+import { Search, RefreshCw, Plus, ClipboardList } from 'lucide-react';
+import Link from 'next/link';
+import { serviceOrdersApi, clientsApi } from '@/lib/api';
+import { toast } from 'sonner';
+import type { ServiceOrder, Client } from '@/types';
+
+const STATUS_STYLE: Record<string, { color: string; bg: string; dot: string; label: string }> = {
+  pendiente:   { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',   dot: '#60a5fa', label: 'Pendiente'   },
+  en_curso:    { color: '#34d399', bg: 'rgba(52,211,153,0.12)',   dot: '#34d399', label: 'En curso'    },
+  suspendida:  { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',   dot: '#fbbf24', label: 'Suspendida'  },
+  completada:  { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', dot: '#a78bfa', label: 'Completada'  },
+  cancelada:   { color: '#f87171', bg: 'rgba(248,113,113,0.12)', dot: '#f87171', label: 'Cancelada'   },
+};
+
+export default function OrdenesPage() {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+
+  const [orders, setOrders]   = useState<ServiceOrder[]>([]);
+  const [total, setTotal]     = useState(0);
+  const [page, setPage]       = useState(1);
+  const [search, setSearch]   = useState('');
+  const [fStatus, setFStatus] = useState('');
+  const [fClient, setFClient] = useState('');
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const tableStyle = {
+    background: isLight ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.06)',
+    border: `1px solid ${isLight ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.10)'}`,
+    backdropFilter: 'blur(20px) saturate(160%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+    boxShadow: isLight
+      ? '0 8px 32px rgba(30,60,120,0.18), inset 0 1px 0 rgba(255,255,255,0.98)'
+      : '0 8px 32px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.10)',
+  };
+
+  const rowBorder = isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.06)';
+  const headBg    = isLight ? 'rgba(30,60,120,0.06)' : 'rgba(255,255,255,0.03)';
+  const tc = isLight
+    ? { p: '#0a1628', s: '#1a3050', m: '#4a6080' }
+    : { p: '#e2e8f0', s: '#94a3b8', m: '#6b82a0' };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await serviceOrdersApi.list({
+        page, limit: 15, search: search || undefined,
+        status: fStatus || undefined, clientId: fClient || undefined,
+      });
+      setOrders(res.data);
+      setTotal(res.meta.total);
+    } catch { toast.error('Error al cargar órdenes'); }
+    finally { setLoading(false); }
+  }, [page, search, fStatus, fClient]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    clientsApi.list({ limit: 100 }).then(r => setClients(r.data)).catch(() => {});
+  }, []);
+
+  return (
+    <div className="space-y-5 max-w-7xl">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="font-bold text-xl flex items-center gap-2" style={{ color: tc.p }}>
+            <ClipboardList className="w-5 h-5 text-blue-400" /> Órdenes de Servicio
+          </h2>
+          <p className="text-sm mt-0.5" style={{ color: tc.m }}>{total} órdenes registradas</p>
+        </div>
+        <Link href="/implementacion/ordenes/nueva">
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white font-medium">
+            <Plus className="w-4 h-4" /> Nueva OS
+          </motion.button>
+        </Link>
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: tc.m }} />
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Buscar por OS#, producto, cliente..."
+            className="input-glass w-full rounded-xl pl-9 pr-4 py-2.5 text-sm" />
+        </div>
+        <select value={fStatus} onChange={e => { setFStatus(e.target.value); setPage(1); }}
+          className="input-glass rounded-xl px-4 py-2.5 text-sm">
+          <option value="">Todos los estados</option>
+          {Object.entries(STATUS_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <select value={fClient} onChange={e => { setFClient(e.target.value); setPage(1); }}
+          className="input-glass rounded-xl px-4 py-2.5 text-sm">
+          <option value="">Todos los clientes</option>
+          {clients.map(c => <option key={c.id} value={c.id}>{c.businessName}</option>)}
+        </select>
+        <button onClick={load} className="p-2.5 rounded-xl transition-colors" style={{ color: tc.m }}>
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Tabla */}
+      <div className="rounded-2xl overflow-hidden" style={tableStyle}>
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{ borderBottom: rowBorder, background: headBg }}>
+              {['OS#', 'Cliente', 'Producto', 'Líderes', 'Estado', 'Fechas', ''].map(h => (
+                <th key={h} className="text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wide"
+                  style={{ color: tc.m }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: rowBorder }}>
+                    <td colSpan={7} className="px-4 py-3.5">
+                      <div className="h-4 rounded animate-pulse" style={{ background: 'var(--border-subtle)' }} />
+                    </td>
+                  </tr>
+                ))
+              : orders.map((os, i) => {
+                  const ss = STATUS_STYLE[os.status] ?? STATUS_STYLE.pendiente;
+                  return (
+                    <motion.tr key={os.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      transition={{ delay: i * 0.03 }}
+                      style={{ borderBottom: rowBorder }}
+                      className="transition-colors cursor-pointer"
+                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(30,60,120,0.03)' : 'rgba(255,255,255,0.03)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <td className="px-4 py-3.5">
+                        <span className="font-mono font-bold text-xs" style={{ color: '#60a5fa' }}>{os.osNumber}</span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <p className="text-sm font-medium" style={{ color: tc.p }}>{os.client.businessName}</p>
+                        <p className="text-xs" style={{ color: tc.m }}>{os.client.nit}</p>
+                      </td>
+                      <td className="px-4 py-3.5 max-w-[200px]">
+                        <p className="text-sm truncate" style={{ color: tc.s }}>{os.product}</p>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="space-y-0.5">
+                          {os.clinicalLeader && (
+                            <p className="text-xs" style={{ color: tc.m }}>
+                              <span style={{ color: '#60a5fa' }}>Clínico:</span> {os.clinicalLeader.firstName} {os.clinicalLeader.lastName}
+                            </p>
+                          )}
+                          {os.financialLeader && (
+                            <p className="text-xs" style={{ color: tc.m }}>
+                              <span style={{ color: '#34d399' }}>Financiero:</span> {os.financialLeader.firstName} {os.financialLeader.lastName}
+                            </p>
+                          )}
+                          {!os.clinicalLeader && !os.financialLeader && (
+                            <span className="text-xs italic" style={{ color: tc.m }}>Sin líderes</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold w-fit"
+                          style={{ background: ss.bg, color: ss.color, border: `1px solid ${ss.color}40` }}>
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: ss.dot }} />
+                          {ss.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <p className="text-xs" style={{ color: tc.m }}>
+                          {new Date(os.startDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                        <p className="text-xs" style={{ color: tc.m }}>
+                          → {new Date(os.endDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <Link href={`/implementacion/ordenes/${os.id}`}>
+                          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                            style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
+                            Ver
+                          </motion.button>
+                        </Link>
+                      </td>
+                    </motion.tr>
+                  );
+                })
+            }
+          </tbody>
+        </table>
+        {!loading && orders.length === 0 && (
+          <div className="py-16 text-center text-sm" style={{ color: tc.m }}>
+            No se encontraron órdenes de servicio
+          </div>
+        )}
+      </div>
+
+      {/* Paginación */}
+      {total > 15 && (
+        <div className="flex items-center justify-between text-sm">
+          <span style={{ color: tc.m }}>Página {page} de {Math.ceil(total / 15)}</span>
+          <div className="flex gap-2">
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+              className="px-4 py-2 rounded-xl transition-colors disabled:opacity-30"
+              style={{ border: '1px solid var(--border-subtle)', color: tc.s }}>Anterior</button>
+            <button disabled={page >= Math.ceil(total / 15)} onClick={() => setPage(p => p + 1)}
+              className="px-4 py-2 rounded-xl transition-colors disabled:opacity-30"
+              style={{ border: '1px solid var(--border-subtle)', color: tc.s }}>Siguiente</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

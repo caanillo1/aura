@@ -52,6 +52,7 @@ model Company {
   serviceOrders    ServiceOrder[]
   systemConfigs    SystemConfig[]
   templateFlows    TemplateFlow[]
+  templateModules  TemplateModule[]
   templateRisks    TemplateRisk[]
   emailTemplates   EmailTemplate[]
   auditLogs        AuditLog[]
@@ -143,6 +144,7 @@ model User {
   reportsCreated       ScheduledReport[]        @relation("ReportCreatedBy")
   trainingParticipant  TrainingParticipant[]    @relation("ParticipantUser")
   soImplementers       ServiceOrderImplementer[]
+  activityThreads      ActivityThread[]         @relation("ThreadAuthor")
 
   @@map("Usuarios")
 }
@@ -197,6 +199,8 @@ model ClientStaff {
   client                Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   signatures            Signature[]            @relation("SignatureStaff")
   trainingParticipants  TrainingParticipant[]  @relation("ParticipantStaff")
+  activitiesAssigned    Activity[]             @relation("ActivityClientStaff")
+  serviceOrdersLed      ServiceOrder[]         @relation("SOClientLeader")
 
   @@map("PersonalCliente")
 }
@@ -226,29 +230,40 @@ model TemplateFlow {
 }
 
 model TemplateModule {
-  id             String   @id @default(uuid()) @db.UniqueIdentifier
-  templateFlowId String   @db.UniqueIdentifier
-  name           String   @db.NVarChar(200)
-  description    String?  @db.NVarChar(500)
-  order          Int      @default(0)
-  estimatedDays  Int      @default(0)
-  isActive       Boolean  @default(true)
+  id              String    @id @default(uuid()) @db.UniqueIdentifier
+  companyId       String    @db.UniqueIdentifier
+  templateFlowId  String?   @db.UniqueIdentifier
+  code            String    @db.NVarChar(20)
+  name            String    @db.NVarChar(200)
+  description     String?   @db.NVarChar(500)
+  order           Int       @default(0)
+  estimatedDays   Int       @default(0)
+  days            Int       @default(0)
+  startDate       DateTime? @db.Date
+  endDate         DateTime? @db.Date
+  executionDate   DateTime? @db.Date
+  isActive        Boolean   @default(true)
 
-  templateFlow   TemplateFlow    @relation(fields: [templateFlowId], references: [id], onDelete: Cascade)
-  phases         TemplatePhase[]
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  templateFlow    TemplateFlow?   @relation(fields: [templateFlowId], references: [id], onDelete: Cascade)
+  phases          TemplatePhase[]
 
+  @@unique([companyId, code])
   @@map("ModulosPlantilla")
 }
 
 model TemplatePhase {
-  id               String   @id @default(uuid()) @db.UniqueIdentifier
-  templateModuleId String   @db.UniqueIdentifier
-  name             String   @db.NVarChar(200)
-  slug             String   @db.NVarChar(50)
-  order            Int      @default(0)
-  estimatedDays    Int      @default(0)
-  color            String?  @db.NVarChar(7)
-  icon             String?  @db.NVarChar(100)
+  id               String    @id @default(uuid()) @db.UniqueIdentifier
+  templateModuleId String    @db.UniqueIdentifier
+  name             String    @db.NVarChar(200)
+  slug             String    @db.NVarChar(50)
+  order            Int       @default(0)
+  estimatedDays    Int       @default(0)
+  startDate        DateTime? @db.Date
+  endDate          DateTime? @db.Date
+  executionDate    DateTime? @db.Date
+  color            String?   @db.NVarChar(7)
+  icon             String?   @db.NVarChar(100)
 
   templateModule   TemplateModule     @relation(fields: [templateModuleId], references: [id], onDelete: Cascade)
   activities       TemplateActivity[]
@@ -257,15 +272,21 @@ model TemplatePhase {
 }
 
 model TemplateActivity {
-  id              String   @id @default(uuid()) @db.UniqueIdentifier
-  templatePhaseId String   @db.UniqueIdentifier
-  code            String   @db.NVarChar(20)
-  name            String   @db.NVarChar(300)
-  description     String?  @db.NVarChar(Max)
-  order           Int      @default(0)
-  estimatedHours  Decimal  @default(0) @db.Decimal(6, 2)
-  defaultRole     String?  @db.NVarChar(50)
-  priority        String   @default("media") @db.NVarChar(20)
+  id              String    @id @default(uuid()) @db.UniqueIdentifier
+  templatePhaseId String    @db.UniqueIdentifier
+  code            String    @db.NVarChar(20)
+  name            String    @db.NVarChar(300)
+  description     String?   @db.NVarChar(Max)
+  order           Int       @default(0)
+  estimatedHours  Decimal   @default(0) @db.Decimal(6, 2)
+  calculatedDays  Int       @default(0)
+  defaultRole     String?   @db.NVarChar(50)
+  priority        String    @default("media") @db.NVarChar(20)
+  assigneeType    String?   @db.NVarChar(20)
+  assigneeId      String?   @db.UniqueIdentifier
+  startDate       DateTime? @db.Date
+  endDate         DateTime? @db.Date
+  executionDate   DateTime? @db.Date
 
   templatePhase   TemplatePhase          @relation(fields: [templatePhaseId], references: [id], onDelete: Cascade)
   subActivities   TemplateSubActivity[]
@@ -319,16 +340,18 @@ model ServiceOrder {
   observations      String?  @db.NVarChar(Max)
   clinicalLeaderId  String?  @db.UniqueIdentifier
   financialLeaderId String?  @db.UniqueIdentifier
+  clientLeaderId    String?  @db.UniqueIdentifier
   status            String   @default("pendiente") @db.NVarChar(30)
   createdById       String   @db.UniqueIdentifier
   createdAt         DateTime @default(now()) @db.DateTime2
   updatedAt         DateTime @updatedAt @db.DateTime2
 
-  company           Company  @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  client            Client   @relation(fields: [clientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  createdBy         User     @relation("SOCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  clinicalLeader    User?    @relation("SOClinicalLeader", fields: [clinicalLeaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  financialLeader   User?    @relation("SOFinancialLeader", fields: [financialLeaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company           Company      @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  client            Client       @relation(fields: [clientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy         User         @relation("SOCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clinicalLeader    User?        @relation("SOClinicalLeader", fields: [clinicalLeaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  financialLeader   User?        @relation("SOFinancialLeader", fields: [financialLeaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientLeader      ClientStaff? @relation("SOClientLeader", fields: [clientLeaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   implementers      ServiceOrderImplementer[]
   history           ServiceOrderHistory[]
   project           Project?
@@ -398,12 +421,14 @@ model Project {
 }
 
 model ProjectModule {
-  id              String   @id @default(uuid()) @db.UniqueIdentifier
-  projectId       String   @db.UniqueIdentifier
-  name            String   @db.NVarChar(200)
-  order           Int      @default(0)
-  progressPercent Decimal  @default(0) @db.Decimal(5, 2)
-  isActive        Boolean  @default(true)
+  id              String    @id @default(uuid()) @db.UniqueIdentifier
+  projectId       String    @db.UniqueIdentifier
+  name            String    @db.NVarChar(200)
+  order           Int       @default(0)
+  progressPercent Decimal   @default(0) @db.Decimal(5, 2)
+  isActive        Boolean   @default(true)
+  startDate       DateTime? @db.DateTime
+  endDate         DateTime? @db.DateTime
 
   project         Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   phases          Phase[]
@@ -420,10 +445,13 @@ model Phase {
   order           Int       @default(0)
   startDate       DateTime? @db.Date
   endDate         DateTime? @db.Date
+  executionDate   DateTime? @db.Date
   progressPercent Decimal   @default(0) @db.Decimal(5, 2)
   status          String    @default("pendiente") @db.NVarChar(30)
   color           String?   @db.NVarChar(7)
   icon            String?   @db.NVarChar(100)
+  responsibleId   String?   @db.UniqueIdentifier
+  clientStaffId   String?   @db.UniqueIdentifier
 
   projectModule   ProjectModule @relation(fields: [projectModuleId], references: [id], onDelete: Cascade)
   activities      Activity[]
@@ -438,12 +466,16 @@ model Activity {
   name             String    @db.NVarChar(300)
   description      String?   @db.NVarChar(Max)
   assignedToId     String?   @db.UniqueIdentifier
+  assigneeType     String?   @db.NVarChar(20)
+  clientStaffId    String?   @db.UniqueIdentifier
   priority         String    @default("media") @db.NVarChar(20)
   status           String    @default("pendiente") @db.NVarChar(30)
   plannedStartDate DateTime? @db.Date
   plannedEndDate   DateTime? @db.Date
   actualStartDate  DateTime? @db.Date
   actualEndDate    DateTime? @db.Date
+  executionDate    DateTime? @db.Date
+  calculatedDays   Int       @default(0)
   plannedHours     Decimal   @default(0) @db.Decimal(6, 2)
   actualHours      Decimal   @default(0) @db.Decimal(6, 2)
   progressPercent  Decimal   @default(0) @db.Decimal(5, 2)
@@ -452,14 +484,31 @@ model Activity {
   createdAt        DateTime  @default(now()) @db.DateTime2
   updatedAt        DateTime  @updatedAt @db.DateTime2
 
-  phase            Phase     @relation(fields: [phaseId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  assignedTo       User?     @relation("ActivityAssignedTo", fields: [assignedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  phase            Phase        @relation(fields: [phaseId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  assignedTo       User?        @relation("ActivityAssignedTo", fields: [assignedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientStaff      ClientStaff? @relation("ActivityClientStaff", fields: [clientStaffId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subActivities    SubActivity[]
   visitActivities  VisitActivity[]
+  threads          ActivityThread[]
   dependencies     ActivityDependency[] @relation("ADActivity")
   dependsOn        ActivityDependency[] @relation("ADDependsOn")
 
   @@map("Actividades")
+}
+
+model ActivityThread {
+  id          String   @id @default(uuid()) @db.UniqueIdentifier
+  activityId  String   @db.UniqueIdentifier
+  authorId    String   @db.UniqueIdentifier
+  authorType  String   @default("agent") @db.NVarChar(20)
+  content     String   @db.NVarChar(Max)
+  createdAt   DateTime @default(now()) @db.DateTime2
+  updatedAt   DateTime @updatedAt @db.DateTime2
+
+  activity    Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  author      User     @relation("ThreadAuthor", fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("HilosActividad")
 }
 
 model ActivityDependency {

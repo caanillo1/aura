@@ -1,8 +1,8 @@
-'use client';
+﻿'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
-import { Search, RefreshCw, CheckCircle2, XCircle, Pencil, KeyRound } from 'lucide-react';
+import { Search, RefreshCw, CheckCircle2, XCircle, Pencil, KeyRound, UserCheck, UserX } from 'lucide-react';
 import { usersApi, companyApi } from '@/lib/api';
 import { Modal } from '@/components/ui/Modal';
 import { toast } from 'sonner';
@@ -213,21 +213,24 @@ export default function UsuariosPage() {
                       <div className="flex items-center gap-1.5 justify-end">
                         <button onClick={() => openEdit(u)} title="Editar"
                           className="p-1.5 rounded-lg transition-all"
-                          style={{ color: isLight ? '#1d4ed8' : '#60a5fa', background: isLight ? 'rgba(29,78,216,0.10)' : 'rgba(96,165,250,0.10)' }}>
+                          style={{ color: isLight ? '#1d4ed8' : '#60a5fa' }}>
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button onClick={() => { setResetUser(u); setNewPassword(''); }} title="Resetear contraseña"
                           className="p-1.5 rounded-lg transition-all"
-                          style={{ color: isLight ? '#92400e' : '#fbbf24', background: isLight ? 'rgba(146,64,14,0.10)' : 'rgba(251,191,36,0.10)' }}>
+                          style={{ color: isLight ? '#92400e' : '#fbbf24' }}>
                           <KeyRound className="w-3.5 h-3.5" />
                         </button>
                         <button onClick={() => handleToggle(u)}
-                          className="text-xs px-2.5 py-1 rounded-lg font-medium transition-all"
+                          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium transition-all"
                           style={u.isActive
                             ? { color: isLight ? '#991b1b' : '#f87171', background: isLight ? 'rgba(185,28,28,0.10)' : 'rgba(239,68,68,0.12)', border: `1px solid ${isLight ? 'rgba(185,28,28,0.25)' : 'rgba(239,68,68,0.25)'}` }
                             : { color: isLight ? '#065f46' : '#34d399', background: isLight ? 'rgba(6,95,70,0.10)'  : 'rgba(52,211,153,0.12)', border: `1px solid ${isLight ? 'rgba(6,95,70,0.25)'  : 'rgba(52,211,153,0.25)'}` }
                           }>
-                          {u.isActive ? 'Desactivar' : 'Activar'}
+                          {u.isActive
+                            ? <><UserX className="w-3.5 h-3.5" /> Desactivar</>
+                            : <><UserCheck className="w-3.5 h-3.5" /> Activar</>
+                          }
                         </button>
                       </div>
                     </td>

@@ -9,14 +9,24 @@ import { Toaster } from 'sonner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const { isAuthenticated } = useAuthStore();
   const { theme } = useTheme();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) router.push('/login');
-  }, [isAuthenticated, router]);
+    // localStorage es síncrono: para cuando este effect corre, Zustand ya leyó el token
+    setHydrated(true);
+  }, []);
 
+  useEffect(() => {
+    if (hydrated && !isAuthenticated) router.push('/login');
+  }, [hydrated, isAuthenticated, router]);
+
+  // Mientras el store rehidrata desde localStorage, mostrar fondo oscuro sin redirigir
+  if (!hydrated) return (
+    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at top right, #0f1f3d 0%, #060d1c 50%, #050810 100%)' }} />
+  );
   if (!isAuthenticated) return null;
 
   const isLight = theme === 'light';

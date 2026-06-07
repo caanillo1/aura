@@ -21,7 +21,6 @@ export const useAuthStore = create<AuthState>()(
         if (typeof window !== 'undefined') {
           localStorage.setItem('aura_access_token', accessToken);
           localStorage.setItem('aura_refresh_token', refreshToken);
-          // Cookie para el middleware Next.js (SSR route protection)
           document.cookie = `aura_access_token=${accessToken};path=/;max-age=${60 * 60 * 24 * 7}`;
         }
         set({ user, accessToken, isAuthenticated: true });

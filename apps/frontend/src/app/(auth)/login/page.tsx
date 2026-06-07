@@ -22,7 +22,7 @@ function LoginContent() {
 
   useEffect(() => {
     if (searchParams.get('expired') === '1') {
-      setError('Tu sesiÃ³n expirÃ³. Por favor inicia sesiÃ³n nuevamente.');
+      setError('Tu sesión expiró. Por favor inicia sesión nuevamente.');
     }
   }, [searchParams]);
 
@@ -44,7 +44,7 @@ function LoginContent() {
       toast.success(`Bienvenido, ${data.user.firstName}`);
       router.push('/dashboard');
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Error al iniciar sesiÃ³n';
+      const msg = err?.response?.data?.message ?? 'Error al iniciar sesión';
       setError(Array.isArray(msg) ? msg[0] : msg);
     } finally {
       setLoading(false);
@@ -82,7 +82,7 @@ function LoginContent() {
           transition={{ delay: 0.2 }}
           className="glass-strong rounded-2xl p-8"
         >
-          <h2 className="text-xl font-semibold text-white mb-1">Iniciar SesiÃ³n</h2>
+          <h2 className="text-xl font-semibold text-white mb-1">Iniciar Sesión</h2>
           <p className="text-slate-400 text-sm mb-6">Ingresa tus credenciales para continuar</p>
 
           {/* Error */}
@@ -101,7 +101,7 @@ function LoginContent() {
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                Correo electrÃ³nico
+                Correo electrónico
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -116,14 +116,14 @@ function LoginContent() {
             {/* Password */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                ContraseÃ±a
+                Contraseña
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type={showPass ? 'text' : 'password'} name="password"
                   value={form.password} onChange={handleChange}
-                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" autoComplete="current-password"
+                  placeholder="Tu contraseña" autoComplete="current-password"
                   className="input-glass w-full rounded-lg pl-10 pr-10 py-2.5 text-sm"
                 />
                 <button type="button" onClick={() => setShowPass((p) => !p)}
@@ -140,7 +140,7 @@ function LoginContent() {
             >
               {loading
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Verificando...</>
-                : 'Iniciar SesiÃ³n'
+                : 'Iniciar Sesión'
               }
             </motion.button>
           </form>
@@ -148,7 +148,7 @@ function LoginContent() {
           {/* Divider */}
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-white/10" />
-            <span className="text-slate-500 text-xs">Â¿Nuevo en AURA?</span>
+            <span className="text-slate-500 text-xs">¿Nuevo en AURA?</span>
             <div className="flex-1 h-px bg-white/10" />
           </div>
 
@@ -170,7 +170,7 @@ function LoginContent() {
         </motion.div>
 
         <p className="text-center text-slate-600 text-xs mt-6">
-          Â© 2024 Sistemas Infotec Â· AURA ERP v1.0.0
+          © 2024 Sistemas Infotec · AURA ERP v1.0.0
         </p>
       </motion.div>
     </div>

@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { PaginationDto, paginate, buildMeta } from '../common/dto/pagination.dto';
 import {
-  CreateClientDto, UpdateClientDto, CreateStaffDto, UpdateStaffDto,
+  CreateClientDto, UpdateClientDto, CreateStaffDto, UpdateStaffDto, BulkCreateStaffDto,
 } from './dto/client.dto';
 
 const CLIENT_SELECT = {
@@ -125,6 +125,24 @@ export class ClientsService {
     if (!staff) throw new NotFoundException('Funcionario no encontrado');
     await this.prisma.clientStaff.delete({ where: { id: staffId } });
     return { message: 'Funcionario eliminado' };
+  }
+
+  async bulkCreateStaff(companyId: string, clientId: string, dto: BulkCreateStaffDto) {
+    await this.findOne(companyId, clientId);
+    const created = await this.prisma.clientStaff.createMany({
+      data: dto.items.map(item => ({
+        clientId,
+        document: item.document,
+        firstName: item.firstName,
+        lastName: item.lastName,
+        jobTitle: item.jobTitle,
+        email: item.email,
+        phone: item.phone,
+        area: item.area,
+        isProjectLeader: item.isProjectLeader ?? false,
+      })),
+    });
+    return { count: created.count, message: `${created.count} funcionario(s) importado(s)` };
   }
 }
 

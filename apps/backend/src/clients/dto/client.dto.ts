@@ -1,5 +1,6 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsBoolean, IsArray, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class CreateClientDto {
   @ApiProperty() @IsString() @IsNotEmpty() nit: string;
@@ -32,6 +33,7 @@ export class CreateStaffDto {
   @ApiPropertyOptional() @IsOptional() @IsEmail() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() area?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() @Type(() => Boolean) isProjectLeader?: boolean;
 }
 
 export class UpdateStaffDto {
@@ -41,4 +43,13 @@ export class UpdateStaffDto {
   @ApiPropertyOptional() @IsOptional() @IsEmail() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() area?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() @Type(() => Boolean) isProjectLeader?: boolean;
+}
+
+export class BulkCreateStaffDto {
+  @ApiProperty({ type: [CreateStaffDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateStaffDto)
+  items: CreateStaffDto[];
 }

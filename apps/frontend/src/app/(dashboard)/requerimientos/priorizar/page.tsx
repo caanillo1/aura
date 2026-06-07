@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -522,17 +522,17 @@ export default function PriorizarRequerimientosPage() {
                       <div className="flex items-center gap-1">
                         <button onClick={() => move(realIdx,-1)} disabled={realIdx===0}
                           className="p-1.5 rounded-lg transition-colors disabled:opacity-20"
-                          style={{ color: isLight ? '#1d4ed8' : '#60a5fa', background: isLight ? 'rgba(29,78,216,0.08)' : 'rgba(96,165,250,0.08)' }}>
+                          style={{ color: isLight ? '#1d4ed8' : '#60a5fa' }}>
                           <ArrowUp className="w-3.5 h-3.5" />
                         </button>
                         <button onClick={() => move(realIdx,1)} disabled={realIdx===items.length-1}
                           className="p-1.5 rounded-lg transition-colors disabled:opacity-20"
-                          style={{ color: isLight ? '#1d4ed8' : '#60a5fa', background: isLight ? 'rgba(29,78,216,0.08)' : 'rgba(96,165,250,0.08)' }}>
+                          style={{ color: isLight ? '#1d4ed8' : '#60a5fa' }}>
                           <ArrowDown className="w-3.5 h-3.5" />
                         </button>
                         <button onClick={() => { setModalTicket(req); setGestion({ estado:'Priorizado', observacion:'', fecha: new Date().toISOString().split('T')[0] }); }}
                           className="p-1.5 rounded-lg transition-colors ml-1"
-                          style={{ color:'#a78bfa', background:'rgba(167,139,250,0.10)' }}
+                          style={{ color:'#a78bfa' }}
                           title="Registrar gestión">
                           <Send className="w-3.5 h-3.5" />
                         </button>
@@ -569,7 +569,7 @@ export default function PriorizarRequerimientosPage() {
                                   >
                                     {/* Dot */}
                                     <div className="w-3.5 h-3.5 rounded-full shrink-0 mt-0.5 ring-2 z-10"
-                                      style={{ background:hs.dot, ringColor:`${hs.dot}40`, boxShadow:`0 0 0 3px ${hs.dot}25` }} />
+                                      style={{ background:hs.dot, boxShadow:`0 0 0 3px ${hs.dot}25` }} />
 
                                     {/* Contenido */}
                                     <div className="flex-1 rounded-xl p-3"

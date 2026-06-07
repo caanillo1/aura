@@ -8,6 +8,7 @@ import {
   ClipboardList, FileText, BarChart3, Settings,
   ChevronLeft, ChevronRight, ChevronDown, LogOut,
   ClipboardPlus, ListOrdered, MessageSquarePlus,
+  Briefcase, LayoutTemplate, Layers,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth.store';
@@ -39,13 +40,16 @@ const NAV_ITEMS: NavItem[] = [
     href: '/clientes', label: 'Clientes', icon: Building2,
     roles: ['admin','coordinator','implementer_clinical','implementer_financial','implementer_support','support'],
   },
+  // ── IMPLEMENTACIÓN (sub-menú) ─────────────────────────────────────────────
   {
-    href: '/ordenes', label: 'Órdenes de Servicio', icon: ClipboardList,
-    roles: ['admin','coordinator','implementer_clinical','implementer_financial'],
-  },
-  {
-    href: '/proyectos', label: 'Proyectos', icon: FolderKanban,
+    label: 'Implementación', icon: Briefcase,
     roles: ['admin','coordinator','implementer_clinical','implementer_financial','implementer_support'],
+    children: [
+      { href: '/implementacion/ordenes',    label: 'Órdenes de Servicio', icon: ClipboardList   },
+      { href: '/implementacion/plantillas', label: 'Plantillas',          icon: LayoutTemplate  },
+      { href: '/implementacion/modulos',    label: 'Módulos',             icon: Layers          },
+      { href: '/implementacion/proyectos',  label: 'Proyectos',           icon: FolderKanban    },
+    ],
   },
   // ── REQUERIMIENTOS (sub-menú) ─────────────────────────────────────────────
   {
@@ -80,7 +84,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const isLight   = theme === 'light';
 
   // Estado de expansión de sub-menús
-  const [expanded, setExpanded] = useState<string[]>(['Requerimientos']);
+  const [expanded, setExpanded] = useState<string[]>(['Requerimientos', 'Implementación']);
 
   const visibleItems = NAV_ITEMS.filter(
     (item) => user && item.roles.includes(user.role as UserRole),

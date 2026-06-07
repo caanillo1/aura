@@ -120,3 +120,192 @@ export interface ClientStaff {
   isActSigner: boolean;
   isActive: boolean;
 }
+
+// ── Service Orders ────────────────────────────────────────────────────────────
+export type OSStatus = 'pendiente' | 'en_curso' | 'suspendida' | 'completada' | 'cancelada';
+
+export interface ServiceOrderImplementer {
+  role: string;
+  assignedAt: string;
+  user: { id: string; firstName: string; lastName: string; jobTitle?: string };
+}
+
+export interface ServiceOrderHistory {
+  id: string;
+  serviceOrderId: string;
+  changedById: string;
+  fieldName: string;
+  oldValue?: string | null;
+  newValue?: string | null;
+  reason?: string | null;
+  createdAt: string;
+}
+
+export interface ServiceOrder {
+  id: string;
+  osNumber: string;
+  product: string;
+  scope?: string;
+  durationDays: number;
+  startDate: string;
+  endDate: string;
+  observations?: string;
+  status: OSStatus;
+  createdAt: string;
+  updatedAt: string;
+  client: { id: string; businessName: string; nit: string };
+  clinicalLeader?:  { id: string; firstName: string; lastName: string } | null;
+  financialLeader?: { id: string; firstName: string; lastName: string } | null;
+  clientLeader?:    { id: string; firstName: string; lastName: string } | null;
+  createdBy: { id: string; firstName: string; lastName: string };
+  implementers: ServiceOrderImplementer[];
+  history?: ServiceOrderHistory[];
+  project?: { id: string; name: string; status: string; progressPercent: number } | null;
+  _count?: { history: number };
+}
+
+// ── Templates ─────────────────────────────────────────────────────────────────
+export interface TemplateActivity {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  order: number;
+  estimatedHours: number;
+  calculatedDays: number;
+  defaultRole?: string;
+  priority: string;
+  assigneeType?: string | null;
+  assigneeId?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  executionDate?: string | null;
+  subActivities?: { id: string; name: string; order: number; estimatedHours: number }[];
+}
+
+export interface TemplatePhase {
+  id: string;
+  name: string;
+  slug: string;
+  order: number;
+  estimatedDays: number;
+  color?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  executionDate?: string | null;
+  activities: TemplateActivity[];
+}
+
+export interface TemplateModule {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  order: number;
+  estimatedDays: number;
+  days: number;
+  isActive: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+  executionDate?: string | null;
+  templateFlow?: { id: string; name: string; version: string };
+  _count?: { phases: number };
+  phases?: TemplatePhase[];
+}
+
+export interface ActivityThread {
+  id: string;
+  activityId: string;
+  authorId: string;
+  authorType: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  author: { id: string; firstName: string; lastName: string; jobTitle?: string };
+}
+
+export interface TemplateFlow {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  version: string;
+  isActive: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  modules: TemplateModule[];
+  _count?: { modules: number };
+}
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+export type ProjectStatus = 'activo' | 'pausado' | 'completado' | 'cancelado';
+export type ActivityStatus = 'pendiente' | 'en_progreso' | 'completado' | 'bloqueado';
+export type PhaseStatus   = 'pendiente' | 'en_progreso' | 'completado' | 'bloqueado';
+
+export interface ProjectActivity {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  status: ActivityStatus;
+  priority: string;
+  progressPercent: number;
+  plannedHours: number;
+  actualHours: number;
+  observations?: string;
+  order: number;
+  calculatedDays: number;
+  plannedStartDate?: string | null;
+  plannedEndDate?: string | null;
+  actualStartDate?: string | null;
+  actualEndDate?: string | null;
+  executionDate?: string | null;
+  assignedToId?: string | null;
+  clientStaffId?: string | null;
+  assignedTo?: { id: string; firstName: string; lastName: string } | null;
+  clientStaff?: { id: string; firstName: string; lastName: string } | null;
+  threads?: ActivityThread[];
+}
+
+export interface ProjectPhase {
+  id: string;
+  name: string;
+  slug?: string;
+  order: number;
+  status: PhaseStatus;
+  color?: string;
+  progressPercent: number;
+  startDate?: string | null;
+  endDate?: string | null;
+  executionDate?: string | null;
+  activities: ProjectActivity[];
+}
+
+export interface ProjectModule {
+  id: string;
+  name: string;
+  order: number;
+  progressPercent: number;
+  isActive: boolean;
+  phases: ProjectPhase[];
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  progressPercent: number;
+  status: ProjectStatus;
+  createdAt: string;
+  serviceOrder: {
+    id: string;
+    osNumber: string;
+    product: string;
+    client: { id: string; businessName: string };
+  };
+  templateFlow?: { id: string; name: string } | null;
+  modules?: ProjectModule[];
+  _count?: { modules: number };
+}

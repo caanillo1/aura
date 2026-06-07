@@ -7,6 +7,9 @@ import { AuthModule } from './auth/auth.module';
 import { CompanyModule } from './company/company.module';
 import { UsersModule } from './users/users.module';
 import { ClientsModule } from './clients/clients.module';
+import { ServiceOrdersModule } from './service-orders/service-orders.module';
+import { TemplatesModule } from './templates/templates.module';
+import { ProjectsModule } from './projects/projects.module';
 import { QueuesModule } from './queues/queues.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { AppController } from './app.controller';
@@ -20,6 +23,9 @@ import { AppService } from './app.service';
     CompanyModule,
     UsersModule,
     ClientsModule,
+    ServiceOrdersModule,
+    TemplatesModule,
+    ProjectsModule,
     QueuesModule,
     GatewayModule,
   ],

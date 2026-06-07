@@ -11,7 +11,7 @@ import type { JwtUser } from '../common/decorators/get-user.decorator';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { ClientsService } from './clients.service';
 import {
-  CreateClientDto, UpdateClientDto, CreateStaffDto, UpdateStaffDto,
+  CreateClientDto, UpdateClientDto, CreateStaffDto, UpdateStaffDto, BulkCreateStaffDto,
 } from './dto/client.dto';
 
 @ApiTags('Clients')
@@ -100,5 +100,12 @@ export class ClientsController {
     @Param('staffId') staffId: string,
   ) {
     return this.svc.deleteStaff(user.companyId, id, staffId);
+  }
+
+  @Post(':id/staff/bulk')
+  @Roles('admin', 'coordinator')
+  @ApiOperation({ summary: 'Carga masiva de funcionarios desde Excel' })
+  bulkCreateStaff(@GetUser() user: JwtUser, @Param('id') id: string, @Body() dto: BulkCreateStaffDto) {
+    return this.svc.bulkCreateStaff(user.companyId, id, dto);
   }
 }

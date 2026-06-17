@@ -2,10 +2,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
-import { Search, RefreshCw, CheckCircle2, XCircle, Pencil, KeyRound, UserCheck, UserX } from 'lucide-react';
+import { Search, RefreshCw, CheckCircle2, XCircle, Pencil, KeyRound, UserCheck, UserX, Trash2, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { usersApi, companyApi } from '@/lib/api';
 import { Modal } from '@/components/ui/Modal';
 import { toast } from 'sonner';
+import { usePermission } from '@/hooks/usePermission';
 import type { User, Role } from '@/types';
 
 // Colores por tema: [dark, light]
@@ -39,15 +40,27 @@ export default function UsuariosPage() {
 
   // Modal editar
   const [editUser, setEditUser]       = useState<User | null>(null);
-  const [editForm, setEditForm]       = useState({ firstName: '', lastName: '', jobTitle: '', phone: '', roleSlug: '' });
+  const [editForm, setEditForm]       = useState({ firstName: '', lastName: '', jobTitle: '', phone: '', roleSlug: '', userType: 'agent' as 'agent' | 'client' });
   const [saving, setSaving]           = useState(false);
 
   // Modal reset password
   const [resetUser, setResetUser]     = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [resetting, setResetting]     = useState(false);
+
+  // Modal nuevo usuario
+  const EMPTY_NEW = { userType: 'agent' as 'agent'|'client', document: '', firstName: '', lastName: '', email: '', password: '', roleSlug: '', jobTitle: '', phone: '' };
+  const [showNew, setShowNew]   = useState(false);
+  const [newForm, setNewForm]   = useState(EMPTY_NEW);
+  const [creating, setCreating] = useState(false);
+  const [showPwd, setShowPwd]   = useState(false);
+
+  // Modal eliminar usuario
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [deleting, setDeleting]         = useState(false);
   const { theme } = useTheme();
   const isLight = theme === 'light';
+  const { can } = usePermission();
 
   const tableStyle = {
     background: isLight ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.06)',
@@ -77,7 +90,7 @@ export default function UsuariosPage() {
 
   const openEdit = (u: User) => {
     setEditUser(u);
-    setEditForm({ firstName: u.firstName, lastName: u.lastName, jobTitle: u.jobTitle ?? '', phone: u.phone ?? '', roleSlug: u.role.slug });
+    setEditForm({ firstName: u.firstName, lastName: u.lastName, jobTitle: u.jobTitle ?? '', phone: u.phone ?? '', roleSlug: u.role.slug, userType: (u.userType as 'agent' | 'client') ?? 'agent' });
   };
 
   const handleSaveEdit = async () => {
@@ -101,6 +114,19 @@ export default function UsuariosPage() {
     } catch { toast.error('Error al cambiar estado'); }
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await usersApi.delete(deleteTarget.id);
+      toast.success(`Usuario "${deleteTarget.firstName} ${deleteTarget.lastName}" eliminado`);
+      setDeleteTarget(null);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al eliminar usuario');
+    } finally { setDeleting(false); }
+  };
+
   const handleResetPassword = async () => {
     if (!resetUser || newPassword.length < 8) return;
     setResetting(true);
@@ -114,11 +140,37 @@ export default function UsuariosPage() {
     } finally { setResetting(false); }
   };
 
+  const handleCreateUser = async () => {
+    if (!newForm.document.trim() || !newForm.firstName.trim() || !newForm.lastName.trim() || !newForm.email.trim() || newForm.password.length < 8 || !newForm.roleSlug) {
+      toast.error('Completa todos los campos obligatorios (contraseña mínimo 8 caracteres)');
+      return;
+    }
+    setCreating(true);
+    try {
+      await usersApi.create({ ...newForm, jobTitle: newForm.jobTitle || undefined, phone: newForm.phone || undefined });
+      toast.success(`Usuario ${newForm.firstName} ${newForm.lastName} creado`);
+      setShowNew(false);
+      setNewForm(EMPTY_NEW);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al crear usuario');
+    } finally { setCreating(false); }
+  };
+
   return (
     <div className="space-y-5 max-w-6xl">
-      <div>
-        <h2 className="font-bold text-xl" style={{ color: 'var(--text-primary)' }}>Usuarios</h2>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>{total} usuarios registrados</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="font-bold text-xl" style={{ color: 'var(--text-primary)' }}>Usuarios</h2>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>{total} usuarios registrados</p>
+        </div>
+        {can('users.nuevo') && (
+          <button onClick={() => { setNewForm(EMPTY_NEW); setShowNew(true); }}
+            className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white font-medium">
+            <UserPlus className="w-4 h-4" />
+            Nuevo usuario
+          </button>
+        )}
       </div>
 
       {/* Filtros */}
@@ -211,27 +263,40 @@ export default function UsuariosPage() {
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-1.5 justify-end">
-                        <button onClick={() => openEdit(u)} title="Editar"
-                          className="p-1.5 rounded-lg transition-all"
-                          style={{ color: isLight ? '#1d4ed8' : '#60a5fa' }}>
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => { setResetUser(u); setNewPassword(''); }} title="Resetear contraseña"
-                          className="p-1.5 rounded-lg transition-all"
-                          style={{ color: isLight ? '#92400e' : '#fbbf24' }}>
-                          <KeyRound className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => handleToggle(u)}
-                          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium transition-all"
-                          style={u.isActive
-                            ? { color: isLight ? '#991b1b' : '#f87171', background: isLight ? 'rgba(185,28,28,0.10)' : 'rgba(239,68,68,0.12)', border: `1px solid ${isLight ? 'rgba(185,28,28,0.25)' : 'rgba(239,68,68,0.25)'}` }
-                            : { color: isLight ? '#065f46' : '#34d399', background: isLight ? 'rgba(6,95,70,0.10)'  : 'rgba(52,211,153,0.12)', border: `1px solid ${isLight ? 'rgba(6,95,70,0.25)'  : 'rgba(52,211,153,0.25)'}` }
-                          }>
-                          {u.isActive
-                            ? <><UserX className="w-3.5 h-3.5" /> Desactivar</>
-                            : <><UserCheck className="w-3.5 h-3.5" /> Activar</>
-                          }
-                        </button>
+                        {can('users.editar') && (
+                          <button onClick={() => openEdit(u)} title="Editar"
+                            className="p-1.5 rounded-lg transition-all"
+                            style={{ color: isLight ? '#1d4ed8' : '#60a5fa' }}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {can('users.password') && (
+                          <button onClick={() => { setResetUser(u); setNewPassword(''); }} title="Resetear contraseña"
+                            className="p-1.5 rounded-lg transition-all"
+                            style={{ color: isLight ? '#92400e' : '#fbbf24' }}>
+                            <KeyRound className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {can('users.eliminar') && (
+                          <button onClick={() => setDeleteTarget(u)} title="Eliminar usuario"
+                            className="p-1.5 rounded-lg transition-all"
+                            style={{ color: isLight ? '#dc2626' : '#f87171' }}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {can('users.desactivar') && (
+                          <button onClick={() => handleToggle(u)}
+                            className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg font-medium transition-all"
+                            style={u.isActive
+                              ? { color: isLight ? '#991b1b' : '#f87171', background: isLight ? 'rgba(185,28,28,0.10)' : 'rgba(239,68,68,0.12)', border: `1px solid ${isLight ? 'rgba(185,28,28,0.25)' : 'rgba(239,68,68,0.25)'}` }
+                              : { color: isLight ? '#065f46' : '#34d399', background: isLight ? 'rgba(6,95,70,0.10)'  : 'rgba(52,211,153,0.12)', border: `1px solid ${isLight ? 'rgba(6,95,70,0.25)'  : 'rgba(52,211,153,0.25)'}` }
+                            }>
+                            {u.isActive
+                              ? <><UserX className="w-3.5 h-3.5" /> Desactivar</>
+                              : <><UserCheck className="w-3.5 h-3.5" /> Activar</>
+                            }
+                          </button>
+                        )}
                       </div>
                     </td>
                   </motion.tr>
@@ -289,18 +354,28 @@ export default function UsuariosPage() {
             <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
               value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} />
           </div>
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Rol</label>
-            <select className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
-              value={editForm.roleSlug} onChange={(e) => setEditForm((p) => ({ ...p, roleSlug: e.target.value }))}>
-              {roles.map((r) => (
-                <option key={r.slug} value={r.slug}>{r.name}</option>
-              ))}
-            </select>
-            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-              Cambiar el rol afecta inmediatamente los permisos de acceso del usuario.
-            </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Tipo de usuario</label>
+              <select className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                value={editForm.userType} onChange={(e) => setEditForm((p) => ({ ...p, userType: e.target.value as 'agent' | 'client' }))}>
+                <option value="agent">Agente</option>
+                <option value="client">Cliente</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Rol</label>
+              <select className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                value={editForm.roleSlug} onChange={(e) => setEditForm((p) => ({ ...p, roleSlug: e.target.value }))}>
+                {roles.map((r) => (
+                  <option key={r.slug} value={r.slug}>{r.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
+          <p className="text-xs -mt-2" style={{ color: 'var(--text-muted)' }}>
+            Los usuarios tipo <strong>Agente</strong> reciben notificaciones internas del sistema.
+          </p>
           <div className="flex gap-3 pt-1">
             <button onClick={() => setEditUser(null)}
               className="flex-1 py-2.5 rounded-xl text-sm transition-colors"
@@ -310,6 +385,39 @@ export default function UsuariosPage() {
             <button onClick={handleSaveEdit} disabled={saving}
               className="flex-1 btn-primary py-2.5 rounded-xl text-sm text-white font-medium disabled:opacity-50">
               {saving ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Modal eliminar usuario ────────────────────────────────────────── */}
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Eliminar usuario">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-3.5 rounded-xl"
+            style={{ background: isLight ? 'rgba(220,38,38,0.08)' : 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)' }}>
+            <Trash2 className="w-5 h-5 mt-0.5 shrink-0" style={{ color: '#ef4444' }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: isLight ? '#991b1b' : '#fca5a5' }}>
+                ¿Eliminar a {deleteTarget?.firstName} {deleteTarget?.lastName}?
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                Esta acción es irreversible. Si el usuario tiene historial (requerimientos, gestiones, órdenes de servicio), no se podrá eliminar — usa "Desactivar" en su lugar.
+              </p>
+            </div>
+          </div>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <span className="font-medium">{deleteTarget?.email}</span>
+          </p>
+          <div className="flex gap-3 pt-1">
+            <button onClick={() => setDeleteTarget(null)}
+              className="flex-1 py-2.5 rounded-xl text-sm transition-colors"
+              style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+              Cancelar
+            </button>
+            <button onClick={handleDelete} disabled={deleting}
+              className="flex-1 py-2.5 rounded-xl text-sm text-white font-medium disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}>
+              {deleting ? 'Eliminando...' : 'Sí, eliminar'}
             </button>
           </div>
         </div>
@@ -337,6 +445,87 @@ export default function UsuariosPage() {
               className="flex-1 py-2.5 rounded-xl text-sm text-white font-medium disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg, #d97706, #b45309)' }}>
               {resetting ? 'Actualizando...' : 'Actualizar contraseña'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Modal nuevo usuario ──────────────────────────────────────────────── */}
+      <Modal open={showNew} onClose={() => setShowNew(false)} title="Nuevo usuario">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Nombre *</label>
+              <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                value={newForm.firstName} onChange={e => setNewForm(p => ({ ...p, firstName: e.target.value }))} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Apellido *</label>
+              <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                value={newForm.lastName} onChange={e => setNewForm(p => ({ ...p, lastName: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Documento *</label>
+            <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+              value={newForm.document} onChange={e => setNewForm(p => ({ ...p, document: e.target.value }))} placeholder="Cédula o NIT" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Correo electrónico *</label>
+            <input type="email" className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+              value={newForm.email} onChange={e => setNewForm(p => ({ ...p, email: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Contraseña * (mín. 8 caracteres)</label>
+            <div className="relative">
+              <input type={showPwd ? 'text' : 'password'} className="input-glass w-full rounded-xl px-3 py-2.5 text-sm pr-10"
+                value={newForm.password} onChange={e => setNewForm(p => ({ ...p, password: e.target.value }))}
+                autoComplete="new-password" />
+              <button type="button" onClick={() => setShowPwd(p => !p)}
+                className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Tipo *</label>
+              <select className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                value={newForm.userType} onChange={e => setNewForm(p => ({ ...p, userType: e.target.value as 'agent'|'client' }))}>
+                <option value="agent">Agente</option>
+                <option value="client">Cliente</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Rol *</label>
+              <select className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                value={newForm.roleSlug} onChange={e => setNewForm(p => ({ ...p, roleSlug: e.target.value }))}>
+                <option value="">Seleccionar rol...</option>
+                {roles.map(r => <option key={r.slug} value={r.slug}>{r.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Cargo</label>
+              <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                value={newForm.jobTitle} onChange={e => setNewForm(p => ({ ...p, jobTitle: e.target.value }))} placeholder="Opcional" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Teléfono</label>
+              <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                value={newForm.phone} onChange={e => setNewForm(p => ({ ...p, phone: e.target.value }))} placeholder="Opcional" />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button onClick={() => setShowNew(false)}
+              className="flex-1 py-2.5 rounded-xl text-sm transition-colors"
+              style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+              Cancelar
+            </button>
+            <button onClick={handleCreateUser} disabled={creating}
+              className="flex-1 btn-primary py-2.5 rounded-xl text-sm text-white font-medium disabled:opacity-50">
+              {creating ? 'Creando...' : 'Crear usuario'}
             </button>
           </div>
         </div>

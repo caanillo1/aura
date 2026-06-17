@@ -66,6 +66,11 @@ export class AuthService {
 
     this.logger.log(`Login exitoso: ${user.email}`);
 
+    let permissions: string[] = [];
+    if (user.role.permissions) {
+      try { permissions = JSON.parse(user.role.permissions as string) as string[]; } catch {}
+    }
+
     return {
       user: {
         id: user.id,
@@ -77,6 +82,7 @@ export class AuthService {
         roleName: user.role.name,
         companyId: user.companyId,
         companyName: user.company?.name,
+        permissions,
       },
       ...tokens,
     };
@@ -190,6 +196,11 @@ export class AuthService {
 
     this.logger.log(`Registro exitoso: ${user.email} (${dto.userType})`);
 
+    let permissions: string[] = [];
+    if (role.permissions) {
+      try { permissions = JSON.parse(role.permissions as string) as string[]; } catch {}
+    }
+
     return {
       user: {
         id: user.id,
@@ -200,6 +211,7 @@ export class AuthService {
         role: role.slug,
         roleName: role.name,
         companyId: user.companyId,
+        permissions,
       },
       ...tokens,
     };

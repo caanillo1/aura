@@ -1,20 +1,22 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Eye, EyeOff, Mail, Lock, User, IdCard, Briefcase,
   ShieldCheck, Loader2, AlertCircle, ChevronLeft,
-  Building2, Users, MapPin, Phone, Hash, FileText,
+  Building2, Users, Phone, Hash, FileText,
   ChevronRight, Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { authApi } from '@/lib/api';
+import { authApi, municipiosApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { AuraLogo } from '@/components/ui/AuraLogo';
 import { AuraText } from '@/components/ui/AuraText';
+import { MunicipioSearch } from '@/components/ui/MunicipioSearch';
 import type { UserType } from '@/types/auth.types';
+import type { Municipio } from '@/types';
 
 type Step = 'type' | 'company' | 'user';
 
@@ -53,6 +55,9 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [municipios, setMunicipios] = useState<Municipio[]>([]);
+  useEffect(() => { municipiosApi.listPublic().then(setMunicipios).catch(() => {}); }, []);
+
   const [companyMode, setCompanyMode] = useState<'new' | 'existing'>('new');
   const [company, setCompany] = useState<CompanyForm>({
     nit: '', businessName: '', commercialName: '',
@@ -88,7 +93,7 @@ export default function RegisterPage() {
     if (!company.nit.trim()) return 'El NIT es requerido';
     if (companyMode === 'new') {
       if (!company.businessName.trim()) return 'La razón social es requerida';
-      if (!company.city.trim()) return 'La ciudad es requerida';
+      if (!company.city.trim()) return 'Selecciona un municipio';
     }
     return null;
   };
@@ -397,24 +402,20 @@ export default function RegisterPage() {
                           className="input-glass w-full rounded-lg pl-10 pr-4 py-2.5 text-sm" />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                          Ciudad <span className="text-red-400">*</span>
-                        </label>
-                        <div className="relative">
-                          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input type="text" name="city" value={company.city} onChange={handleCompany}
-                            placeholder="Pereira"
-                            className="input-glass w-full rounded-lg pl-10 pr-3 py-2.5 text-sm" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1.5">Departamento</label>
-                        <input type="text" name="department" value={company.department} onChange={handleCompany}
-                          placeholder="Risaralda"
-                          className="input-glass w-full rounded-lg px-4 py-2.5 text-sm" />
-                      </div>
+                    <div>
+                      <MunicipioSearch
+                        municipios={municipios}
+                        value={company.city ? `${company.city}${company.department ? `, ${company.department}` : ''}` : ''}
+                        onSelect={m => setCompany(p => ({
+                          ...p,
+                          city:       m?.nombreMunicipio ?? '',
+                          department: m?.nombreDepartamento ?? '',
+                        }))}
+                        label="Municipio"
+                        required
+                        placeholder="Buscar municipio o departamento..."
+                        inputClassName="input-glass rounded-lg pl-10 pr-8 py-2.5 text-sm"
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>

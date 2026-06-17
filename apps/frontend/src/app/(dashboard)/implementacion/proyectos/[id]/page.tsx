@@ -6,14 +6,22 @@ import { useTheme } from 'next-themes';
 import {
   ArrowLeft, RefreshCw, CheckCircle2, Circle, Clock, AlertCircle,
   ChevronDown, Layers, Calendar, ClipboardList, Pencil, Check,
-  MessageSquare, Send, Trash2, Upload, Plus, User,
+  MessageSquare, Send, Trash2, Upload, Plus, User, FileText,
 } from 'lucide-react';
 import Link from 'next/link';
-import { projectsApi, templatesApi, usersApi, clientsApi } from '@/lib/api';
+import { projectsApi, templatesApi, usersApi, clientsApi, actasApi } from '@/lib/api';
+import { usePermission } from '@/hooks/usePermission';
 import type { TemplateFlow, User as UserType, ClientStaff } from '@/types';
 import { Modal } from '@/components/ui/Modal';
 import { toast } from 'sonner';
 import type { Project, ProjectPhase, ProjectActivity, ActivityStatus, ProjectStatus, ActivityThread } from '@/types';
+
+const clampDateYear = (val: string): string => {
+  if (!val) return val;
+  const parts = val.split('-');
+  if (parts[0] && parts[0].length > 4) parts[0] = parts[0].slice(0, 4);
+  return parts.join('-');
+};
 
 // ── Configuraciones de estado ──────────────────────────────────────────────
 
@@ -45,11 +53,12 @@ function daysBetween(a?: string | null, b?: string | null): number | null {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 }
 
+// timeZone:'UTC' porque las fechas llegan como medianoche UTC desde el servidor
 const fmtDate = (d?: string | null) =>
-  d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+  d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—';
 
 const fmtShort = (d?: string | null) =>
-  d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : null;
+  d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', timeZone: 'UTC' }) : null;
 
 // ── Sub-componentes ────────────────────────────────────────────────────────
 
@@ -88,13 +97,12 @@ interface AddActivityModalProps {
 function AddActivityModal({ phaseId, users, clientStaff, tc, onClose, onAdded }: AddActivityModalProps) {
   const [form, setForm] = useState({
     name: '', description: '', priority: 'media', plannedHours: '',
-    plannedStartDate: '', plannedEndDate: '',
     actualStartDate: '', actualEndDate: '',
     assignedToId: '', clientStaffId: '',
   });
   const [saving, setSaving] = useState(false);
 
-  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: /date/i.test(k) ? clampDateYear(v) : v }));
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('El nombre es requerido'); return; }
@@ -105,8 +113,6 @@ function AddActivityModal({ phaseId, users, clientStaff, tc, onClose, onAdded }:
         description: form.description || undefined,
         priority: form.priority || undefined,
         plannedHours: form.plannedHours ? Number(form.plannedHours) : undefined,
-        plannedStartDate: form.plannedStartDate || undefined,
-        plannedEndDate: form.plannedEndDate || undefined,
         actualStartDate: form.actualStartDate || undefined,
         actualEndDate: form.actualEndDate || undefined,
         assignedToId: form.assignedToId || undefined,
@@ -153,38 +159,23 @@ function AddActivityModal({ phaseId, users, clientStaff, tc, onClose, onAdded }:
           </div>
         </div>
         <div>
-          <p className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fechas planeadas</p>
+          <p className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fechas programadas</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Inicio</label>
-              <input type="date" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
-                value={form.plannedStartDate} onChange={e => set('plannedStartDate', e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Fin</label>
-              <input type="date" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
-                value={form.plannedEndDate} onChange={e => set('plannedEndDate', e.target.value)} />
-            </div>
-          </div>
-        </div>
-        <div>
-          <p className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fechas reales</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Inicio</label>
-              <input type="date" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
+              <input type="date" max="2099-12-31" min="2000-01-01" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
                 value={form.actualStartDate} onChange={e => set('actualStartDate', e.target.value)} />
             </div>
             <div>
               <label className="block text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Fin</label>
-              <input type="date" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
+              <input type="date" max="2099-12-31" min="2000-01-01" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
                 value={form.actualEndDate} onChange={e => set('actualEndDate', e.target.value)} />
             </div>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Responsable (agente)</label>
+            <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Responsable agente</label>
             <select className="input-glass w-full rounded-xl px-3 py-2 text-sm"
               value={form.assignedToId} onChange={e => set('assignedToId', e.target.value)}>
               <option value="">Sin asignar</option>
@@ -194,11 +185,11 @@ function AddActivityModal({ phaseId, users, clientStaff, tc, onClose, onAdded }:
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Responsable (cliente)</label>
+            <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Responsable cliente</label>
             <select className="input-glass w-full rounded-xl px-3 py-2 text-sm"
               value={form.clientStaffId} onChange={e => set('clientStaffId', e.target.value)}>
               <option value="">Sin asignar</option>
-              {clientStaff.map((s: any) => (
+              {clientStaff.filter((s: any) => s.isProjectLeader).map((s: any) => (
                 <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
               ))}
             </select>
@@ -232,6 +223,7 @@ interface ActivityModalProps {
 }
 
 function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: ActivityModalProps) {
+  const { can } = usePermission();
   const [tab, setTab] = useState<'update' | 'threads'>('update');
   const [form, setForm] = useState({
     status: activity?.status ?? 'pendiente',
@@ -251,6 +243,7 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
   const [threads, setThreads]                 = useState<ActivityThread[]>([]);
   const [loadingThreads, setLoadingThreads]   = useState(false);
   const [newThread, setNewThread]             = useState('');
+  const [newThreadStatus, setNewThreadStatus] = useState('');
   const [postingThread, setPostingThread]     = useState(false);
 
   useEffect(() => {
@@ -285,7 +278,7 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
     if (tab === 'threads' && activity) loadThreads();
   }, [tab, activity?.id]); // eslint-disable-line
 
-  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
+  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: typeof v === 'string' && /date/i.test(k) ? clampDateYear(v) : v }));
 
   const handleSave = async () => {
     if (!activity) return;
@@ -315,9 +308,12 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
     if (!activity || !newThread.trim()) return;
     setPostingThread(true);
     try {
-      const thread = await templatesApi.addThread(activity.id, newThread.trim());
+      const payload: { content: string; newStatus?: string } = { content: newThread.trim() };
+      if (newThreadStatus) payload.newStatus = newThreadStatus;
+      const thread = await templatesApi.addThread(activity.id, payload);
       setThreads(prev => [...prev, thread]);
       setNewThread('');
+      setNewThreadStatus('');
     } catch { toast.error('Error al agregar novedad'); }
     finally { setPostingThread(false); }
   };
@@ -389,7 +385,13 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
                   const Icon = cfg.icon;
                   const active = form.status === key;
                   return (
-                    <button key={key} onClick={() => set('status', key)}
+                    <button key={key} onClick={() => setForm(prev => {
+                      const upd: any = { status: key };
+                      if (key === 'completado') upd.progressPercent = 100;
+                      else if (key === 'pendiente') upd.progressPercent = 0;
+                      else if (key === 'en_progreso' && Number(prev.progressPercent) === 0) upd.progressPercent = 10;
+                      return { ...prev, ...upd };
+                    })}
                       className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all border"
                       style={{
                         background: active ? cfg.bg : 'transparent',
@@ -427,35 +429,18 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
                 className="input-glass w-full rounded-xl px-3 py-2 text-sm" />
             </div>
 
-            {/* Fechas planeadas */}
+            {/* Fechas programadas */}
             <div>
-              <p className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fechas planeadas</p>
+              <p className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fechas programadas</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Inicio</label>
-                  <input type="date" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
-                    value={form.plannedStartDate} onChange={e => set('plannedStartDate', e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Fin</label>
-                  <input type="date" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
-                    value={form.plannedEndDate} onChange={e => set('plannedEndDate', e.target.value)} />
-                </div>
-              </div>
-            </div>
-
-            {/* Fechas reales */}
-            <div>
-              <p className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fechas reales</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Inicio</label>
-                  <input type="date" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
+                  <input type="date" max="2099-12-31" min="2000-01-01" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
                     value={form.actualStartDate} onChange={e => set('actualStartDate', e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-[10px] mb-1" style={{ color: 'var(--text-muted)' }}>Fin</label>
-                  <input type="date" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
+                  <input type="date" max="2099-12-31" min="2000-01-01" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
                     value={form.actualEndDate} onChange={e => set('actualEndDate', e.target.value)} />
                 </div>
               </div>
@@ -464,7 +449,7 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
             {/* Fecha ejecución */}
             <div>
               <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fecha de ejecución</label>
-              <input type="date" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
+              <input type="date" max="2099-12-31" min="2000-01-01" className="input-glass w-full rounded-xl px-3 py-2 text-sm"
                 value={form.executionDate} onChange={e => set('executionDate', e.target.value)} />
             </div>
 
@@ -485,7 +470,7 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
                 <select className="input-glass w-full rounded-xl px-3 py-2 text-sm"
                   value={form.clientStaffId} onChange={e => set('clientStaffId', e.target.value)}>
                   <option value="">Sin asignar</option>
-                  {clientStaff.map(s => (
+                  {clientStaff.filter(s => s.isProjectLeader).map(s => (
                     <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
                   ))}
                 </select>
@@ -544,16 +529,29 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
                       <div className="flex-1 min-w-0 rounded-xl px-3 py-2"
                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="text-xs font-semibold" style={{ color: tc.s }}>
-                            {thread.author.firstName} {thread.author.lastName}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-semibold" style={{ color: tc.s }}>
+                              {thread.author.firstName} {thread.author.lastName}
+                            </span>
+                            {thread.newStatus && (() => {
+                              const cfg = ACTIVITY_STATUS[thread.newStatus as ActivityStatus] ?? ACTIVITY_STATUS.pendiente;
+                              return (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                                  style={{ background: cfg.bg, color: cfg.color }}>
+                                  → {cfg.label}
+                                </span>
+                              );
+                            })()}
+                          </div>
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px]" style={{ color: tc.m }}>{date}</span>
-                            <button onClick={() => handleDeleteThread(thread.id)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded"
-                              style={{ color: '#f87171' }}>
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                            {can('activities.manage') && (
+                              <button onClick={() => handleDeleteThread(thread.id)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded"
+                                style={{ color: '#f87171' }}>
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </div>
                         </div>
                         <p className="text-sm whitespace-pre-wrap" style={{ color: tc.p }}>{thread.content}</p>
@@ -563,18 +561,47 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
                 })
               )}
             </div>
-            <div className="flex gap-2 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-              <textarea rows={2}
-                value={newThread}
-                onChange={e => setNewThread(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddThread(); }}
-                placeholder="Escribe una novedad o comentario... (Ctrl+Enter para enviar)"
-                className="input-glass flex-1 rounded-xl px-3 py-2 text-sm resize-none" />
-              <button onClick={handleAddThread} disabled={!newThread.trim() || postingThread}
-                className="self-end px-3 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 transition-all"
-                style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.30)' }}>
-                {postingThread ? '...' : <Send className="w-4 h-4" />}
-              </button>
+            <div className="pt-1 space-y-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+              {/* Optional status change */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: tc.m }}>
+                  Cambiar estado (opcional):
+                </span>
+                {['', 'pendiente', 'en_progreso', 'completado', 'bloqueado'].map(s => {
+                  if (!s) return (
+                    <button key="none" type="button" onClick={() => setNewThreadStatus('')}
+                      className="text-[10px] px-2 py-0.5 rounded-full font-semibold transition-all"
+                      style={{
+                        background: newThreadStatus === '' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                        color: newThreadStatus === '' ? tc.p : tc.m,
+                        border: '1px solid rgba(255,255,255,0.10)',
+                      }}>Sin cambio</button>
+                  );
+                  const cfg = ACTIVITY_STATUS[s as ActivityStatus] ?? ACTIVITY_STATUS.pendiente;
+                  return (
+                    <button key={s} type="button" onClick={() => setNewThreadStatus(s)}
+                      className="text-[10px] px-2 py-0.5 rounded-full font-semibold transition-all"
+                      style={{
+                        background: newThreadStatus === s ? cfg.bg : 'rgba(255,255,255,0.04)',
+                        color: newThreadStatus === s ? cfg.color : '#94a3b8',
+                        border: `1px solid ${newThreadStatus === s ? cfg.color + '60' : 'rgba(255,255,255,0.08)'}`,
+                      }}>{cfg.label}</button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <textarea rows={2}
+                  value={newThread}
+                  onChange={e => setNewThread(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAddThread(); }}
+                  placeholder="Escribe una novedad o comentario... (Ctrl+Enter para enviar)"
+                  className="input-glass flex-1 rounded-xl px-3 py-2 text-sm resize-none" />
+                <button onClick={handleAddThread} disabled={!newThread.trim() || postingThread}
+                  className="self-end px-3 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 transition-all"
+                  style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.30)' }}>
+                  {postingThread ? '...' : <Send className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -583,21 +610,29 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
   );
 }
 
+
 // ── Componente de fase ─────────────────────────────────────────────────────
 
-function PhaseRow({ phase, tc, users, clientStaff, onActivityUpdate, onActivityAdded }: {
+function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdate, onActivityAdded }: {
   phase: ProjectPhase;
   tc: any;
   users: UserType[];
   clientStaff: ClientStaff[];
+  filterStatus: ActivityStatus | null;
   onActivityUpdate: () => void;
   onActivityAdded: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<ProjectActivity | null>(null);
   const [addModal, setAddModal] = useState(false);
+  const { can } = usePermission();
   const cfg = ACTIVITY_STATUS[phase.status as ActivityStatus] ?? ACTIVITY_STATUS.pendiente;
   const pct = Number(phase.progressPercent) || 0;
+  const visibleActivities = filterStatus
+    ? phase.activities.filter(a => a.status === filterStatus)
+    : phase.activities;
+  // Si el filtro activo no produce ninguna actividad en esta fase, ocultar
+  if (filterStatus && visibleActivities.length === 0) return null;
 
   return (
     <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
@@ -646,10 +681,10 @@ function PhaseRow({ phase, tc, users, clientStaff, onActivityUpdate, onActivityA
           <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }}
             className="overflow-hidden">
             <div className="border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-              {phase.activities.length === 0 ? (
+              {visibleActivities.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-center" style={{ color: tc.m }}>Sin actividades</p>
               ) : (
-                phase.activities.map((act, i) => {
+                visibleActivities.map((act, i) => {
                   const aCfg = ACTIVITY_STATUS[act.status] ?? ACTIVITY_STATUS.pendiente;
                   const AIcon = aCfg.icon;
                   const prio = PRIORITY_STYLE[act.priority] ?? PRIORITY_STYLE.media;
@@ -687,12 +722,14 @@ function PhaseRow({ phase, tc, users, clientStaff, onActivityUpdate, onActivityA
                           <span className="text-[10px] block text-right mb-0.5" style={{ color: tc.m }}>{actPct.toFixed(0)}%</span>
                           <ProgressBar pct={actPct} color={aCfg.color} height={3} />
                         </div>
-                        <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                          onClick={() => setSelected(act)}
-                          className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1"
-                          style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)' }}>
-                          <Pencil className="w-3 h-3" /> Editar
-                        </motion.button>
+                        {can('activities.manage') && (
+                          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                            onClick={() => setSelected(act)}
+                            className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1"
+                            style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)' }}>
+                            <Pencil className="w-3 h-3" /> Editar
+                          </motion.button>
+                        )}
                       </div>
 
                       {/* Fila 2: fechas, días, responsable */}
@@ -757,14 +794,17 @@ function PhaseRow({ phase, tc, users, clientStaff, onActivityUpdate, onActivityA
                 })
               )}
 
+
               {/* Botón agregar actividad */}
-              <div className="px-4 py-2.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                <button onClick={() => setAddModal(true)}
-                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-                  style={{ background: 'rgba(52,211,153,0.08)', color: '#34d399', border: '1px solid rgba(52,211,153,0.20)' }}>
-                  <Plus className="w-3.5 h-3.5" /> Agregar actividad
-                </button>
-              </div>
+              {can('activities.manage') && (
+                <div className="px-4 py-2.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <button onClick={() => setAddModal(true)}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ background: 'rgba(52,211,153,0.08)', color: '#34d399', border: '1px solid rgba(52,211,153,0.20)' }}>
+                    <Plus className="w-3.5 h-3.5" /> Agregar actividad
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -800,10 +840,13 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const { theme } = useTheme();
   const isLight = theme === 'light';
+  const { can } = usePermission();
 
   const [project, setProject]   = useState<Project | null>(null);
   const [loading, setLoading]   = useState(true);
   const [activeModIdx, setActiveModIdx] = useState(0);
+  const [filterStatus, setFilterStatus] = useState<ActivityStatus | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   // Listas para responsables
   const [users, setUsers]               = useState<UserType[]>([]);
@@ -823,12 +866,35 @@ export default function ProjectDetailPage() {
     id: string; name: string;
     phases: { id: string; name: string; color?: string }[];
   }[]>([]);
-  const [phaseDates, setPhaseDates]     = useState<Record<string, { startDate: string; endDate: string }>>({});
-  const [loadingTpl, setLoadingTpl]     = useState(false);
+  const [phaseDates, setPhaseDates]         = useState<Record<string, { startDate: string; endDate: string }>>({});
+  const [tplExcludedIds, setTplExcludedIds] = useState<Set<string>>(new Set());
+  const [loadingTpl, setLoadingTpl]         = useState(false);
+
+  // Agregar módulos modal (wizard 2 pasos)
+  const [addModModal, setAddModModal]       = useState(false);
+  const [addModStep, setAddModStep]         = useState<1 | 2>(1);
+  const [addModSelTpl, setAddModSelTpl]     = useState('');
+  const [addModules, setAddModules]         = useState<{
+    id: string; name: string;
+    phases: { id: string; name: string; color?: string }[];
+  }[]>([]);
+  const [addModSelected, setAddModSelected] = useState<Set<string>>(new Set());
+  const [addModPhDates, setAddModPhDates]   = useState<Record<string, {
+    startDate: string; endDate: string; agentLeaderId: string; clientLeaderId: string;
+  }>>({});
+  const [addModAgents, setAddModAgents]         = useState<UserType[]>([]);
+  const [addModStaff, setAddModStaff]           = useState<ClientStaff[]>([]);
+  const [loadingAddMod, setLoadingAddMod]       = useState(false);
+
+  // Eliminar módulo
+  const [deleteModuleId, setDeleteModuleId]     = useState<string | null>(null);
+  const [deleteModuleName, setDeleteModuleName] = useState('');
+  const [deletingModule, setDeletingModule]     = useState(false);
 
   // Eliminar proyecto
   const [deleteModal, setDeleteModal]   = useState(false);
   const [deleting, setDeleting]         = useState(false);
+  const [actaCount, setActaCount]       = useState(0);
 
   const tc = isLight
     ? { p: '#0a1628', s: '#1a3050', m: '#4a6080' }
@@ -851,20 +917,27 @@ export default function ProjectDetailPage() {
       const data = await projectsApi.get(id);
       setProject(data);
 
-      // Cargar usuarios y staff del cliente (para dropdowns de responsable)
-      const [usersRes, staffRes] = await Promise.all([
-        usersApi.list({ limit: 200, userType: 'agent' }),
+      // Cargar usuarios, staff del cliente y conteo de actas en paralelo
+      const [usersRes, staffRes, actasRes] = await Promise.all([
+        usersApi.listAgents({ limit: 200 }),
         data.serviceOrder?.client?.id
           ? clientsApi.getStaff(data.serviceOrder.client.id)
           : Promise.resolve([]),
+        actasApi.list(data.id).catch(() => []),
       ]);
       setUsers(usersRes.data);
       setClientStaff(staffRes as any[]);
+      setActaCount(Array.isArray(actasRes) ? actasRes.length : 0);
     } catch { toast.error('Error al cargar el proyecto'); }
     finally { setLoading(false); }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const handleStatusSave = async () => {
     if (!project) return;
@@ -887,6 +960,7 @@ export default function ProjectDetailPage() {
     setTplStep(1);
     setTplModules([]);
     setPhaseDates({});
+    setTplExcludedIds(new Set());
     setTplModal(true);
   };
 
@@ -918,8 +992,9 @@ export default function ProjectDetailPage() {
           endDate: v.endDate || undefined,
         }));
       await projectsApi.loadTemplate(project.id, {
-        templateFlowId: selTpl,
-        phaseDates: phDates.length ? phDates : undefined,
+        templateFlowId:    selTpl,
+        phaseDates:        phDates.length ? phDates : undefined,
+        excludedModuleIds: tplExcludedIds.size ? Array.from(tplExcludedIds) : undefined,
       });
       toast.success('Plantilla cargada correctamente');
       setTplModal(false);
@@ -927,6 +1002,88 @@ export default function ProjectDetailPage() {
     } catch (e: any) {
       toast.error(e?.response?.data?.message ?? 'Error al cargar plantilla');
     } finally { setLoadingTpl(false); }
+  };
+
+  // ── Wizard: Agregar módulos ───────────────────────────────────────────────
+  const openAddModModal = async () => {
+    if (!tplList.length) {
+      const res = await templatesApi.list({ limit: 100 });
+      setTplList(res.data);
+    }
+    setAddModSelTpl('');
+    setAddModStep(1);
+    setAddModules([]);
+    setAddModSelected(new Set());
+    setAddModPhDates({});
+    setAddModModal(true);
+  };
+
+  const handleAddModNext = async () => {
+    if (!addModSelTpl) { toast.error('Selecciona una plantilla'); return; }
+    try {
+      const [tpl, agentsRes, staffRes] = await Promise.all([
+        templatesApi.get(addModSelTpl),
+        addModAgents.length ? Promise.resolve({ data: addModAgents }) : usersApi.listAgents({ limit: 200 }),
+        project?.serviceOrder?.client?.id && !addModStaff.length
+          ? clientsApi.getStaff(project.serviceOrder.client.id)
+          : Promise.resolve(addModStaff),
+      ]);
+      if (!addModAgents.length) setAddModAgents((agentsRes as any).data);
+      if (!addModStaff.length) {
+        const staffList = Array.isArray(staffRes) ? staffRes : (staffRes as any).data ?? [];
+        setAddModStaff(staffList.filter((s: any) => s.isProjectLeader));
+      }
+      const mods = (tpl.modules ?? []).map((m: any) => ({
+        id: m.id, name: m.name,
+        phases: (m.phases ?? []).map((p: any) => ({ id: p.id, name: p.name, color: p.color })),
+      }));
+      setAddModules(mods);
+      // Por defecto todos seleccionados
+      setAddModSelected(new Set(mods.map((m: any) => m.id)));
+      const init: Record<string, { startDate: string; endDate: string; agentLeaderId: string; clientLeaderId: string }> = {};
+      mods.forEach((m: any) => m.phases.forEach((p: any) => {
+        init[p.id] = { startDate: '', endDate: '', agentLeaderId: '', clientLeaderId: '' };
+      }));
+      setAddModPhDates(init);
+      setAddModStep(2);
+    } catch { toast.error('Error al cargar módulos de la plantilla'); }
+  };
+
+  const handleAddModules = async () => {
+    if (!project || addModSelected.size === 0) { toast.error('Selecciona al menos un módulo'); return; }
+    setLoadingAddMod(true);
+    try {
+      const phDates = Object.entries(addModPhDates).map(([templatePhaseId, v]) => ({
+        templatePhaseId,
+        startDate:      v.startDate      || undefined,
+        endDate:        v.endDate        || undefined,
+        agentLeaderId:  v.agentLeaderId  || undefined,
+        clientLeaderId: v.clientLeaderId || undefined,
+      }));
+      await projectsApi.addModules(project.id, {
+        templateFlowId:    addModSelTpl,
+        selectedModuleIds: Array.from(addModSelected),
+        phaseDates:        phDates,
+      });
+      toast.success('Módulos agregados correctamente');
+      setAddModModal(false);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al agregar módulos');
+    } finally { setLoadingAddMod(false); }
+  };
+
+  const handleDeleteModule = async () => {
+    if (!deleteModuleId) return;
+    setDeletingModule(true);
+    try {
+      await projectsApi.deleteModule(deleteModuleId);
+      toast.success('Módulo eliminado');
+      setDeleteModuleId(null);
+      setActiveModIdx(0);
+      load();
+    } catch { toast.error('Error al eliminar el módulo'); }
+    finally { setDeletingModule(false); }
   };
 
   const handleDeleteProject = async () => {
@@ -968,11 +1125,18 @@ export default function ProjectDetailPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-1">
               <h2 className="font-bold text-xl truncate" style={{ color: tc.p }}>{project.name}</h2>
-              <button onClick={() => { setNewStatus(project.status); setStatusModal(true); }}
-                className="px-3 py-1 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition"
-                style={{ background: stCfg.bg, color: stCfg.color }}>
-                {stCfg.label} ▾
-              </button>
+              {can('projects.editar') ? (
+                <button onClick={() => { setNewStatus(project.status); setStatusModal(true); }}
+                  className="px-3 py-1 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition"
+                  style={{ background: stCfg.bg, color: stCfg.color }}>
+                  {stCfg.label} ▾
+                </button>
+              ) : (
+                <span className="px-3 py-1 rounded-full text-xs font-semibold"
+                  style={{ background: stCfg.bg, color: stCfg.color }}>
+                  {stCfg.label}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-4 flex-wrap text-sm" style={{ color: tc.m }}>
               <span className="flex items-center gap-1">
@@ -997,16 +1161,35 @@ export default function ProjectDetailPage() {
               <p className="text-xs" style={{ color: tc.m }}>Progreso global</p>
               <p className="text-2xl font-bold" style={{ color: '#60a5fa' }}>{pct.toFixed(0)}%</p>
             </div>
-            <button onClick={openTplModal} title="Cargar/reemplazar plantilla"
-              className="p-2 rounded-xl transition-colors"
-              style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)' }}>
-              <Upload className="w-4 h-4" />
-            </button>
-            <button onClick={() => setDeleteModal(true)} title="Eliminar proyecto"
-              className="p-2 rounded-xl transition-colors"
-              style={{ background: 'rgba(248,113,113,0.10)', color: '#f87171', border: '1px solid rgba(248,113,113,0.20)' }}>
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <Link href={`/implementacion/proyectos/${project.id}/actas`} title="Actas del proyecto"
+              className="p-2 rounded-xl transition-colors flex items-center"
+              style={{ background: 'rgba(167,139,250,0.10)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.20)' }}>
+              <FileText className="w-4 h-4" />
+            </Link>
+            {can('projects.editar') && (
+              <button onClick={openAddModModal} title="Agregar módulos desde plantilla"
+                className="p-2 rounded-xl transition-colors"
+                style={{ background: 'rgba(52,211,153,0.10)', color: '#34d399', border: '1px solid rgba(52,211,153,0.20)' }}>
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
+            {can('projects.editar') && (
+              <button onClick={openTplModal} title="Cargar/reemplazar plantilla"
+                className="p-2 rounded-xl transition-colors"
+                style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)' }}>
+                <Upload className="w-4 h-4" />
+              </button>
+            )}
+            {can('projects.editar') && (
+              <button
+                onClick={() => setDeleteModal(true)}
+                title={actaCount > 0 ? `No se puede eliminar: tiene ${actaCount} acta${actaCount !== 1 ? 's' : ''} asociada${actaCount !== 1 ? 's' : ''}` : 'Eliminar proyecto'}
+                disabled={actaCount > 0}
+                className="p-2 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: 'rgba(248,113,113,0.10)', color: '#f87171', border: '1px solid rgba(248,113,113,0.20)' }}>
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
             <button onClick={load} title="Refrescar" className="p-2 rounded-xl" style={{ color: tc.m }}>
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -1017,12 +1200,71 @@ export default function ProjectDetailPage() {
           <ProgressBar pct={pct} color={stCfg.color} height={8} />
         </div>
 
-        <div className="flex items-center gap-4 mt-3 text-xs" style={{ color: tc.m }}>
-          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Inicio: {new Date(project.startDate).toLocaleDateString('es-CO')}</span>
-          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Fin: {new Date(project.endDate).toLocaleDateString('es-CO')}</span>
-          <span className="flex items-center gap-1"><Layers className="w-3 h-3" /> {modules.length} módulo{modules.length !== 1 ? 's' : ''}</span>
-        </div>
+        {(() => {
+          const start      = new Date(project.startDate);
+          const end        = new Date(project.endDate);
+          const totalDays  = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000));
+          const elapsed    = Math.round((now.getTime() - start.getTime()) / 86400000);
+          const remaining  = Math.round((end.getTime() - now.getTime()) / 86400000);
+          const notStarted = elapsed < 0;
+          const overdue    = remaining < 0;
+          const dayPct     = Math.min(100, Math.max(0, Math.round((elapsed / totalDays) * 100)));
+
+          const remainingColor = overdue ? '#f87171' : remaining <= 7 ? '#fbbf24' : '#34d399';
+          const remainingLabel = overdue
+            ? `${Math.abs(remaining)} día${Math.abs(remaining) !== 1 ? 's' : ''} de retraso`
+            : notStarted
+            ? `Inicia en ${Math.abs(elapsed)} día${Math.abs(elapsed) !== 1 ? 's' : ''}`
+            : `${remaining} día${remaining !== 1 ? 's' : ''} restantes`;
+
+          return (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center gap-4 text-xs flex-wrap" style={{ color: tc.m }}>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" /> Inicio: {start.toLocaleDateString('es-CO', { timeZone: 'UTC' })}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" /> Fin: {end.toLocaleDateString('es-CO', { timeZone: 'UTC' })}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Layers className="w-3 h-3" /> {modules.length} módulo{modules.length !== 1 ? 's' : ''}
+                </span>
+                <span className="flex items-center gap-1 font-mono">
+                  Día {Math.max(0, elapsed)} de {totalDays}
+                </span>
+                <span className="font-semibold px-2 py-0.5 rounded-full text-[11px]"
+                  style={{ background: remainingColor + '18', color: remainingColor, border: `1px solid ${remainingColor}40` }}>
+                  {remainingLabel}
+                </span>
+              </div>
+              {/* Barra de tiempo */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 rounded-full overflow-hidden" style={{ height: 4, background: 'rgba(255,255,255,0.08)' }}>
+                  <div className="h-full rounded-full transition-all"
+                    style={{ width: `${dayPct}%`, background: overdue ? '#f87171' : remaining <= 7 ? '#fbbf24' : '#34d399' }} />
+                </div>
+                <span className="text-[10px] font-mono shrink-0" style={{ color: tc.m }}>{dayPct}%</span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
+
+      {/* Alerta: actas asociadas bloquean eliminación */}
+      {actaCount > 0 && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
+          style={{ background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.30)', color: '#fbbf24' }}>
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <p className="text-sm leading-snug">
+            Este proyecto tiene <strong>{actaCount} acta{actaCount !== 1 ? 's' : ''} asociada{actaCount !== 1 ? 's' : ''}</strong> y no puede eliminarse.
+            Para habilitarlo, elimina primero todas las actas desde la sección{' '}
+            <Link href={`/implementacion/proyectos/${project.id}/actas`}
+              className="underline font-semibold hover:opacity-80">
+              Actas
+            </Link>.
+          </p>
+        </div>
+      )}
 
       {/* Contenido */}
       {modules.length === 0 ? (
@@ -1044,29 +1286,38 @@ export default function ProjectDetailPage() {
               const modPct = Number(mod.progressPercent) || 0;
               const isActive = idx === activeModIdx;
               return (
-                <motion.button key={mod.id} onClick={() => setActiveModIdx(idx)}
-                  whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                  className="w-full text-left p-3 rounded-xl transition-all"
+                <motion.div key={mod.id}
+                  whileHover={{ scale: 1.01 }}
+                  className="rounded-xl transition-all cursor-pointer"
                   style={{
                     background: isActive
                       ? 'rgba(96,165,250,0.12)'
                       : (isLight ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.04)'),
                     border: `1px solid ${isActive ? 'rgba(96,165,250,0.35)' : 'rgba(255,255,255,0.08)'}`,
                     backdropFilter: 'blur(12px)',
-                  }}>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-xs font-semibold truncate" style={{ color: isActive ? '#60a5fa' : tc.s }}>
-                      {mod.name}
-                    </span>
-                    <span className="text-[10px] font-mono shrink-0" style={{ color: isActive ? '#60a5fa' : tc.m }}>
-                      {modPct.toFixed(0)}%
-                    </span>
+                  }}
+                  onClick={() => setActiveModIdx(idx)}>
+                  <div className="p-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xs font-semibold truncate flex-1" style={{ color: isActive ? '#60a5fa' : tc.s }}>
+                        {mod.name}
+                      </span>
+                      <button
+                        onClick={e => { e.stopPropagation(); setDeleteModuleId(mod.id); setDeleteModuleName(mod.name); }}
+                        style={{ color: '#f87171' }}
+                        title="Eliminar módulo">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                      <span className="text-[10px] font-mono shrink-0" style={{ color: isActive ? '#60a5fa' : tc.m }}>
+                        {modPct.toFixed(0)}%
+                      </span>
+                    </div>
+                    <ProgressBar pct={modPct} color={isActive ? '#60a5fa' : '#6b82a0'} height={3} />
+                    <p className="text-[10px] mt-1.5" style={{ color: tc.m }}>
+                      {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
+                    </p>
                   </div>
-                  <ProgressBar pct={modPct} color={isActive ? '#60a5fa' : '#6b82a0'} height={3} />
-                  <p className="text-[10px] mt-1.5" style={{ color: tc.m }}>
-                    {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
-                  </p>
-                </motion.button>
+                </motion.div>
               );
             })}
           </div>
@@ -1075,12 +1326,59 @@ export default function ProjectDetailPage() {
           <div className="space-y-3">
             {activeMod && (
               <>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-3">
                   <h3 className="font-bold text-base" style={{ color: tc.p }}>{activeMod.name}</h3>
                   <span className="text-sm" style={{ color: tc.m }}>
                     {activeMod.phases.filter(p => p.status === 'completado').length} / {activeMod.phases.length} fases completadas
                   </span>
                 </div>
+
+                {/* Filtro por estado */}
+                {(() => {
+                  const allActs = activeMod.phases.flatMap(p => p.activities);
+                  const counts: Record<string, number> = { pendiente: 0, en_progreso: 0, completado: 0, bloqueado: 0 };
+                  allActs.forEach(a => { if (counts[a.status] !== undefined) counts[a.status]++; });
+                  const filters: { key: ActivityStatus | null; label: string }[] = [
+                    { key: null,          label: 'Todas'       },
+                    { key: 'pendiente',   label: 'Pendiente'   },
+                    { key: 'en_progreso', label: 'En progreso' },
+                    { key: 'completado',  label: 'Completado'  },
+                    { key: 'bloqueado',   label: 'Bloqueado'   },
+                  ];
+                  return (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {filters.map(({ key, label }) => {
+                        const active = filterStatus === key;
+                        const cfg = key ? ACTIVITY_STATUS[key] : null;
+                        const count = key ? counts[key] : allActs.length;
+                        return (
+                          <button key={String(key)} onClick={() => setFilterStatus(key)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                            style={{
+                              background: active
+                                ? (cfg ? cfg.bg : 'rgba(96,165,250,0.15)')
+                                : 'rgba(255,255,255,0.05)',
+                              color: active
+                                ? (cfg ? cfg.color : '#60a5fa')
+                                : tc.m,
+                              border: `1px solid ${active ? (cfg ? cfg.color + '50' : 'rgba(96,165,250,0.40)') : 'rgba(255,255,255,0.08)'}`,
+                            }}>
+                            {label}
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                              style={{
+                                background: active
+                                  ? (cfg ? cfg.color + '30' : 'rgba(96,165,250,0.25)')
+                                  : 'rgba(255,255,255,0.08)',
+                              }}>
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
                 {activeMod.phases.length === 0 ? (
                   <div style={{ ...cardStyle, textAlign: 'center' }}>
                     <p style={{ color: tc.m }}>Sin fases definidas</p>
@@ -1093,6 +1391,7 @@ export default function ProjectDetailPage() {
                       tc={tc}
                       users={users}
                       clientStaff={clientStaff}
+                      filterStatus={filterStatus}
                       onActivityUpdate={load}
                       onActivityAdded={load}
                     />
@@ -1103,6 +1402,171 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Modal: Agregar módulos — wizard 2 pasos */}
+      <Modal open={addModModal} onClose={() => { setAddModModal(false); setAddModStep(1); }}
+        title={addModStep === 1 ? 'Agregar módulos al proyecto' : 'Configurar fechas y responsables'}
+        width="max-w-2xl">
+        {addModStep === 1 ? (
+          <div className="space-y-4">
+            {/* Indicador de pasos */}
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <span className="px-2 py-0.5 rounded-full text-white text-[11px] font-bold" style={{ background: 'rgba(52,211,153,0.8)' }}>1</span>
+              <span>Seleccionar plantilla</span>
+              <span className="flex-1 border-t" style={{ borderColor: 'var(--border-subtle)' }} />
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-muted)' }}>2</span>
+              <span>Fechas y responsables</span>
+            </div>
+            <div className="flex items-start gap-2 px-3 py-2 rounded-xl text-xs"
+              style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.20)', color: '#34d399' }}>
+              ✦ Los módulos seleccionados se agregarán al proyecto sin afectar los módulos existentes.
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                Plantilla <span className="text-red-400 normal-case">*</span>
+              </label>
+              <select className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                value={addModSelTpl} onChange={e => setAddModSelTpl(e.target.value)}>
+                <option value="">Seleccionar plantilla...</option>
+                {tplList.map(t => <option key={t.id} value={t.id}>{t.name} v{t.version}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setAddModModal(false)}
+                className="px-4 py-2.5 rounded-xl text-sm"
+                style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                Cancelar
+              </button>
+              <button onClick={handleAddModNext}
+                className="flex-1 py-2.5 rounded-xl text-sm text-white font-semibold"
+                style={{ background: 'rgba(52,211,153,0.8)' }}>
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Indicador de pasos */}
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold" style={{ background: 'rgba(255,255,255,0.1)', color: 'var(--text-muted)' }}>1</span>
+              <span>Seleccionar plantilla</span>
+              <span className="flex-1 border-t" style={{ borderColor: 'var(--border-subtle)' }} />
+              <span className="px-2 py-0.5 rounded-full text-white text-[11px] font-bold" style={{ background: 'rgba(52,211,153,0.8)' }}>2</span>
+              <span>Fechas y responsables</span>
+            </div>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Selecciona los módulos a agregar y configura las fechas y responsables de cada fase.
+            </p>
+            {addModules.length === 0 ? (
+              <p className="text-sm text-center py-6" style={{ color: tc.m }}>Esta plantilla no tiene módulos.</p>
+            ) : (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                {addModules.map((mod, mi) => {
+                  const included = addModSelected.has(mod.id);
+                  return (
+                    <div key={mod.id} className="rounded-xl overflow-hidden transition-all"
+                      style={{ border: `1px solid ${included ? 'rgba(52,211,153,0.30)' : 'rgba(255,255,255,0.08)'}`, opacity: included ? 1 : 0.45 }}>
+                      {/* Header módulo con toggle */}
+                      <div className="px-3 py-2 flex items-center gap-2"
+                        style={{ background: included ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.04)' }}>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                          style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399' }}>
+                          MOD-{String(mi + 1).padStart(2, '0')}
+                        </span>
+                        <span className="text-sm font-semibold flex-1" style={{ color: tc.p }}>{mod.name}</span>
+                        <span className="text-xs mr-2" style={{ color: tc.m }}>{mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}</span>
+                        <button
+                          onClick={() => setAddModSelected(prev => {
+                            const next = new Set(prev);
+                            next.has(mod.id) ? next.delete(mod.id) : next.add(mod.id);
+                            return next;
+                          })}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all"
+                          style={{
+                            background: included ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.08)',
+                            color: included ? '#34d399' : tc.m,
+                            border: `1px solid ${included ? 'rgba(52,211,153,0.30)' : 'rgba(255,255,255,0.12)'}`,
+                          }}>
+                          {included ? '✓ Incluir' : '✗ Excluir'}
+                        </button>
+                      </div>
+                      {/* Fases del módulo */}
+                      {included && mod.phases.length > 0 && (
+                        <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                          {mod.phases.map((ph, pi) => (
+                            <div key={ph.id} className="px-3 py-3">
+                              <div className="flex items-center gap-2 mb-2.5">
+                                {ph.color && <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ph.color }} />}
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                  style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa' }}>
+                                  FSE-{String(pi + 1).padStart(2, '0')}
+                                </span>
+                                <span className="text-xs font-medium" style={{ color: tc.s }}>{ph.name}</span>
+                              </div>
+                              {/* Fechas */}
+                              <div className="grid grid-cols-2 gap-2 mb-2">
+                                <div>
+                                  <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Inicio</label>
+                                  <input type="date" max="2099-12-31" min="2000-01-01" className="input-glass w-full rounded-lg px-2 py-1.5 text-xs"
+                                    value={addModPhDates[ph.id]?.startDate ?? ''}
+                                    onChange={e => setAddModPhDates(prev => ({ ...prev, [ph.id]: { ...prev[ph.id], startDate: e.target.value } }))} />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fin</label>
+                                  <input type="date" max="2099-12-31" min="2000-01-01" className="input-glass w-full rounded-lg px-2 py-1.5 text-xs"
+                                    value={addModPhDates[ph.id]?.endDate ?? ''}
+                                    onChange={e => setAddModPhDates(prev => ({ ...prev, [ph.id]: { ...prev[ph.id], endDate: e.target.value } }))} />
+                                </div>
+                              </div>
+                              {/* Responsables */}
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Responsable agente</label>
+                                  <select className="input-glass w-full rounded-lg px-2 py-1.5 text-xs"
+                                    value={addModPhDates[ph.id]?.agentLeaderId ?? ''}
+                                    onChange={e => setAddModPhDates(prev => ({ ...prev, [ph.id]: { ...prev[ph.id], agentLeaderId: e.target.value } }))}>
+                                    <option value="">Sin asignar</option>
+                                    {addModAgents.map(u => (
+                                      <option key={u.id} value={u.id}>{u.firstName} {u.lastName}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Responsable cliente</label>
+                                  <select className="input-glass w-full rounded-lg px-2 py-1.5 text-xs"
+                                    value={addModPhDates[ph.id]?.clientLeaderId ?? ''}
+                                    onChange={e => setAddModPhDates(prev => ({ ...prev, [ph.id]: { ...prev[ph.id], clientLeaderId: e.target.value } }))}>
+                                    <option value="">Sin asignar</option>
+                                    {addModStaff.map(s => (
+                                      <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setAddModStep(1)}
+                className="px-4 py-2.5 rounded-xl text-sm"
+                style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                ← Atrás
+              </button>
+              <button onClick={handleAddModules} disabled={loadingAddMod || addModSelected.size === 0}
+                className="flex-1 py-2.5 rounded-xl text-sm text-white font-semibold disabled:opacity-50"
+                style={{ background: 'rgba(52,211,153,0.8)' }}>
+                {loadingAddMod ? 'Agregando...' : `Agregar ${addModSelected.size} módulo${addModSelected.size !== 1 ? 's' : ''}`}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Modal: Cargar plantilla — wizard 2 pasos */}
       <Modal open={tplModal} onClose={() => { setTplModal(false); setTplStep(1); setPhaseDates({}); }}
@@ -1161,54 +1625,71 @@ export default function ProjectDetailPage() {
               <p className="text-sm text-center py-6" style={{ color: tc.m }}>Esta plantilla no tiene módulos.</p>
             ) : (
               <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                {tplModules.map((mod, mi) => (
-                  <div key={mod.id} className="rounded-xl overflow-hidden"
-                    style={{ border: '1px solid rgba(255,255,255,0.10)' }}>
-                    <div className="px-3 py-2 flex items-center gap-2"
-                      style={{ background: isLight ? 'rgba(96,165,250,0.10)' : 'rgba(96,165,250,0.08)' }}>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                        style={{ background: 'rgba(96,165,250,0.20)', color: '#60a5fa' }}>
-                        MOD-{String(mi + 1).padStart(2, '0')}
-                      </span>
-                      <span className="text-sm font-semibold" style={{ color: tc.p }}>{mod.name}</span>
-                      <span className="text-xs ml-auto" style={{ color: tc.m }}>
-                        {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    {mod.phases.length === 0 ? (
-                      <p className="px-3 py-2 text-xs" style={{ color: tc.m }}>Sin fases</p>
-                    ) : (
-                      <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                        {mod.phases.map((ph, pi) => (
-                          <div key={ph.id} className="px-3 py-2.5">
-                            <div className="flex items-center gap-2 mb-2">
-                              {ph.color && <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ph.color }} />}
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                                style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399' }}>
-                                FSE-{String(pi + 1).padStart(2, '0')}
-                              </span>
-                              <span className="text-xs font-medium" style={{ color: tc.s }}>{ph.name}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Inicio</label>
-                                <input type="date" className="input-glass w-full rounded-lg px-2 py-1.5 text-xs"
-                                  value={phaseDates[ph.id]?.startDate ?? ''}
-                                  onChange={e => setPhaseDates(prev => ({ ...prev, [ph.id]: { ...prev[ph.id], startDate: e.target.value } }))} />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fin</label>
-                                <input type="date" className="input-glass w-full rounded-lg px-2 py-1.5 text-xs"
-                                  value={phaseDates[ph.id]?.endDate ?? ''}
-                                  onChange={e => setPhaseDates(prev => ({ ...prev, [ph.id]: { ...prev[ph.id], endDate: e.target.value } }))} />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                {tplModules.map((mod, mi) => {
+                  const excluded = tplExcludedIds.has(mod.id);
+                  return (
+                    <div key={mod.id} className="rounded-xl overflow-hidden transition-all"
+                      style={{ border: `1px solid ${excluded ? 'rgba(255,255,255,0.07)' : 'rgba(96,165,250,0.25)'}`, opacity: excluded ? 0.45 : 1 }}>
+                      <div className="px-3 py-2 flex items-center gap-2"
+                        style={{ background: excluded ? 'rgba(255,255,255,0.03)' : (isLight ? 'rgba(96,165,250,0.10)' : 'rgba(96,165,250,0.08)') }}>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                          style={{ background: 'rgba(96,165,250,0.20)', color: '#60a5fa' }}>
+                          MOD-{String(mi + 1).padStart(2, '0')}
+                        </span>
+                        <span className="text-sm font-semibold flex-1" style={{ color: tc.p }}>{mod.name}</span>
+                        <span className="text-xs mr-2" style={{ color: tc.m }}>
+                          {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
+                        </span>
+                        <button
+                          onClick={() => setTplExcludedIds(prev => {
+                            const next = new Set(prev);
+                            next.has(mod.id) ? next.delete(mod.id) : next.add(mod.id);
+                            return next;
+                          })}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all"
+                          style={{
+                            background: excluded ? 'rgba(248,113,113,0.12)' : 'rgba(96,165,250,0.15)',
+                            color: excluded ? '#f87171' : '#60a5fa',
+                            border: `1px solid ${excluded ? 'rgba(248,113,113,0.30)' : 'rgba(96,165,250,0.30)'}`,
+                          }}>
+                          {excluded ? '✗ Excluido' : '✓ Incluido'}
+                        </button>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {!excluded && (mod.phases.length === 0 ? (
+                        <p className="px-3 py-2 text-xs" style={{ color: tc.m }}>Sin fases</p>
+                      ) : (
+                        <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                          {mod.phases.map((ph, pi) => (
+                            <div key={ph.id} className="px-3 py-2.5">
+                              <div className="flex items-center gap-2 mb-2">
+                                {ph.color && <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ph.color }} />}
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                  style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399' }}>
+                                  FSE-{String(pi + 1).padStart(2, '0')}
+                                </span>
+                                <span className="text-xs font-medium" style={{ color: tc.s }}>{ph.name}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Inicio</label>
+                                  <input type="date" max="2099-12-31" min="2000-01-01" className="input-glass w-full rounded-lg px-2 py-1.5 text-xs"
+                                    value={phaseDates[ph.id]?.startDate ?? ''}
+                                    onChange={e => setPhaseDates(prev => ({ ...prev, [ph.id]: { ...prev[ph.id], startDate: e.target.value } }))} />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-semibold mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Fin</label>
+                                  <input type="date" max="2099-12-31" min="2000-01-01" className="input-glass w-full rounded-lg px-2 py-1.5 text-xs"
+                                    value={phaseDates[ph.id]?.endDate ?? ''}
+                                    onChange={e => setPhaseDates(prev => ({ ...prev, [ph.id]: { ...prev[ph.id], endDate: e.target.value } }))} />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
             <div className="flex gap-3 pt-1">
@@ -1219,32 +1700,84 @@ export default function ProjectDetailPage() {
               </button>
               <button onClick={handleLoadTemplate} disabled={loadingTpl}
                 className="flex-1 btn-primary py-2.5 rounded-xl text-sm text-white font-semibold disabled:opacity-50">
-                {loadingTpl ? 'Cargando...' : 'Cargar plantilla'}
+                {loadingTpl
+                  ? 'Cargando...'
+                  : `Cargar ${tplModules.length - tplExcludedIds.size} módulo${tplModules.length - tplExcludedIds.size !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Modal: Confirmar eliminación */}
-      <Modal open={deleteModal} onClose={() => setDeleteModal(false)} title="Eliminar proyecto" width="max-w-sm">
+      {/* Modal: Confirmar eliminación de módulo */}
+      <Modal open={!!deleteModuleId} onClose={() => setDeleteModuleId(null)} title="Eliminar módulo" width="max-w-sm">
         <div className="space-y-4">
           <p className="text-sm" style={{ color: tc.s }}>
-            ¿Estás seguro de que deseas eliminar el proyecto <strong style={{ color: tc.p }}>{project?.name}</strong>?
-            Esta acción eliminará todos los módulos, fases y actividades del proyecto.
+            ¿Eliminar el módulo <strong style={{ color: tc.p }}>{deleteModuleName}</strong>?
+            Se eliminarán todas sus fases y actividades. Esta acción no se puede deshacer.
           </p>
           <div className="flex gap-3 pt-1">
-            <button onClick={() => setDeleteModal(false)}
+            <button onClick={() => setDeleteModuleId(null)}
               className="flex-1 px-4 py-2.5 rounded-xl text-sm"
               style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
               Cancelar
             </button>
-            <button onClick={handleDeleteProject} disabled={deleting}
+            <button onClick={handleDeleteModule} disabled={deletingModule}
               className="flex-1 py-2.5 rounded-xl text-sm text-white font-semibold disabled:opacity-50"
               style={{ background: '#ef4444' }}>
-              {deleting ? 'Eliminando...' : 'Eliminar proyecto'}
+              {deletingModule ? 'Eliminando...' : 'Eliminar módulo'}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Confirmar eliminación */}
+      <Modal open={deleteModal} onClose={() => setDeleteModal(false)} title="Eliminar proyecto" width="max-w-sm">
+        <div className="space-y-4">
+          {actaCount > 0 ? (
+            <>
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
+                style={{ background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.30)', color: '#fbbf24' }}>
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p className="text-sm leading-snug">
+                  No se puede eliminar este proyecto porque tiene <strong>{actaCount} acta{actaCount !== 1 ? 's' : ''} asociada{actaCount !== 1 ? 's' : ''}</strong>.
+                  Elimina todas las actas primero desde la sección de actas del proyecto.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => setDeleteModal(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm"
+                  style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                  Entendido
+                </button>
+                <Link href={`/implementacion/proyectos/${project.id}/actas`}
+                  onClick={() => setDeleteModal(false)}
+                  className="flex-1 py-2.5 rounded-xl text-sm text-white font-semibold text-center"
+                  style={{ background: '#f59e0b' }}>
+                  Ver actas
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm" style={{ color: tc.s }}>
+                ¿Estás seguro de que deseas eliminar el proyecto <strong style={{ color: tc.p }}>{project?.name}</strong>?
+                Esta acción eliminará todos los módulos, fases y actividades del proyecto.
+              </p>
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => setDeleteModal(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm"
+                  style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                  Cancelar
+                </button>
+                <button onClick={handleDeleteProject} disabled={deleting}
+                  className="flex-1 py-2.5 rounded-xl text-sm text-white font-semibold disabled:opacity-50"
+                  style={{ background: '#ef4444' }}>
+                  {deleting ? 'Eliminando...' : 'Eliminar proyecto'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 

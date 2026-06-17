@@ -1,5 +1,5 @@
 import {
-  Injectable, NotFoundException, ConflictException, BadRequestException,
+  Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,6 +14,12 @@ const USER_SELECT = {
   createdAt: true, updatedAt: true,
   role: { select: { id: true, name: true, slug: true } },
   client: { select: { id: true, businessName: true, nit: true } },
+};
+
+const ME_SELECT = {
+  ...USER_SELECT,
+  signatureData: true,
+  role: { select: { id: true, name: true, slug: true, permissions: true } },
 };
 
 @Injectable()
@@ -113,5 +119,69 @@ export class UsersService {
       data: { passwordHash, failedLoginCount: 0, lockedUntil: null },
     });
     return { message: 'Contraseña actualizada exitosamente' };
+  }
+
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: ME_SELECT });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    return user;
+  }
+
+  async updateMySignature(userId: string, signatureData: string | null) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { signatureData: signatureData ?? null },
+      select: { id: true, signatureData: true },
+    });
+  }
+
+  async delete(companyId: string, id: string, requestingUserId: string) {
+    if (id === requestingUserId) {
+      throw new ForbiddenException('No puedes eliminar tu propia cuenta');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id, companyId },
+      select: { id: true, firstName: true, lastName: true, email: true },
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const [reqAsAgent, reqCreated, gestionCount, osAsClinical, osAsFinancial, osCreated, activityCount] =
+      await Promise.all([
+        this.prisma.requerimiento.count({ where: { agenteId: id } }),
+        this.prisma.requerimiento.count({ where: { createdById: id } }),
+        this.prisma.requerimientoGestion.count({ where: { changedById: id } }),
+        this.prisma.serviceOrder.count({ where: { clinicalLeaderId: id } }),
+        this.prisma.serviceOrder.count({ where: { financialLeaderId: id } }),
+        this.prisma.serviceOrder.count({ where: { createdById: id } }),
+        this.prisma.activity.count({ where: { assignedToId: id } }),
+      ]);
+
+    const bloqueos: string[] = [];
+    const reqTotal = reqAsAgent + reqCreated;
+    const osTotal  = osAsClinical + osAsFinancial + osCreated;
+    if (reqTotal     > 0) bloqueos.push(`${reqTotal} requerimiento(s)`);
+    if (gestionCount > 0) bloqueos.push(`${gestionCount} gestión(es) de tickets`);
+    if (osTotal      > 0) bloqueos.push(`${osTotal} orden(es) de servicio`);
+    if (activityCount > 0) bloqueos.push(`${activityCount} actividad(es) asignada(s)`);
+
+    if (bloqueos.length > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar a "${user.firstName} ${user.lastName}" porque tiene: ${bloqueos.join(', ')}. Usa "Desactivar" para inhabilitar el acceso sin perder el historial.`,
+      );
+    }
+
+    try {
+      await this.prisma.user.delete({ where: { id } });
+    } catch (err: any) {
+      const msg: string = err?.message ?? '';
+      if (msg.includes('Foreign key') || msg.includes('REFERENCE') || err?.code === 'P2003') {
+        throw new BadRequestException(
+          `No se puede eliminar a "${user.firstName} ${user.lastName}" porque tiene registros en el sistema. Usa "Desactivar" en su lugar.`,
+        );
+      }
+      throw err;
+    }
+    return { message: `Usuario "${user.firstName} ${user.lastName}" eliminado exitosamente` };
   }
 }

@@ -1,24 +1,26 @@
-'use client';
+﻿'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import {
   Mail, Phone, MapPin, Users, Hash, Briefcase, CheckCircle2, XCircle,
-  UserCircle2, Plus, Upload, Download, Pencil, Trash2, Star, X, FileSpreadsheet,
+  UserCircle2, Plus, Upload, Download, Pencil, Trash2, Star, X, FileSpreadsheet, FolderOpen,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { BackButton } from '@/components/ui/BackButton';
 import { Modal } from '@/components/ui/Modal';
-import { clientsApi } from '@/lib/api';
+import { clientsApi, municipiosApi } from '@/lib/api';
+import { DocumentosSection } from '@/components/ui/DocumentosSection';
+import { usePermission } from '@/hooks/usePermission';
 import { toast } from 'sonner';
-import type { Client, ClientStaff } from '@/types';
+import type { Client, ClientStaff, Municipio } from '@/types';
 
-type Tab = 'staff' | 'users';
+type Tab = 'staff' | 'users' | 'documentos';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const STAFF_COLS = ['Documento', 'Nombres', 'Apellidos', 'Cargo', 'Correo', 'Lider_Proyecto'];
+const STAFF_COLS = ['Documento', 'Nombres', 'Apellidos', 'Cargo', 'Correo', 'Telefono', 'Lider_Proyecto'];
 
 function downloadTemplate() {
   const wb = XLSX.utils.book_new();
@@ -46,6 +48,7 @@ function downloadTemplate() {
     ['Apellidos', 'Apellidos del funcionario', 'SÍ', 'Pérez Gómez'],
     ['Cargo', 'Cargo o posición que ocupa', 'NO', 'Analista de Sistemas'],
     ['Correo', 'Correo electrónico institucional', 'NO', 'juan.perez@empresa.com'],
+    ['Telefono', 'Número de teléfono o celular', 'NO', '3001234567'],
     ['Lider_Proyecto', 'SI si es líder del proyecto, NO si no lo es', 'NO', 'SI'],
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(instructions);
@@ -55,11 +58,11 @@ function downloadTemplate() {
   // Hoja 2: Personal (plantilla con ejemplo)
   const data = [
     STAFF_COLS,
-    ['1234567890', 'Juan Carlos', 'Pérez Gómez', 'Analista', 'juan.perez@empresa.com', 'SI'],
-    ['9876543210', 'María', 'López', 'Coordinadora', 'maria.lopez@empresa.com', 'NO'],
+    ['1234567890', 'Juan Carlos', 'Pérez Gómez', 'Analista', 'juan.perez@empresa.com', '3001234567', 'SI'],
+    ['9876543210', 'María', 'López', 'Coordinadora', 'maria.lopez@empresa.com', '3109876543', 'NO'],
   ];
   const ws2 = XLSX.utils.aoa_to_sheet(data);
-  ws2['!cols'] = [{ wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 30 }, { wch: 16 }];
+  ws2['!cols'] = [{ wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 30 }, { wch: 16 }, { wch: 16 }];
   XLSX.utils.book_append_sheet(wb, ws2, 'Personal');
 
   XLSX.writeFile(wb, 'plantilla_personal_cliente.xlsx');
@@ -90,6 +93,7 @@ function parseStaffExcel(file: File): Promise<object[]> {
             lastName:        String(r['Apellidos']).trim(),
             jobTitle:        String(r['Cargo'] ?? '').trim() || undefined,
             email:           String(r['Correo'] ?? '').trim() || undefined,
+            phone:           String(r['Telefono'] ?? '').trim() || undefined,
             isProjectLeader: String(r['Lider_Proyecto'] ?? '').trim().toUpperCase() === 'SI',
           }));
 
@@ -108,12 +112,12 @@ function parseStaffExcel(file: File): Promise<object[]> {
 
 interface StaffForm {
   document: string; firstName: string; lastName: string;
-  jobTitle: string; email: string; isProjectLeader: boolean;
+  jobTitle: string; email: string; phone: string; isProjectLeader: boolean;
 }
 
 const EMPTY_FORM: StaffForm = {
   document: '', firstName: '', lastName: '',
-  jobTitle: '', email: '', isProjectLeader: false,
+  jobTitle: '', email: '', phone: '', isProjectLeader: false,
 };
 
 interface StaffModalProps {
@@ -133,6 +137,7 @@ function StaffModal({ mode, initial, clientId, onClose, onSaved }: StaffModalPro
           lastName: initial.lastName,
           jobTitle: initial.jobTitle ?? '',
           email: initial.email ?? '',
+          phone: initial.phone ?? '',
           isProjectLeader: initial.isProjectLeader,
         }
       : EMPTY_FORM
@@ -154,6 +159,7 @@ function StaffModal({ mode, initial, clientId, onClose, onSaved }: StaffModalPro
         lastName: form.lastName.trim(),
         jobTitle: form.jobTitle.trim() || undefined,
         email: form.email.trim() || undefined,
+        phone: form.phone.trim() || undefined,
         isProjectLeader: form.isProjectLeader,
       };
       const result = mode === 'add'
@@ -202,10 +208,17 @@ function StaffModal({ mode, initial, clientId, onClose, onSaved }: StaffModalPro
           <input type="text" className={inputClass} placeholder="Ej: Analista de Sistemas"
             value={form.jobTitle} onChange={e => set('jobTitle', e.target.value)} />
         </div>
-        <div>
-          <label className={labelClass} style={{ color: 'var(--text-muted)' }}>Correo electrónico</label>
-          <input type="email" className={inputClass} placeholder="correo@empresa.com"
-            value={form.email} onChange={e => set('email', e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass} style={{ color: 'var(--text-muted)' }}>Correo electrónico</label>
+            <input type="email" className={inputClass} placeholder="correo@empresa.com"
+              value={form.email} onChange={e => set('email', e.target.value)} />
+          </div>
+          <div>
+            <label className={labelClass} style={{ color: 'var(--text-muted)' }}>Teléfono</label>
+            <input type="tel" className={inputClass} placeholder="Ej: 3001234567"
+              value={form.phone} onChange={e => set('phone', e.target.value)} />
+          </div>
         </div>
 
         {/* Checkbox líder de proyecto */}
@@ -252,12 +265,20 @@ export default function ClienteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { theme } = useTheme();
   const isLight = theme === 'light';
+  const { can } = usePermission();
 
   const [client, setClient]   = useState<(Client & { staff: ClientStaff[] }) | null>(null);
   const [users, setUsers]     = useState<any[]>([]);
   const [tab, setTab]         = useState<Tab>('staff');
   const [loading, setLoading] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [municipios, setMunicipios] = useState<Municipio[]>([]);
+  const [editClientModal, setEditClientModal] = useState(false);
+  const [editForm, setEditForm] = useState({ address: '', municipioId: '', email: '', phone: '', economicActivity: '' });
+  const [savingClient, setSavingClient] = useState(false);
+  const [munQuery, setMunQuery] = useState('');
+  const [munOpen, setMunOpen] = useState(false);
+  const munRef = useRef<HTMLDivElement>(null);
 
   // Staff CRUD state
   const [addModal, setAddModal]       = useState(false);
@@ -290,6 +311,14 @@ export default function ClienteDetailPage() {
   };
 
   useEffect(() => { loadClient(); }, [id]); // eslint-disable-line
+  useEffect(() => { municipiosApi.listAll().then(setMunicipios).catch(() => {}); }, []);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (munRef.current && !munRef.current.contains(e.target as Node)) setMunOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   useEffect(() => {
     if (tab === 'users' && users.length === 0) {
@@ -324,6 +353,40 @@ export default function ClienteDetailPage() {
       setDeleteTarget(null);
     } catch { toast.error('Error al eliminar funcionario'); }
     finally { setDeleting(false); }
+  };
+
+  const openEditClient = () => {
+    if (!client) return;
+    setEditForm({
+      address: client.address ?? '',
+      municipioId: client.municipioId ?? '',
+      email: client.email ?? '',
+      phone: client.phone ?? '',
+      economicActivity: client.economicActivity ?? '',
+    });
+    const mun = municipios.find(m => m.id === (client.municipioId ?? ''));
+    setMunQuery(mun ? `${mun.nombreMunicipio} — ${mun.nombreDepartamento}` : '');
+    setMunOpen(false);
+    setEditClientModal(true);
+  };
+
+  const handleSaveClient = async () => {
+    if (!client) return;
+    setSavingClient(true);
+    try {
+      const updated = await clientsApi.update(client.id, {
+        address: editForm.address || undefined,
+        municipioId: editForm.municipioId || null,
+        email: editForm.email || undefined,
+        phone: editForm.phone || undefined,
+        economicActivity: editForm.economicActivity || undefined,
+      });
+      setClient(prev => prev ? { ...prev, ...updated } : prev);
+      toast.success('Datos actualizados');
+      setEditClientModal(false);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al guardar');
+    } finally { setSavingClient(false); }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -386,12 +449,19 @@ export default function ClienteDetailPage() {
                 ? <span className="flex items-center gap-1 text-emerald-500 text-xs"><CheckCircle2 className="w-3.5 h-3.5" />Activo</span>
                 : <span className="flex items-center gap-1 text-red-400 text-xs"><XCircle className="w-3.5 h-3.5" />Inactivo</span>
               }
+              {can('clients.editar') && (
+                <button onClick={openEditClient}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ml-auto"
+                  style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
+                  <Pencil className="w-3 h-3" /> Editar datos
+                </button>
+              )}
             </div>
             {client.commercialName && <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>{client.commercialName}</p>}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
               {[
                 { icon: Hash,      value: client.nit,              mono: true },
-                { icon: MapPin,    value: client.city && `${client.city}${client.department ? `, ${client.department}` : ''}` },
+                { icon: MapPin,    value: client.municipio ? `${client.municipio.nombreMunicipio}, ${client.municipio.nombreDepartamento}` : (client.city && `${client.city}${client.department ? `, ${client.department}` : ''}`) },
                 { icon: Mail,      value: client.email },
                 { icon: Phone,     value: client.phone },
                 { icon: Briefcase, value: client.economicActivity },
@@ -411,16 +481,19 @@ export default function ClienteDetailPage() {
         {([
           { key: 'staff', label: 'Personal', icon: Users, count: staff.length },
           { key: 'users', label: 'Usuarios portal', icon: UserCircle2, count: users.length },
+          { key: 'documentos', label: 'Documentos', icon: FolderOpen, count: null },
         ] as const).map(({ key, label, icon: Icon, count }) => (
           <button key={key} onClick={() => setTab(key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === key ? 'btn-primary text-white' : ''}`}
             style={tab !== key ? { color: 'var(--text-secondary)' } : {}}>
             <Icon className="w-4 h-4" />
             {label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${tab === key ? 'bg-white/20' : ''}`}
-              style={tab !== key ? { background: 'var(--border-subtle)', color: 'var(--text-muted)' } : {}}>
-              {count}
-            </span>
+            {count !== null && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${tab === key ? 'bg-white/20' : ''}`}
+                style={tab !== key ? { background: 'var(--border-subtle)', color: 'var(--text-muted)' } : {}}>
+                {count}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -439,22 +512,28 @@ export default function ClienteDetailPage() {
               )}
             </p>
             <div className="flex items-center gap-2">
-              <button onClick={downloadTemplate}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors"
-                style={{ background: 'rgba(52,211,153,0.10)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
-                <Download className="w-3.5 h-3.5" /> Descargar plantilla
-              </button>
-              <button onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors"
-                style={{ background: 'rgba(167,139,250,0.10)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)' }}>
-                <FileSpreadsheet className="w-3.5 h-3.5" /> Subir archivo
-              </button>
+              {can('clients.importar') && (
+                <button onClick={downloadTemplate}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors"
+                  style={{ background: 'rgba(52,211,153,0.10)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
+                  <Download className="w-3.5 h-3.5" /> Descargar plantilla
+                </button>
+              )}
+              {can('clients.importar') && (
+                <button onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors"
+                  style={{ background: 'rgba(167,139,250,0.10)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)' }}>
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Subir archivo
+                </button>
+              )}
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden"
                 onChange={handleFileSelect} />
-              <button onClick={() => setAddModal(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white btn-primary transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Agregar funcionario
-              </button>
+              {can('clients.staff') && (
+                <button onClick={() => setAddModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white btn-primary transition-colors">
+                  <Plus className="w-3.5 h-3.5" /> Agregar funcionario
+                </button>
+              )}
             </div>
           </div>
 
@@ -472,9 +551,9 @@ export default function ClienteDetailPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: rowBorder, background: isLight ? 'rgba(30,60,120,0.04)' : 'rgba(255,255,255,0.03)' }}>
-                    {['Funcionario', 'Cargo', 'Correo', 'Rol', 'Acciones'].map((h) => (
+                    {['Funcionario', 'Cargo', 'Correo', 'Teléfono', 'Rol', 'Acciones'].map((h) => (
                       <th key={h}
-                        className={`text-left font-medium px-4 py-3 text-xs uppercase tracking-wide ${['Correo'].includes(h) ? 'hidden md:table-cell' : ''}`}
+                        className={`text-left font-medium px-4 py-3 text-xs uppercase tracking-wide ${['Correo', 'Teléfono'].includes(h) ? 'hidden md:table-cell' : ''}`}
                         style={{ color: 'var(--text-muted)' }}>{h}</th>
                     ))}
                   </tr>
@@ -509,6 +588,7 @@ export default function ClienteDetailPage() {
                       </td>
                       <td className="px-4 py-3.5 text-xs" style={{ color: 'var(--text-secondary)' }}>{s.jobTitle ?? '—'}</td>
                       <td className="px-4 py-3.5 hidden md:table-cell text-xs" style={{ color: 'var(--text-secondary)' }}>{s.email ?? '—'}</td>
+                      <td className="px-4 py-3.5 hidden md:table-cell text-xs" style={{ color: 'var(--text-secondary)' }}>{s.phone ?? '—'}</td>
                       <td className="px-4 py-3.5">
                         {s.isProjectLeader ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold"
@@ -521,18 +601,22 @@ export default function ClienteDetailPage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => setEditTarget(s)}
-                            className="p-1.5 rounded-lg transition-colors"
-                            style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa' }}
-                            title="Editar">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => setDeleteTarget(s)}
-                            className="p-1.5 rounded-lg transition-colors"
-                            style={{ background: 'rgba(248,113,113,0.10)', color: '#f87171' }}
-                            title="Eliminar">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {can('clients.staff') && (
+                            <button onClick={() => setEditTarget(s)}
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa' }}
+                              title="Editar">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {can('clients.staff') && (
+                            <button onClick={() => setDeleteTarget(s)}
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ background: 'rgba(248,113,113,0.10)', color: '#f87171' }}
+                              title="Eliminar">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -589,6 +673,11 @@ export default function ClienteDetailPage() {
         </motion.div>
       )}
 
+      {/* Tab: Documentos */}
+      {tab === 'documentos' && (
+        <DocumentosSection clientId={id} />
+      )}
+
       {/* Modal: Agregar funcionario */}
       {addModal && (
         <StaffModal mode="add" clientId={id} onClose={() => setAddModal(false)} onSaved={handleStaffSaved} />
@@ -625,6 +714,110 @@ export default function ClienteDetailPage() {
         </div>
       </Modal>
 
+      {/* Modal: Editar datos del cliente */}
+      <Modal open={editClientModal} onClose={() => { setEditClientModal(false); setMunOpen(false); }} title="Editar datos del cliente" width="max-w-xl">
+        <div className="grid grid-cols-2 gap-3">
+          {/* Municipio — autocomplete */}
+          <div className="col-span-2" ref={munRef} style={{ position: 'relative' }}>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Municipio</label>
+            <div style={{ position: 'relative' }}>
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+              <input
+                className="input-glass w-full rounded-xl py-2.5 text-sm"
+                style={{ paddingLeft: 32, paddingRight: editForm.municipioId ? 32 : 12 }}
+                placeholder="Buscar municipio..."
+                value={munQuery}
+                onChange={e => {
+                  setMunQuery(e.target.value);
+                  setEditForm(p => ({ ...p, municipioId: '' }));
+                  setMunOpen(true);
+                }}
+                onFocus={() => setMunOpen(true)}
+              />
+              {editForm.municipioId && (
+                <button
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded"
+                  style={{ color: 'var(--text-muted)' }}
+                  onClick={() => { setEditForm(p => ({ ...p, municipioId: '' })); setMunQuery(''); setMunOpen(false); }}>
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            {munOpen && (
+              <div className="absolute left-0 right-0 z-50 mt-1 rounded-xl overflow-hidden overflow-y-auto"
+                style={{
+                  top: '100%', maxHeight: 220,
+                  background: isLight ? '#fff' : '#0d1a2e',
+                  border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255,255,255,0.12)'}`,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                }}>
+                {(() => {
+                  const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+                  const q = norm(munQuery.trim());
+                  const filtered = q
+                    ? municipios.filter(m =>
+                        norm(m.nombreMunicipio).includes(q) ||
+                        norm(m.nombreDepartamento).includes(q)
+                      )
+                    : municipios;
+                  if (filtered.length === 0) return (
+                    <p className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>Sin resultados</p>
+                  );
+                  return filtered.slice(0, 50).map(m => (
+                    <button key={m.id}
+                      className="w-full text-left px-4 py-2.5 text-sm transition-colors"
+                      style={{ color: 'var(--text-primary)' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? '#f1f5f9' : 'rgba(255,255,255,0.07)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      onMouseDown={e => {
+                        e.preventDefault();
+                        setEditForm(p => ({ ...p, municipioId: m.id }));
+                        setMunQuery(`${m.nombreMunicipio} — ${m.nombreDepartamento}`);
+                        setMunOpen(false);
+                      }}>
+                      <span className="font-medium">{m.nombreMunicipio}</span>
+                      <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>{m.nombreDepartamento}</span>
+                    </button>
+                  ));
+                })()}
+              </div>
+            )}
+          </div>
+
+          <div className="col-span-2">
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Dirección</label>
+            <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm" placeholder="Cra 15 #23-45"
+              value={editForm.address} onChange={e => setEditForm(p => ({ ...p, address: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Correo empresa</label>
+            <input type="email" className="input-glass w-full rounded-xl px-3 py-2.5 text-sm" placeholder="info@empresa.com"
+              value={editForm.email} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Teléfono</label>
+            <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm" placeholder="3101234567"
+              value={editForm.phone} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Actividad económica</label>
+            <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm" placeholder="Servicios de salud"
+              value={editForm.economicActivity} onChange={e => setEditForm(p => ({ ...p, economicActivity: e.target.value }))} />
+          </div>
+          <div className="col-span-2 flex gap-3 pt-2">
+            <button onClick={() => { setEditClientModal(false); setMunOpen(false); }}
+              className="flex-1 py-2.5 rounded-xl text-sm"
+              style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+              Cancelar
+            </button>
+            <button onClick={handleSaveClient} disabled={savingClient}
+              className="flex-1 btn-primary py-2.5 rounded-xl text-sm text-white font-medium disabled:opacity-50">
+              {savingClient ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Modal: Vista previa carga masiva */}
       <Modal open={previewModal} onClose={() => { setPreviewModal(false); setPreviewRows([]); }}
         title="Previsualizar carga masiva" width="max-w-2xl">
@@ -642,7 +835,7 @@ export default function ClienteDetailPage() {
               <thead className="sticky top-0"
                 style={{ background: isLight ? 'rgba(30,60,120,0.06)' : 'rgba(255,255,255,0.06)' }}>
                 <tr>
-                  {['Documento', 'Nombres', 'Apellidos', 'Cargo', 'Correo', 'Líder'].map(h => (
+                  {['Documento', 'Nombres', 'Apellidos', 'Cargo', 'Correo', 'Teléfono', 'Líder'].map(h => (
                     <th key={h} className="text-left px-3 py-2 font-semibold uppercase tracking-wide"
                       style={{ color: 'var(--text-muted)', borderBottom: rowBorder }}>{h}</th>
                   ))}
@@ -656,6 +849,7 @@ export default function ClienteDetailPage() {
                     <td className="px-3 py-2" style={{ color: 'var(--text-primary)' }}>{row.lastName}</td>
                     <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{row.jobTitle ?? '—'}</td>
                     <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{row.email ?? '—'}</td>
+                    <td className="px-3 py-2" style={{ color: 'var(--text-secondary)' }}>{row.phone ?? '—'}</td>
                     <td className="px-3 py-2">
                       {row.isProjectLeader
                         ? <span className="flex items-center gap-1 text-yellow-400 font-semibold"><Star className="w-3 h-3" /> Sí</span>

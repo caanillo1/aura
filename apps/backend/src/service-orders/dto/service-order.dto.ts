@@ -1,5 +1,5 @@
 import {
-  IsString, IsNotEmpty, IsOptional, IsDateString, IsInt, IsUUID, Min,
+  IsString, IsNotEmpty, IsOptional, IsDateString, IsInt, IsUUID, IsIn, Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -7,6 +7,7 @@ import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class CreateServiceOrderDto {
   @ApiProperty() @IsUUID() clientId: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() ticketRubi?: string;
   @ApiProperty() @IsString() @IsNotEmpty() product: string;
   @ApiPropertyOptional() @IsOptional() @IsString() scope?: string;
   @ApiProperty() @IsDateString() startDate: string;
@@ -19,6 +20,7 @@ export class CreateServiceOrderDto {
 }
 
 export class UpdateServiceOrderDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() ticketRubi?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() product?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() scope?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() startDate?: string;
@@ -33,6 +35,14 @@ export class UpdateServiceOrderDto {
 export class ChangeStatusDto {
   @ApiProperty() @IsString() @IsNotEmpty() status: string;
   @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
+}
+
+export class AddNoteDto {
+  @ApiProperty() @IsString() @IsNotEmpty() note: string;
+  @ApiProperty() @IsString() @IsIn(['interna', 'general']) noteType: string;
+  @ApiProperty() @IsString() @IsIn(['baja', 'media', 'alta', 'critica']) noteLevel: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['proximos_logros', 'riesgo_critico']) noteSubtype?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() noteMitigation?: string;
 }
 
 export class AddImplementerDto {

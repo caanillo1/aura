@@ -4,3 +4,20 @@ dist/
 .env
 .env.local
 *.log
+
+# Uploads y archivos generados
+apps/backend/uploads/
+apps/backend/wa-session/
+
+# Archivos temporales de TypeScript
+tsc_errors.txt
+ts-errors.txt
+tsc_output.txt
+apps/frontend/tsc_output.txt
+apps/frontend/ts-errors.txt
+
+# Claude Code
+.claude/
+
+# Estado del proyecto (doc interno)
+ESTADO_PROYECTO.md

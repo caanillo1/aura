@@ -11,6 +11,7 @@ export interface AuthUser {
   companyId: string;
   companyName?: string;
   clientId?: string;
+  permissions: string[];
 }
 
 export interface AuthTokens {

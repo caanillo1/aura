@@ -1,6 +1,6 @@
 import {
   IsString, IsNotEmpty, IsOptional, IsInt, Min, IsArray,
-  IsDateString, IsIn, IsUUID,
+  IsDateString, IsIn, IsUUID, ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -104,4 +104,44 @@ export class UpdateTemplateActivityDto {
 
 export class CreateActivityThreadDto {
   @ApiProperty() @IsString() @IsNotEmpty() content: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() newStatus?: string;
+}
+
+// ── Bulk import ────────────────────────────────────────────────────────────
+
+export class BulkImportActivityDto {
+  @ApiProperty() @IsString() @IsNotEmpty() name: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+  @ApiPropertyOptional() @IsOptional() @Type(() => Number) estimatedHours?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Type(() => Number) calculatedDays?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() defaultRole?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() priority?: string;
+}
+
+export class BulkImportPhaseDto {
+  @ApiProperty() @IsString() @IsNotEmpty() name: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() color?: string;
+  @ApiProperty({ type: [BulkImportActivityDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BulkImportActivityDto)
+  activities: BulkImportActivityDto[];
+}
+
+export class BulkImportModuleItemDto {
+  @ApiProperty() @IsString() @IsNotEmpty() name: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+  @ApiProperty({ type: [BulkImportPhaseDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BulkImportPhaseDto)
+  phases: BulkImportPhaseDto[];
+}
+
+export class BulkImportModulesDto {
+  @ApiProperty({ type: [BulkImportModuleItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BulkImportModuleItemDto)
+  modules: BulkImportModuleItemDto[];
 }

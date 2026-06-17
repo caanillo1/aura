@@ -31,6 +31,15 @@ export class LoadTemplateDto {
   @ApiProperty() @IsUUID() templateFlowId: string;
   @ApiPropertyOptional() @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => PhaseDateDto)
   phaseDates?: PhaseDateDto[];
+  @ApiPropertyOptional() @IsOptional() @IsArray() @IsUUID(undefined, { each: true })
+  excludedModuleIds?: string[];
+}
+
+export class AddModulesDto {
+  @ApiProperty() @IsUUID() templateFlowId: string;
+  @ApiProperty() @IsArray() @IsUUID(undefined, { each: true }) selectedModuleIds: string[];
+  @ApiPropertyOptional() @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => PhaseDateDto)
+  phaseDates?: PhaseDateDto[];
 }
 
 export class ProjectFilterDto extends PaginationDto {

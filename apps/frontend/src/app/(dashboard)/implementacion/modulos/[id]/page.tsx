@@ -219,7 +219,7 @@ export default function ModuleDetailPage() {
     <div className="space-y-5 max-w-4xl">
       {/* Header */}
       <div className="flex items-start gap-3 flex-wrap">
-        <BackButton href="/implementacion/modulos" />
+        <BackButton href="/implementacion/modulos" label="Módulos" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold px-2 py-0.5 rounded-lg"

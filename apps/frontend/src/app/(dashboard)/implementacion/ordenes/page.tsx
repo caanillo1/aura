@@ -2,11 +2,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
-import { Search, RefreshCw, Plus, ClipboardList } from 'lucide-react';
+import { Search, RefreshCw, Plus, ClipboardList, Trash2, X, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
 import { serviceOrdersApi, clientsApi } from '@/lib/api';
+import { usePermission } from '@/hooks/usePermission';
 import { toast } from 'sonner';
 import type { ServiceOrder, Client } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 const STATUS_STYLE: Record<string, { color: string; bg: string; dot: string; label: string }> = {
   pendiente:   { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',   dot: '#60a5fa', label: 'Pendiente'   },
@@ -19,6 +21,7 @@ const STATUS_STYLE: Record<string, { color: string; bg: string; dot: string; lab
 export default function OrdenesPage() {
   const { theme } = useTheme();
   const isLight = theme === 'light';
+  const { can } = usePermission();
 
   const [orders, setOrders]   = useState<ServiceOrder[]>([]);
   const [total, setTotal]     = useState(0);
@@ -28,6 +31,16 @@ export default function OrdenesPage() {
   const [fClient, setFClient] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Eliminación individual
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; osNumber: string; client: string } | null>(null);
+  const [deleting, setDeleting]         = useState(false);
+
+  // Selección múltiple
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected]     = useState<Set<string>>(new Set());
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting]        = useState(false);
 
   const tableStyle = {
     background: isLight ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.06)',
@@ -63,6 +76,57 @@ export default function OrdenesPage() {
     clientsApi.list({ limit: 100 }).then(r => setClients(r.data)).catch(() => {});
   }, []);
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await serviceOrdersApi.delete(deleteTarget.id);
+      toast.success(`OS ${deleteTarget.osNumber} eliminada`);
+      setDeleteTarget(null);
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al eliminar la orden de servicio');
+    } finally { setDeleting(false); }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selected.size === orders.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(orders.map(o => o.id)));
+    }
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selected);
+      const res = await serviceOrdersApi.bulkDelete(ids);
+      if (res.eliminadas > 0) toast.success(`${res.eliminadas} OS eliminada(s)`);
+      if (res.fallidas > 0)   toast.error(`${res.fallidas} OS no se pudieron eliminar`);
+      setShowBulkConfirm(false);
+      exitSelectMode();
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al eliminar órdenes');
+    } finally { setBulkDeleting(false); }
+  };
+
+  const allSelected = orders.length > 0 && selected.size === orders.length;
+
   return (
     <div className="space-y-5 max-w-7xl">
       {/* Header */}
@@ -73,12 +137,48 @@ export default function OrdenesPage() {
           </h2>
           <p className="text-sm mt-0.5" style={{ color: tc.m }}>{total} órdenes registradas</p>
         </div>
-        <Link href="/implementacion/ordenes/nueva">
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white font-medium">
-            <Plus className="w-4 h-4" /> Nueva OS
-          </motion.button>
-        </Link>
+        {selectMode ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium" style={{ color: tc.s }}>
+              {selected.size} seleccionada(s)
+            </span>
+            <button onClick={toggleAll}
+              className="text-xs px-3 py-2 rounded-xl transition-colors"
+              style={{ border: '1px solid var(--border-subtle)', color: tc.s }}>
+              {allSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+            </button>
+            {selected.size > 0 && (
+              <button onClick={() => setShowBulkConfirm(true)}
+                className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl font-medium transition-colors"
+                style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
+                <Trash2 className="w-3.5 h-3.5" /> Eliminar {selected.size}
+              </button>
+            )}
+            <button onClick={exitSelectMode}
+              className="p-2 rounded-xl transition-colors"
+              style={{ color: tc.m }}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            {can('orders.eliminar') && (
+              <button onClick={() => setSelectMode(true)}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm transition-colors"
+                style={{ border: '1px solid var(--border-subtle)', color: tc.s }}>
+                <CheckSquare className="w-4 h-4" /> Seleccionar
+              </button>
+            )}
+            {can('orders.nuevo') && (
+              <Link href="/implementacion/ordenes/nueva">
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white font-medium">
+                  <Plus className="w-4 h-4" /> Nueva OS
+                </motion.button>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filtros */}
@@ -109,7 +209,13 @@ export default function OrdenesPage() {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: rowBorder, background: headBg }}>
-              {['OS#', 'Cliente', 'Producto', 'Líderes', 'Estado', 'Fechas', ''].map(h => (
+              {selectMode && (
+                <th className="pl-4 pr-2 py-3.5 w-8">
+                  <input type="checkbox" checked={allSelected} onChange={toggleAll}
+                    className="w-3.5 h-3.5 rounded cursor-pointer accent-blue-500" />
+                </th>
+              )}
+              {['OS# / Ticket Rubi', 'Cliente', 'Producto', 'Líderes', 'Estado', 'Fechas', ''].map(h => (
                 <th key={h} className="text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wide"
                   style={{ color: tc.m }}>{h}</th>
               ))}
@@ -119,22 +225,39 @@ export default function OrdenesPage() {
             {loading
               ? Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i} style={{ borderBottom: rowBorder }}>
-                    <td colSpan={7} className="px-4 py-3.5">
+                    <td colSpan={selectMode ? 8 : 7} className="px-4 py-3.5">
                       <div className="h-4 rounded animate-pulse" style={{ background: 'var(--border-subtle)' }} />
                     </td>
                   </tr>
                 ))
               : orders.map((os, i) => {
                   const ss = STATUS_STYLE[os.status] ?? STATUS_STYLE.pendiente;
+                  const isSelected = selected.has(os.id);
                   return (
                     <motion.tr key={os.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.03 }}
-                      style={{ borderBottom: rowBorder }}
+                      style={{
+                        borderBottom: rowBorder,
+                        background: isSelected
+                          ? (isLight ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.08)')
+                          : 'transparent',
+                        outline: isSelected ? `1px solid rgba(239,68,68,0.25)` : 'none',
+                      }}
                       className="transition-colors cursor-pointer"
-                      onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(30,60,120,0.03)' : 'rgba(255,255,255,0.03)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isLight ? 'rgba(30,60,120,0.03)' : 'rgba(255,255,255,0.03)'; }}
+                      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+                      onClick={() => { if (selectMode) toggleSelect(os.id); }}>
+                      {selectMode && (
+                        <td className="pl-4 pr-2 py-3.5 w-8" onClick={e => e.stopPropagation()}>
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(os.id)}
+                            className="w-3.5 h-3.5 rounded cursor-pointer accent-blue-500" />
+                        </td>
+                      )}
                       <td className="px-4 py-3.5">
                         <span className="font-mono font-bold text-xs" style={{ color: '#60a5fa' }}>{os.osNumber}</span>
+                        {os.ticketRubi && (
+                          <p className="text-xs mt-0.5 font-mono" style={{ color: '#dc2626' }}>{os.ticketRubi}</p>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
                         <p className="text-sm font-medium" style={{ color: tc.p }}>{os.client.businessName}</p>
@@ -169,20 +292,32 @@ export default function OrdenesPage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <p className="text-xs" style={{ color: tc.m }}>
-                          {new Date(os.startDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {new Date(os.startDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}
                         </p>
                         <p className="text-xs" style={{ color: tc.m }}>
-                          → {new Date(os.endDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          → {new Date(os.endDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}
                         </p>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <Link href={`/implementacion/ordenes/${os.id}`}>
-                          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                            style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
-                            Ver
-                          </motion.button>
-                        </Link>
+                      <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          <Link href={`/implementacion/ordenes/${os.id}`}>
+                            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                              style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
+                              Ver
+                            </motion.button>
+                          </Link>
+                          {!selectMode && can('orders.eliminar') && (
+                            <motion.button
+                              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                              onClick={() => setDeleteTarget({ id: os.id, osNumber: os.osNumber, client: os.client.businessName })}
+                              className="p-1.5 rounded-lg transition-all"
+                              title="Eliminar OS"
+                              style={{ background: 'rgba(248,113,113,0.10)', color: '#f87171', border: '1px solid rgba(248,113,113,0.20)' }}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </motion.button>
+                          )}
+                        </div>
                       </td>
                     </motion.tr>
                   );
@@ -211,6 +346,68 @@ export default function OrdenesPage() {
           </div>
         </div>
       )}
+
+      {/* Modal: Confirmar eliminación individual */}
+      <Modal open={!!deleteTarget} onClose={() => { if (!deleting) setDeleteTarget(null); }}
+        title="Eliminar orden de servicio" width="max-w-sm">
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: tc.s }}>
+            ¿Eliminar la orden{' '}
+            <strong style={{ color: '#60a5fa' }}>{deleteTarget?.osNumber}</strong> de{' '}
+            <strong style={{ color: tc.p }}>{deleteTarget?.client}</strong>?
+          </p>
+          <p className="text-xs" style={{ color: tc.m }}>
+            Esta acción no se puede deshacer. Si la OS tiene un proyecto o requerimientos asociados, primero deberás eliminarlos.
+          </p>
+          <div className="flex gap-3 pt-1">
+            <button onClick={() => setDeleteTarget(null)} disabled={deleting}
+              className="flex-1 px-4 py-2.5 rounded-xl text-sm disabled:opacity-40"
+              style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+              Cancelar
+            </button>
+            <button onClick={handleDelete} disabled={deleting}
+              className="flex-1 py-2.5 rounded-xl text-sm text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ background: '#ef4444' }}>
+              {deleting
+                ? <><span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Eliminando...</>
+                : <><Trash2 className="w-4 h-4" /> Eliminar OS</>}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: Confirmar eliminación múltiple */}
+      <Modal open={showBulkConfirm} onClose={() => { if (!bulkDeleting) setShowBulkConfirm(false); }}
+        title="Eliminar órdenes seleccionadas" width="max-w-sm">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-3.5 rounded-xl"
+            style={{ background: isLight ? 'rgba(220,38,38,0.08)' : 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)' }}>
+            <Trash2 className="w-5 h-5 mt-0.5 shrink-0" style={{ color: '#ef4444' }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: isLight ? '#991b1b' : '#fca5a5' }}>
+                ¿Eliminar {selected.size} orden{selected.size !== 1 ? 'es' : ''} de servicio?
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                Las OS que tengan proyectos o requerimientos asociados no se eliminarán y se reportarán como fallidas.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button onClick={() => setShowBulkConfirm(false)} disabled={bulkDeleting}
+              className="flex-1 py-2.5 rounded-xl text-sm disabled:opacity-40"
+              style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+              Cancelar
+            </button>
+            <button onClick={handleBulkDelete} disabled={bulkDeleting}
+              className="flex-1 py-2.5 rounded-xl text-sm text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}>
+              {bulkDeleting
+                ? <><span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Eliminando...</>
+                : <><Trash2 className="w-4 h-4" /> Confirmar eliminación</>}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

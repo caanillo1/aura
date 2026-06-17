@@ -1,7 +1,7 @@
 'use client';
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
-import { ShieldCheck, Building2, Settings2, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Building2, Settings2, MapPin, MessageCircle, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 const OPCIONES = [
@@ -14,7 +14,7 @@ const OPCIONES = [
     bg: 'rgba(167,139,250,0.12)',
   },
   {
-    href: '#',
+    href: '/configuracion/empresa',
     icon: Building2,
     title: 'Datos de la Empresa',
     desc: 'Nombre, NIT, logo, colores corporativos, SMTP de correos.',
@@ -22,12 +22,28 @@ const OPCIONES = [
     bg: 'rgba(96,165,250,0.12)',
   },
   {
-    href: '#',
+    href: '/configuracion/parametros',
     icon: Settings2,
     title: 'Parámetros del Sistema',
     desc: 'Configuraciones generales, rutas de archivos, límites.',
     color: '#34d399',
     bg: 'rgba(52,211,153,0.12)',
+  },
+  {
+    href: '/configuracion/municipios',
+    icon: MapPin,
+    title: 'Municipios',
+    desc: 'Gestiona los municipios disponibles para asignar ubicación geográfica a clientes.',
+    color: '#fb923c',
+    bg: 'rgba(251,146,60,0.12)',
+  },
+  {
+    href: '/configuracion/whatsapp',
+    icon: MessageCircle,
+    title: 'WhatsApp',
+    desc: 'Conecta tu número de WhatsApp para enviar notificaciones automáticas a firmantes.',
+    color: '#25d366',
+    bg: 'rgba(37,211,102,0.12)',
   },
 ];
 
@@ -77,9 +93,7 @@ export default function ConfiguracionPage() {
             </motion.div>
           );
 
-          return op.href === '#'
-            ? <div key={op.title} style={{ opacity: 0.6 }}>{content}</div>
-            : <Link key={op.title} href={op.href}>{content}</Link>;
+          return <Link key={op.title} href={op.href}>{content}</Link>;
         })}
       </div>
     </div>

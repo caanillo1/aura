@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginationDto, paginate, buildMeta } from '../common/dto/pagination.dto';
 import {
@@ -6,8 +6,9 @@ import {
   CreateTemplateModuleDto, UpdateTemplateModuleDto, ReorderDto,
   CreateTemplatePhaseDto, UpdateTemplatePhaseDto,
   CreateTemplateActivityDto, UpdateTemplateActivityDto, CreateActivityThreadDto,
-  CreateStandaloneModuleDto,
+  CreateStandaloneModuleDto, BulkImportModulesDto,
 } from './dto/template.dto';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class TemplatesService {
@@ -187,6 +188,87 @@ export class TemplatesService {
     });
   }
 
+  async bulkImportModules(companyId: string, dto: BulkImportModulesDto) {
+    // 3 queries en paralelo: nombres existentes + códigos actuales + conteo
+    const [existingByName, allCodes, existingCount] = await Promise.all([
+      this.prisma.templateModule.findMany({
+        where: { companyId, name: { in: dto.modules.map(m => m.name) } },
+        select: { name: true },
+      }),
+      this.prisma.templateModule.findMany({ where: { companyId }, select: { code: true } }),
+      this.prisma.templateModule.count({ where: { companyId } }),
+    ]);
+
+    const existingNameSet = new Set(existingByName.map(m => m.name));
+    const toCreate = dto.modules.filter(m => !existingNameSet.has(m.name));
+    const skipped  = dto.modules.length - toCreate.length;
+
+    if (toCreate.length === 0) {
+      return { count: 0, skipped, message: 'Los módulos ya existen y fueron omitidos' };
+    }
+
+    // Calcular el próximo código en memoria
+    let maxModNum = allCodes.reduce((max, m) => {
+      const n = parseInt(m.code.replace('MOD-', ''), 10);
+      return isNaN(n) ? max : Math.max(max, n);
+    }, 0);
+    let orderCounter = existingCount;
+
+    // Construir todos los registros en memoria con IDs pre-generados
+    const moduleRows:   any[] = [];
+    const phaseRows:    any[] = [];
+    const activityRows: any[] = [];
+
+    for (const modData of toCreate) {
+      const modId   = randomUUID();
+      const modCode = `MOD-${String(++maxModNum).padStart(3, '0')}`;
+
+      moduleRows.push({
+        id: modId, companyId, name: modData.name, code: modCode,
+        order: orderCounter++, isActive: true,
+        ...(modData.description && { description: modData.description }),
+      });
+
+      let actCounter = 0;
+      for (let pi = 0; pi < modData.phases.length; pi++) {
+        const phData  = modData.phases[pi];
+        const rawSlug = phData.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `fase_${pi + 1}`;
+        const phaseId = randomUUID();
+
+        phaseRows.push({
+          id: phaseId, templateModuleId: modId,
+          name: phData.name, slug: rawSlug.slice(0, 50), order: pi,
+          ...(phData.color ? { color: phData.color.slice(0, 7) } : {}),
+        });
+
+        for (let ai = 0; ai < phData.activities.length; ai++) {
+          const actData = phData.activities[ai];
+          activityRows.push({
+            id: randomUUID(), templatePhaseId: phaseId,
+            code: `ACT-${String(++actCounter).padStart(2, '0')}`,
+            name: actData.name, order: ai,
+            ...(actData.description      && { description:    actData.description }),
+            ...(actData.estimatedHours !== undefined && { estimatedHours: actData.estimatedHours }),
+            ...(actData.calculatedDays !== undefined && { calculatedDays: actData.calculatedDays }),
+            ...(actData.defaultRole      && { defaultRole:    actData.defaultRole }),
+            ...(actData.priority         && { priority:       actData.priority }),
+          });
+        }
+      }
+    }
+
+    // 3 createMany en lugar de N transacciones
+    await this.prisma.templateModule.createMany({ data: moduleRows });
+    if (phaseRows.length)    await this.prisma.templatePhase.createMany({ data: phaseRows });
+    if (activityRows.length) await this.prisma.templateActivity.createMany({ data: activityRows });
+
+    const msg = skipped > 0
+      ? `${toCreate.length} módulo${toCreate.length !== 1 ? 's' : ''} importado${toCreate.length !== 1 ? 's' : ''}, ${skipped} ya exist${skipped !== 1 ? 'ían' : 'ía'} y ${skipped !== 1 ? 'fueron omitidos' : 'fue omitido'}`
+      : `${toCreate.length} módulo${toCreate.length !== 1 ? 's' : ''} importado${toCreate.length !== 1 ? 's' : ''} correctamente`;
+
+    return { count: toCreate.length, skipped, message: msg };
+  }
+
   async findAllModules(companyId: string, dto: PaginationDto) {
     const { take, skip } = paginate(dto.page, dto.limit);
     const where: any = { companyId };
@@ -300,6 +382,20 @@ export class TemplatesService {
   }
 
   // ── Module-scoped phase/activity CRUD ─────────────────────────────────────
+
+  async findAllModulesWithPhases(companyId: string) {
+    return this.prisma.templateModule.findMany({
+      where: { companyId },
+      orderBy: { order: 'asc' },
+      select: {
+        id: true, code: true, name: true,
+        phases: {
+          orderBy: { order: 'asc' },
+          select: { id: true, name: true, color: true, order: true },
+        },
+      },
+    });
+  }
 
   async getModuleDetail(companyId: string, moduleId: string) {
     const mod = await this.prisma.templateModule.findFirst({
@@ -541,14 +637,79 @@ export class TemplatesService {
   }
 
   async addActivityThread(activityId: string, authorId: string, authorType: string, dto: CreateActivityThreadDto) {
-    const activity = await this.prisma.activity.findUnique({ where: { id: activityId } });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
-    return this.prisma.activityThread.create({
-      data: { activityId, authorId, authorType, content: dto.content },
-      include: {
-        author: { select: { id: true, firstName: true, lastName: true, jobTitle: true } },
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: {
+        phaseId: true,
+        phase: {
+          select: {
+            projectModuleId: true,
+            activities: { select: { id: true, progressPercent: true, status: true } },
+            projectModule: {
+              select: {
+                projectId: true,
+                phases: { select: { id: true, progressPercent: true } },
+                project: { select: { modules: { select: { id: true, progressPercent: true } } } },
+              },
+            },
+          },
+        },
       },
     });
+    if (!activity) throw new NotFoundException('Actividad no encontrada');
+
+    if (dto.newStatus) {
+      const phaseId   = activity.phaseId;
+      const moduleId  = activity.phase.projectModuleId;
+      const projectId = activity.phase.projectModule.projectId;
+      const newPct    = this.statusToProgress(dto.newStatus);
+
+      // Compute cascade averages in memory from pre-fetched siblings
+      const sibActs = activity.phase.activities.map(a =>
+        a.id === activityId ? { progressPercent: newPct, status: dto.newStatus! } : { progressPercent: Number(a.progressPercent), status: a.status }
+      );
+      const phaseAvg = sibActs.length ? sibActs.reduce((s, a) => s + a.progressPercent, 0) / sibActs.length : 0;
+      let phaseStatus = 'pendiente';
+      if (sibActs.length && sibActs.every(a => a.status === 'completado')) phaseStatus = 'completado';
+      else if (sibActs.some(a => a.status === 'en_progreso' || a.status === 'completado')) phaseStatus = 'en_progreso';
+
+      const moduleAvg = activity.phase.projectModule.phases.length
+        ? activity.phase.projectModule.phases.reduce((s, p) => s + (p.id === phaseId ? phaseAvg : Number(p.progressPercent)), 0) / activity.phase.projectModule.phases.length
+        : 0;
+      const projectAvg = activity.phase.projectModule.project.modules.length
+        ? activity.phase.projectModule.project.modules.reduce((s, m) => s + (m.id === moduleId ? moduleAvg : Number(m.progressPercent)), 0) / activity.phase.projectModule.project.modules.length
+        : 0;
+
+      // All 5 writes in one transaction — single DB round trip
+      const results = await this.prisma.$transaction([
+        this.prisma.activity.update({
+          where: { id: activityId },
+          data: { status: dto.newStatus, progressPercent: newPct, ...(dto.newStatus === 'completado' ? { actualEndDate: new Date() } : {}) },
+        }),
+        this.prisma.phase.update({ where: { id: phaseId }, data: { progressPercent: phaseAvg, status: phaseStatus } }),
+        this.prisma.projectModule.update({ where: { id: moduleId }, data: { progressPercent: moduleAvg } }),
+        this.prisma.project.update({ where: { id: projectId }, data: { progressPercent: projectAvg } }),
+        this.prisma.activityThread.create({
+          data: { activityId, authorId, authorType, content: dto.content, newStatus: dto.newStatus },
+          include: { author: { select: { id: true, firstName: true, lastName: true, jobTitle: true } } },
+        }),
+      ]);
+
+      return results[4];
+    }
+
+    return this.prisma.activityThread.create({
+      data: { activityId, authorId, authorType, content: dto.content, newStatus: null },
+      include: { author: { select: { id: true, firstName: true, lastName: true, jobTitle: true } } },
+    });
+  }
+
+  private statusToProgress(status: string): number {
+    switch (status) {
+      case 'completado': return 100;
+      case 'en_progreso': return 50;
+      default: return 0;
+    }
   }
 
   async deleteActivityThread(threadId: string, authorId: string) {

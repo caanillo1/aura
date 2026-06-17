@@ -14,7 +14,7 @@ import {
   CreateTemplateModuleDto, UpdateTemplateModuleDto, ReorderDto,
   CreateTemplatePhaseDto, UpdateTemplatePhaseDto,
   CreateTemplateActivityDto, UpdateTemplateActivityDto, CreateActivityThreadDto,
-  CreateStandaloneModuleDto,
+  CreateStandaloneModuleDto, BulkImportModulesDto,
 } from './dto/template.dto';
 
 const IMPL_ROLES = ['admin', 'coordinator', 'implementer_clinical', 'implementer_financial', 'implementer_support'] as const;
@@ -87,11 +87,25 @@ export class TemplatesController {
     return this.svc.findAllModules(user.companyId, dto);
   }
 
+  @Get('modules/all-with-phases')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Todos los módulos con sus fases (sin paginación, para selectores)' })
+  findAllModulesWithPhases(@GetUser() user: JwtUser) {
+    return this.svc.findAllModulesWithPhases(user.companyId);
+  }
+
   @Post('modules')
   @Roles(...EDIT_ROLES)
   @ApiOperation({ summary: 'Crear módulo independiente (código auto-generado)' })
   createModule(@GetUser() user: JwtUser, @Body() dto: CreateStandaloneModuleDto) {
     return this.svc.createStandaloneModule(user.companyId, dto);
+  }
+
+  @Post('modules/bulk-import')
+  @Roles(...EDIT_ROLES)
+  @ApiOperation({ summary: 'Importar múltiples módulos con fases y actividades' })
+  bulkImportModules(@GetUser() user: JwtUser, @Body() dto: BulkImportModulesDto) {
+    return this.svc.bulkImportModules(user.companyId, dto);
   }
 
   @Put('modules/:moduleId')

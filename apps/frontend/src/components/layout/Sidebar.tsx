@@ -16,14 +16,16 @@ import { authApi } from '@/lib/api';
 import { AuraLogo } from '@/components/ui/AuraLogo';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { usePermission } from '@/hooks/usePermission';
 import type { UserRole } from '@/types';
 
-interface SubItem { href: string; label: string; icon: React.ElementType }
+interface SubItem { href: string; label: string; icon: React.ElementType; permission?: string }
 interface NavItem {
   href?: string;
   label: string;
   icon: React.ElementType;
   roles: UserRole[];
+  permission?: string;
   children?: SubItem[];
 }
 
@@ -35,20 +37,22 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: '/usuarios', label: 'Usuarios', icon: Users,
     roles: ['admin','coordinator'],
+    permission: 'users.buscar',
   },
   {
     href: '/clientes', label: 'Clientes', icon: Building2,
     roles: ['admin','coordinator','implementer_clinical','implementer_financial','implementer_support','support'],
+    permission: 'clients.buscar',
   },
   // ── IMPLEMENTACIÓN (sub-menú) ─────────────────────────────────────────────
   {
     label: 'Implementación', icon: Briefcase,
     roles: ['admin','coordinator','implementer_clinical','implementer_financial','implementer_support'],
     children: [
-      { href: '/implementacion/ordenes',    label: 'Órdenes de Servicio', icon: ClipboardList   },
-      { href: '/implementacion/plantillas', label: 'Plantillas',          icon: LayoutTemplate  },
-      { href: '/implementacion/modulos',    label: 'Módulos',             icon: Layers          },
-      { href: '/implementacion/proyectos',  label: 'Proyectos',           icon: FolderKanban    },
+      { href: '/implementacion/ordenes',    label: 'Órdenes de Servicio', icon: ClipboardList,  permission: 'orders.buscar'   },
+      { href: '/implementacion/plantillas', label: 'Plantillas',          icon: LayoutTemplate, permission: 'settings.editar' },
+      { href: '/implementacion/modulos',    label: 'Módulos',             icon: Layers,         permission: 'settings.editar' },
+      { href: '/implementacion/proyectos',  label: 'Proyectos',           icon: FolderKanban,   permission: 'projects.editar' },
     ],
   },
   // ── REQUERIMIENTOS (sub-menú) ─────────────────────────────────────────────
@@ -56,8 +60,8 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Requerimientos', icon: MessageSquarePlus,
     roles: ['admin','coordinator','implementer_clinical','implementer_financial','implementer_support','client'],
     children: [
-      { href: '/requerimientos/nuevo',      label: 'Registrar',  icon: ClipboardPlus },
-      { href: '/requerimientos/priorizar',  label: 'Priorizar',  icon: ListOrdered   },
+      { href: '/requerimientos/nuevo',     label: 'Registrar', icon: ClipboardPlus, permission: 'tickets.nuevo'   },
+      { href: '/requerimientos/priorizar', label: 'Priorizar', icon: ListOrdered,   permission: 'tickets.buscar'  },
     ],
   },
   {
@@ -71,6 +75,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: '/configuracion', label: 'Configuración', icon: Settings,
     roles: ['admin'],
+    permission: 'settings.editar',
   },
 ];
 
@@ -82,13 +87,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, clearAuth } = useAuthStore();
   const { theme } = useTheme();
   const isLight   = theme === 'light';
+  const { can }   = usePermission();
 
   // Estado de expansión de sub-menús
   const [expanded, setExpanded] = useState<string[]>(['Requerimientos', 'Implementación']);
 
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => user && item.roles.includes(user.role as UserRole),
-  );
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (!user || !item.roles.includes(user.role as UserRole)) return false;
+    if (item.permission && !can(item.permission)) return false;
+    if (item.children) {
+      return item.children.some((c) => !c.permission || can(c.permission));
+    }
+    return true;
+  });
 
   const toggleExpand = (label: string) =>
     setExpanded((p) => p.includes(label) ? p.filter((l) => l !== label) : [...p, label]);
@@ -103,8 +114,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const isActive = (href?: string) =>
     href ? (pathname === href || pathname.startsWith(href + '/')) : false;
 
-  const hasActiveChild = (children?: SubItem[]) =>
-    children?.some((c) => pathname === c.href || pathname.startsWith(c.href + '/'));
+  const hasActiveChild = (children?: SubItem[]): boolean =>
+    Boolean(children?.some((c) => pathname === c.href || pathname.startsWith(c.href + '/')));
 
   const itemStyle = (active: boolean) => ({
     background: active
@@ -202,7 +213,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                             style={{ color: 'var(--text-muted)' }}>{item.label}</p>
                         </div>
                         {/* Sub-ítems del flyout */}
-                        {item.children.map((child) => {
+                        {item.children.filter((c) => !c.permission || can(c.permission)).map((child) => {
                           const childIsActive = pathname === child.href || pathname.startsWith(child.href + '/');
                           const ChildIcon = child.icon;
                           return (
@@ -241,7 +252,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                         transition={{ duration: 0.22, ease: 'easeInOut' }}
                         className="overflow-hidden ml-4 mt-0.5 space-y-0.5"
                       >
-                        {item.children.map((child) => {
+                        {item.children.filter((c) => !c.permission || can(c.permission)).map((child) => {
                           const childIsActive = pathname === child.href || pathname.startsWith(child.href + '/');
                           const ChildIcon = child.icon;
                           return (

@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, IsBoolean, IsArray, ValidateNested } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsBoolean, IsArray, ValidateNested, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -9,6 +9,7 @@ export class CreateClientDto {
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() department?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() municipioId?: string;
   @ApiPropertyOptional() @IsOptional() @IsEmail() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() economicActivity?: string;
@@ -20,6 +21,7 @@ export class UpdateClientDto {
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() department?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() municipioId?: string;
   @ApiPropertyOptional() @IsOptional() @IsEmail() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() economicActivity?: string;
@@ -52,4 +54,12 @@ export class BulkCreateStaffDto {
   @ValidateNested({ each: true })
   @Type(() => CreateStaffDto)
   items: CreateStaffDto[];
+}
+
+export class BulkCreateClientDto {
+  @ApiProperty({ type: [CreateClientDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateClientDto)
+  items: CreateClientDto[];
 }

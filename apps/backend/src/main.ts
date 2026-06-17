@@ -5,6 +5,10 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Aumentar límite de body para soportar logos en base64
+  app.use(require('express').json({ limit: '10mb' }));
+  app.use(require('express').urlencoded({ extended: true, limit: '10mb' }));
   const logger = new Logger('Bootstrap');
 
   // Prefijo global de API

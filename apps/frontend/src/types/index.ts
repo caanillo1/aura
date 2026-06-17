@@ -38,6 +38,7 @@ export interface Company {
   commercialName?: string;
   nit: string;
   logo?: string;
+  logoData?: string;
   primaryColor: string;
   secondaryColor: string;
   address?: string;
@@ -51,6 +52,8 @@ export interface Company {
   smtpUser?: string;
   smtpFromName?: string;
   smtpFromEmail?: string;
+  emailSignature?: string;
+  filesBasePath?: string;
   isActive: boolean;
 }
 
@@ -61,11 +64,19 @@ export interface CompanyStats {
   activeProjects: number;
 }
 
+export interface SystemConfig {
+  configKey: string;
+  configValue: string;
+  description?: string;
+  updatedAt: string;
+}
+
 export interface Role {
   id: string;
   name: string;
   slug: string;
   description?: string;
+  permissions?: string;
   isSystem: boolean;
   isActive: boolean;
 }
@@ -88,6 +99,16 @@ export interface User {
   client?: { id: string; businessName: string; nit: string } | null;
 }
 
+// ── Municipios ────────────────────────────────────────────────────────────────
+export interface Municipio {
+  id: string;
+  codigoDepartamento: string;
+  nombreDepartamento: string;
+  codigoMunicipio: string;
+  nombreMunicipio: string;
+  codigoPostal?: string | null;
+}
+
 // ── Clients ───────────────────────────────────────────────────────────────────
 export interface Client {
   id: string;
@@ -97,6 +118,8 @@ export interface Client {
   address?: string;
   city?: string;
   department?: string;
+  municipioId?: string | null;
+  municipio?: Municipio | null;
   email?: string;
   phone?: string;
   economicActivity?: string;
@@ -144,6 +167,7 @@ export interface ServiceOrderHistory {
 export interface ServiceOrder {
   id: string;
   osNumber: string;
+  ticketRubi?: string | null;
   product: string;
   scope?: string;
   durationDays: number;
@@ -162,6 +186,34 @@ export interface ServiceOrder {
   history?: ServiceOrderHistory[];
   project?: { id: string; name: string; status: string; progressPercent: number } | null;
   _count?: { history: number };
+}
+
+// ── Documentos ────────────────────────────────────────────────────────────────
+export interface TipoDocumento {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  color: string;
+  scope: 'interno' | 'cliente' | 'ambos';
+  activo: boolean;
+  orden: number;
+  createdAt: string;
+  _count?: { archivos: number };
+}
+
+export interface Archivo {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  nombreOriginal: string;
+  mimeType: string;
+  tamanioBytes: number;
+  esInterno: boolean;
+  createdAt: string;
+  tipoDocumento: { id: string; nombre: string; color: string };
+  client?:       { id: string; businessName: string; nit: string } | null;
+  serviceOrder?: { id: string; osNumber: string; product: string; client?: { businessName: string } | null } | null;
+  subidoPor:     { id: string; firstName: string; lastName: string };
 }
 
 // ── Templates ─────────────────────────────────────────────────────────────────
@@ -219,6 +271,7 @@ export interface ActivityThread {
   authorId: string;
   authorType: string;
   content: string;
+  newStatus?: string;
   createdAt: string;
   updatedAt: string;
   author: { id: string; firstName: string; lastName: string; jobTitle?: string };

@@ -23,6 +23,7 @@ model Company {
   commercialName   String?  @db.NVarChar(200)
   nit              String   @unique @db.NVarChar(20)
   logo             String?  @db.NVarChar(500)
+  logoData         String?  @db.NVarChar(Max)
   primaryColor     String   @default("#1E3A5F") @db.NVarChar(7)
   secondaryColor   String   @default("#2D5086") @db.NVarChar(7)
   address          String?  @db.NVarChar(300)
@@ -51,11 +52,15 @@ model Company {
   clients          Client[]
   serviceOrders    ServiceOrder[]
   systemConfigs    SystemConfig[]
+  municipios       Municipio[]
   templateFlows    TemplateFlow[]
   templateModules  TemplateModule[]
   templateRisks    TemplateRisk[]
   emailTemplates   EmailTemplate[]
   auditLogs        AuditLog[]
+  requerimientos   Requerimiento[]
+  tiposDocumento   TipoDocumento[]
+  archivos         Archivo[]
 
   @@map("Empresas")
 }
@@ -109,6 +114,7 @@ model User {
   jobTitle          String?   @db.NVarChar(150)
   phone             String?   @db.NVarChar(30)
   signatureFilePath String?   @db.NVarChar(500)
+  signatureData     String?   @db.NVarChar(Max)
   clientId          String?   @db.UniqueIdentifier
   isActive          Boolean   @default(true)
   isEmailVerified   Boolean   @default(false)
@@ -128,6 +134,8 @@ model User {
   notifications        Notification[]
   auditLogs            AuditLog[]               @relation("AuditLogUser")
   activitiesAssigned   Activity[]               @relation("ActivityAssignedTo")
+  actaActividadesAgent  ActaActividad[]          @relation("ActaActividadAgent")
+  actaCompromisosAgent  ActaCompromiso[]         @relation("ActaCompromisoAgent")
   subActivitiesAssigned SubActivity[]           @relation("SubActivityAssignedTo")
   visitsCreated        Visit[]                  @relation("VisitCreatedBy")
   trainingsTrainer     Training[]               @relation("TrainingTrainer")
@@ -145,6 +153,11 @@ model User {
   trainingParticipant  TrainingParticipant[]    @relation("ParticipantUser")
   soImplementers       ServiceOrderImplementer[]
   activityThreads      ActivityThread[]         @relation("ThreadAuthor")
+  actasCreated         Acta[]                   @relation("ActaCreatedBy")
+  requerimientosAgente Requerimiento[]          @relation("ReqAgente")
+  requerimientosCreados Requerimiento[]         @relation("ReqCreatedBy")
+  gestionesReq         RequerimientoGestion[]   @relation("GestionChangedBy")
+  archivosSubidos      Archivo[]                @relation("ArchivoSubidoPor")
 
   @@map("Usuarios")
 }
@@ -152,6 +165,23 @@ model User {
 // =============================================================================
 // SECCIÓN 3: CLIENTES
 // =============================================================================
+
+model Municipio {
+  id                 String  @id @default(uuid()) @db.UniqueIdentifier
+  companyId          String  @db.UniqueIdentifier
+  codigoDepartamento String  @db.NVarChar(10)
+  nombreDepartamento String  @db.NVarChar(100)
+  codigoMunicipio    String  @db.NVarChar(10)
+  nombreMunicipio    String  @db.NVarChar(100)
+  codigoPostal       String? @db.NVarChar(10)
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clients  Client[]
+  actas    Acta[]
+
+  @@unique([companyId, codigoDepartamento, codigoMunicipio])
+  @@map("Municipios")
+}
 
 model Client {
   id               String   @id @default(uuid()) @db.UniqueIdentifier
@@ -162,6 +192,7 @@ model Client {
   address          String?  @db.NVarChar(300)
   city             String?  @db.NVarChar(100)
   department       String?  @db.NVarChar(100)
+  municipioId      String?  @db.UniqueIdentifier
   email            String?  @db.NVarChar(200)
   phone            String?  @db.NVarChar(50)
   economicActivity String?  @db.NVarChar(200)
@@ -170,11 +201,14 @@ model Client {
   updatedAt        DateTime @updatedAt @db.DateTime2
   createdById      String?  @db.UniqueIdentifier
 
-  company          Company  @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  createdBy        User?    @relation("ClientCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users            User[]   @relation("UserClient")
+  company          Company    @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy        User?      @relation("ClientCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  municipio        Municipio? @relation(fields: [municipioId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users            User[]     @relation("UserClient")
   staff            ClientStaff[]
   serviceOrders    ServiceOrder[]
+  requerimientos   Requerimiento[]
+  archivos         Archivo[]
 
   @@unique([companyId, nit])
   @@map("Clientes")
@@ -201,6 +235,8 @@ model ClientStaff {
   trainingParticipants  TrainingParticipant[]  @relation("ParticipantStaff")
   activitiesAssigned    Activity[]             @relation("ActivityClientStaff")
   serviceOrdersLed      ServiceOrder[]         @relation("SOClientLeader")
+  actaActividadesClient  ActaActividad[]        @relation("ActaActividadClient")
+  actaCompromisosClient  ActaCompromiso[]       @relation("ActaCompromisoClient")
 
   @@map("PersonalCliente")
 }
@@ -247,6 +283,7 @@ model TemplateModule {
   company         Company         @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   templateFlow    TemplateFlow?   @relation(fields: [templateFlowId], references: [id], onDelete: Cascade)
   phases          TemplatePhase[]
+  requerimientos  Requerimiento[] @relation("ReqModule")
 
   @@unique([companyId, code])
   @@map("ModulosPlantilla")
@@ -267,6 +304,7 @@ model TemplatePhase {
 
   templateModule   TemplateModule     @relation(fields: [templateModuleId], references: [id], onDelete: Cascade)
   activities       TemplateActivity[]
+  requerimientos   Requerimiento[]    @relation("ReqPhase")
 
   @@map("FasesPlantilla")
 }
@@ -332,6 +370,7 @@ model ServiceOrder {
   companyId         String   @db.UniqueIdentifier
   clientId          String   @db.UniqueIdentifier
   osNumber          String   @db.NVarChar(50)
+  ticketRubi        String?  @db.NVarChar(100)
   product           String   @db.NVarChar(200)
   scope             String?  @db.NVarChar(Max)
   durationDays      Int      @default(0)
@@ -355,6 +394,8 @@ model ServiceOrder {
   implementers      ServiceOrderImplementer[]
   history           ServiceOrderHistory[]
   project           Project?
+  requerimientos    Requerimiento[]
+  archivos          Archivo[]
 
   @@unique([companyId, osNumber])
   @@map("OrdenesServicio")
@@ -381,6 +422,10 @@ model ServiceOrderHistory {
   oldValue       String?  @db.NVarChar(Max)
   newValue       String?  @db.NVarChar(Max)
   reason         String?  @db.NVarChar(500)
+  noteType       String?  @db.NVarChar(20)
+  noteLevel      String?  @db.NVarChar(20)
+  noteSubtype    String?  @db.NVarChar(30)
+  noteMitigation String?  @db.NVarChar(Max)
   createdAt      DateTime @default(now()) @db.DateTime2
 
   serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
@@ -416,6 +461,7 @@ model Project {
   supportHandover  SupportHandover?
   scheduledReports ScheduledReport[]
   risks            Risk[]
+  actas            Acta[]
 
   @@map("Proyectos")
 }
@@ -433,6 +479,8 @@ model ProjectModule {
   project         Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   phases          Phase[]
   trainings       Training[] @relation("TrainingModule")
+  actas           Acta[]     @relation("ActaModulo")
+  actaCompromisos ActaCompromiso[] @relation("ActaCompromisoModule")
 
   @@map("ModulosProyecto")
 }
@@ -455,6 +503,7 @@ model Phase {
 
   projectModule   ProjectModule @relation(fields: [projectModuleId], references: [id], onDelete: Cascade)
   activities      Activity[]
+  actaCompromisos ActaCompromiso[] @relation("ActaCompromisoPhase")
 
   @@map("Fases")
 }
@@ -489,6 +538,7 @@ model Activity {
   clientStaff      ClientStaff? @relation("ActivityClientStaff", fields: [clientStaffId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subActivities    SubActivity[]
   visitActivities  VisitActivity[]
+  actaActividades  ActaActividad[] @relation("ActaActividadActivity")
   threads          ActivityThread[]
   dependencies     ActivityDependency[] @relation("ADActivity")
   dependsOn        ActivityDependency[] @relation("ADDependsOn")
@@ -502,6 +552,7 @@ model ActivityThread {
   authorId    String   @db.UniqueIdentifier
   authorType  String   @default("agent") @db.NVarChar(20)
   content     String   @db.NVarChar(Max)
+  newStatus   String?  @db.NVarChar(30)
   createdAt   DateTime @default(now()) @db.DateTime2
   updatedAt   DateTime @updatedAt @db.DateTime2
 
@@ -825,7 +876,293 @@ model EmailTemplate {
 }
 
 // =============================================================================
-// SECCIÓN 16: NOTIFICACIONES Y AUDITORÍA
+// SECCIÓN 16: ACTAS
+// =============================================================================
+
+model Acta {
+  id                          String    @id @default(uuid()) @db.UniqueIdentifier
+  projectId                   String    @db.UniqueIdentifier
+  type                        String    @db.NVarChar(30)
+  numero                      String?   @db.NVarChar(50)
+  fecha                       DateTime  @db.Date
+  ciudad                      String?   @db.NVarChar(100)
+  municipioId                 String?   @db.UniqueIdentifier
+  lugar                       String?   @db.NVarChar(200)
+
+  // inicio
+  asunto                      String?   @db.NVarChar(500)
+  objetivoGeneral             String?   @db.NVarChar(Max)
+  alcance                     String?   @db.NVarChar(Max)
+
+  // visita
+  implementadorNombre         String?   @db.NVarChar(200)
+  jefeNombre                  String?   @db.NVarChar(200)
+  actividadesRealizadas       String?   @db.NVarChar(Max)
+
+  // cierre
+  cuerpo                      String?   @db.NVarChar(Max)
+  cierreModulosJson           String?   @db.NVarChar(Max)
+
+  // capacitacion
+  moduloId                    String?   @db.UniqueIdentifier
+  expositor                   String?   @db.NVarChar(200)
+  temasCapacitacion           String?   @db.NVarChar(Max)
+  horaInicio                  String?   @db.NVarChar(10)
+  horaFin                     String?   @db.NVarChar(10)
+
+  // entrega_soporte
+  nitCliente                  String?   @db.NVarChar(20)
+  sedes                       String?   @db.NVarChar(500)
+  responsableImplementador    String?   @db.NVarChar(200)
+  responsableSoporte          String?   @db.NVarChar(200)
+  capacitacionModalidad       String?   @db.NVarChar(20)
+  capacitacionHoras           Decimal?  @db.Decimal(6, 2)
+  capacitacionPruebas         Boolean?
+  requerimientosAdicionales   String?   @db.NVarChar(Max)
+  observacionesGenerales      String?   @db.NVarChar(Max)
+  ventanasDistintas           String?   @db.NVarChar(Max)
+  modulosChecklist            String?   @db.NVarChar(Max)
+  infraestructuraChecklist    String?   @db.NVarChar(Max)
+  documentacionChecklist      String?   @db.NVarChar(Max)
+  emisionElectronicaChecklist String?   @db.NVarChar(Max)
+
+  status                      String    @default("borrador") @db.NVarChar(20)
+  createdById                 String    @db.UniqueIdentifier
+  createdAt                   DateTime  @default(now()) @db.DateTime2
+  updatedAt                   DateTime  @updatedAt @db.DateTime2
+
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  modulo       ProjectModule? @relation("ActaModulo", fields: [moduloId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  municipio    Municipio?     @relation(fields: [municipioId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy    User           @relation("ActaCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  firmantes    ActaFirmante[]
+  fechasVisita ActaFechaVisita[]
+  compromisos  ActaCompromiso[]
+  participantes ActaParticipante[]
+  acciones     ActaAccion[]
+  contactos    ActaContacto[]
+  actaActividades ActaActividad[]
+
+  @@index([projectId])
+  @@map("Actas")
+}
+
+model ActaFirmante {
+  id            String    @id @default(uuid()) @db.UniqueIdentifier
+  actaId        String    @db.UniqueIdentifier
+  nombre        String    @db.NVarChar(200)
+  cargo         String?   @db.NVarChar(150)
+  empresa       String?   @db.NVarChar(200)
+  email         String?   @db.NVarChar(200)
+  documento     String?   @db.NVarChar(30)
+  fecha         DateTime? @db.Date
+  orden         Int       @default(0)
+  signatureData String?   @db.NVarChar(Max)
+  signedAt      DateTime? @db.DateTime2
+  signerType    String?   @db.NVarChar(20)
+  comprendio    Boolean?
+  telefono      String?   @db.NVarChar(50)
+
+  acta          Acta @relation(fields: [actaId], references: [id], onDelete: Cascade)
+
+  @@map("ActaFirmantes")
+}
+
+model ActaFechaVisita {
+  id         String    @id @default(uuid()) @db.UniqueIdentifier
+  actaId     String    @db.UniqueIdentifier
+  fecha      DateTime  @db.Date
+  horaInicio String?   @db.NVarChar(10)
+  horaFin    String?   @db.NVarChar(10)
+
+  acta       Acta @relation(fields: [actaId], references: [id], onDelete: Cascade)
+
+  @@map("ActaFechasVisita")
+}
+
+model ActaCompromiso {
+  id            String  @id @default(uuid()) @db.UniqueIdentifier
+  actaId        String  @db.UniqueIdentifier
+  numero        Int?
+  compromiso    String  @db.NVarChar(500)
+  responsable   String? @db.NVarChar(200)
+  estado        String  @default("pendiente") @db.NVarChar(30)
+  assignedToId  String? @db.UniqueIdentifier
+  clientStaffId String? @db.UniqueIdentifier
+  moduleId      String? @db.UniqueIdentifier
+  phaseId       String? @db.UniqueIdentifier
+  activityId    String? @db.UniqueIdentifier
+
+  acta        Acta          @relation(fields: [actaId], references: [id], onDelete: Cascade)
+  assignedTo  User?         @relation("ActaCompromisoAgent", fields: [assignedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientStaff ClientStaff?  @relation("ActaCompromisoClient", fields: [clientStaffId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  module      ProjectModule? @relation("ActaCompromisoModule", fields: [moduleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  phase       Phase?         @relation("ActaCompromisoPhase", fields: [phaseId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // activityId links to Activity.id — managed at app level (no Prisma relation to avoid SQL Server NULL unique constraint)
+
+  @@map("ActaCompromisos")
+}
+
+model ActaParticipante {
+  id          String   @id @default(uuid()) @db.UniqueIdentifier
+  actaId      String   @db.UniqueIdentifier
+  numero      Int?
+  nombre      String   @db.NVarChar(200)
+  cargo       String?  @db.NVarChar(150)
+  documento   String?  @db.NVarChar(30)
+  horaEntrada String?  @db.NVarChar(10)
+  horaSalida  String?  @db.NVarChar(10)
+  comprendio  Boolean?
+
+  acta        Acta @relation(fields: [actaId], references: [id], onDelete: Cascade)
+
+  @@map("ActaParticipantes")
+}
+
+model ActaAccion {
+  id          String    @id @default(uuid()) @db.UniqueIdentifier
+  actaId      String    @db.UniqueIdentifier
+  accion      String    @db.NVarChar(500)
+  responsable String?   @db.NVarChar(200)
+  fechaLimite DateTime? @db.Date
+
+  acta        Acta @relation(fields: [actaId], references: [id], onDelete: Cascade)
+
+  @@map("ActaAcciones")
+}
+
+model ActaContacto {
+  id       String  @id @default(uuid()) @db.UniqueIdentifier
+  actaId   String  @db.UniqueIdentifier
+  nombre   String? @db.NVarChar(200)
+  telefono String? @db.NVarChar(50)
+  area     String? @db.NVarChar(100)
+
+  acta     Acta @relation(fields: [actaId], references: [id], onDelete: Cascade)
+
+  @@map("ActaContactos")
+}
+
+model ActaActividad {
+  id            String   @id @default(uuid()) @db.UniqueIdentifier
+  actaId        String   @db.UniqueIdentifier
+  activityId    String   @db.UniqueIdentifier
+  assignedToId  String?  @db.UniqueIdentifier
+  clientStaffId String?  @db.UniqueIdentifier
+  status        String   @default("completado") @db.NVarChar(30)
+
+  acta        Acta         @relation(fields: [actaId], references: [id], onDelete: Cascade)
+  activity    Activity     @relation("ActaActividadActivity", fields: [activityId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  assignedTo  User?        @relation("ActaActividadAgent", fields: [assignedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clientStaff ClientStaff? @relation("ActaActividadClient", fields: [clientStaffId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([actaId, activityId])
+  @@map("ActasActividades")
+}
+
+// =============================================================================
+// SECCIÓN 12: REQUERIMIENTOS
+// =============================================================================
+
+model Requerimiento {
+  id                  String   @id @default(uuid()) @db.UniqueIdentifier
+  companyId           String   @db.UniqueIdentifier
+  numero              String   @db.NVarChar(20)
+  titulo              String   @db.NVarChar(300)
+  tipo                String   @default("Funcional") @db.NVarChar(50)
+  prioridad           String   @default("Media") @db.NVarChar(20)
+  descripcion         String   @db.NVarChar(Max)
+  criteriosAceptacion String?  @db.NVarChar(Max)
+  templateModuleId    String?  @db.UniqueIdentifier
+  templatePhaseId     String?  @db.UniqueIdentifier
+  area                String   @db.NVarChar(50)
+  ticketRubi          String?  @db.NVarChar(100)
+  estadoActual        String   @default("Elaborado") @db.NVarChar(30)
+  clientId            String   @db.UniqueIdentifier
+  serviceOrderId      String?  @db.UniqueIdentifier
+  agenteId            String   @db.UniqueIdentifier
+  createdById         String   @db.UniqueIdentifier
+  activityId          String?  @db.UniqueIdentifier
+  createdAt           DateTime @default(now()) @db.DateTime2
+  updatedAt           DateTime @updatedAt @db.DateTime2
+
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  client         Client         @relation(fields: [clientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  serviceOrder   ServiceOrder?  @relation(fields: [serviceOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  agente         User           @relation("ReqAgente", fields: [agenteId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy      User           @relation("ReqCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  templateModule TemplateModule? @relation("ReqModule", fields: [templateModuleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  templatePhase  TemplatePhase?  @relation("ReqPhase",  fields: [templatePhaseId],  references: [id], onDelete: NoAction, onUpdate: NoAction)
+  gestiones      RequerimientoGestion[]
+
+  @@unique([companyId, numero])
+  @@map("Requerimientos")
+}
+
+model RequerimientoGestion {
+  id              String   @id @default(uuid()) @db.UniqueIdentifier
+  requerimientoId String   @db.UniqueIdentifier
+  fecha           DateTime @db.Date
+  estado          String   @db.NVarChar(30)
+  observacion     String   @db.NVarChar(Max)
+  changedById     String   @db.UniqueIdentifier
+  createdAt       DateTime @default(now()) @db.DateTime2
+
+  requerimiento Requerimiento @relation(fields: [requerimientoId], references: [id], onDelete: Cascade)
+  changedBy     User          @relation("GestionChangedBy", fields: [changedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("RequerimientoGestiones")
+}
+
+// =============================================================================
+// SECCIÓN 17: REPOSITORIO DE DOCUMENTOS
+// =============================================================================
+
+model TipoDocumento {
+  id          String   @id @default(uuid()) @db.UniqueIdentifier
+  companyId   String   @db.UniqueIdentifier
+  nombre      String   @db.NVarChar(100)
+  descripcion String?  @db.NVarChar(300)
+  color       String   @default("#60a5fa") @db.NVarChar(7)
+  scope       String   @default("ambos") @db.NVarChar(10)
+  activo      Boolean  @default(true)
+  orden       Int      @default(0)
+  createdAt   DateTime @default(now()) @db.DateTime2
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  archivos Archivo[]
+
+  @@unique([companyId, nombre])
+  @@map("TiposDocumento")
+}
+
+model Archivo {
+  id              String   @id @default(uuid()) @db.UniqueIdentifier
+  companyId       String   @db.UniqueIdentifier
+  tipoDocumentoId String   @db.UniqueIdentifier
+  nombre          String   @db.NVarChar(300)
+  descripcion     String?  @db.NVarChar(500)
+  nombreOriginal  String   @db.NVarChar(300)
+  mimeType        String   @db.NVarChar(100)
+  tamanioBytes    Int
+  ruta            String   @db.NVarChar(500)
+  clientId        String?  @db.UniqueIdentifier
+  serviceOrderId  String?  @db.UniqueIdentifier
+  esInterno       Boolean  @default(false)
+  subidoPorId     String   @db.UniqueIdentifier
+  createdAt       DateTime @default(now()) @db.DateTime2
+
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tipoDocumento TipoDocumento @relation(fields: [tipoDocumentoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  client        Client?       @relation(fields: [clientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  serviceOrder  ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subidoPor     User          @relation("ArchivoSubidoPor", fields: [subidoPorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("ArchivosRepositorio")
+}
+
+// =============================================================================
+// SECCIÓN 18: NOTIFICACIONES Y AUDITORÍA
 // =============================================================================
 
 model Notification {

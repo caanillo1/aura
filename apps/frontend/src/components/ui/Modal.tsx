@@ -37,14 +37,15 @@ export function Modal({ open, onClose, title, children, width = 'max-w-lg' }: Mo
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }}
             transition={{ duration: 0.2 }}
-            className={`relative w-full ${width} rounded-2xl shadow-2xl`}
+            className={`relative w-full ${width} rounded-2xl shadow-2xl flex flex-col`}
             style={{
               background: 'var(--bg-surface)',
               border: '1px solid var(--border-strong)',
+              maxHeight: '90vh',
             }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+            <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
               <h3 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>{title}</h3>
               <button
                 onClick={onClose}
@@ -55,7 +56,7 @@ export function Modal({ open, onClose, title, children, width = 'max-w-lg' }: Mo
               </button>
             </div>
             {/* Body */}
-            <div className="px-6 py-5">{children}</div>
+            <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
           </motion.div>
         </div>
       )}

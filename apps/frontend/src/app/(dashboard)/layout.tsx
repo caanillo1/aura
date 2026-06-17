@@ -6,22 +6,35 @@ import { useAuthStore } from '@/store/auth.store';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Toaster } from 'sonner';
+import { usersApi } from '@/lib/api';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, setPermissions } = useAuthStore();
   const { theme } = useTheme();
   const router = useRouter();
 
   useEffect(() => {
-    // localStorage es síncrono: para cuando este effect corre, Zustand ya leyó el token
     setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) router.push('/login');
   }, [hydrated, isAuthenticated, router]);
+
+  // Refresca permisos desde el servidor en cada carga del dashboard
+  // así los cambios de roles toman efecto sin necesidad de re-login
+  useEffect(() => {
+    if (!hydrated || !isAuthenticated) return;
+    usersApi.getMe().then((me: any) => {
+      if (!me?.role?.permissions) { setPermissions([]); return; }
+      try {
+        const parsed = JSON.parse(me.role.permissions);
+        setPermissions(Array.isArray(parsed) ? parsed : []);
+      } catch { setPermissions([]); }
+    }).catch(() => {});
+  }, [hydrated, isAuthenticated, setPermissions]);
 
   // Mientras el store rehidrata desde localStorage, mostrar fondo oscuro sin redirigir
   if (!hydrated) return (

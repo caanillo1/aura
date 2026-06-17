@@ -10,6 +10,7 @@ export class UpdateCompanyDto {
   @ApiPropertyOptional() @IsOptional() @IsEmail() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() website?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() logoData?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() primaryColor?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() secondaryColor?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() smtpHost?: string;
@@ -20,4 +21,5 @@ export class UpdateCompanyDto {
   @ApiPropertyOptional() @IsOptional() @IsEmail() smtpFromEmail?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() emailSignature?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() filesBasePath?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() agentRegPassword?: string;
 }

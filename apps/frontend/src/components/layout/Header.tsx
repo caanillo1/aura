@@ -1,9 +1,10 @@
 'use client';
-import { Bell, Sun, Moon } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth.store';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { NotificationBell } from './NotificationBell';
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard':                   'Dashboard',
@@ -66,12 +67,7 @@ export function Header() {
         )}
 
         {/* Notificaciones */}
-        <button
-          className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          <Bell className="w-4 h-4" />
-        </button>
+        <NotificationBell />
 
         {/* Avatar */}
         <div className="flex items-center gap-2.5">
@@ -83,7 +79,7 @@ export function Header() {
           </div>
           <div className="hidden sm:block">
             <p className="text-xs font-medium leading-none" style={{ color: 'var(--text-primary)' }}>
-              {user?.firstName}
+              {user?.firstName} {user?.lastName}
             </p>
             <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
               {user?.roleName}

@@ -24,12 +24,18 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Sesión inválida');
     }
 
+    let permissions: string[] = [];
+    if (user.role.permissions) {
+      try { permissions = JSON.parse(user.role.permissions as string) as string[]; } catch {}
+    }
+
     return {
       id: user.id,
       email: user.email,
       userType: user.userType,
       role: user.role.slug,
       companyId: user.companyId,
+      permissions,
     };
   }
 }

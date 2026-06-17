@@ -5,6 +5,7 @@ import { useTheme } from 'next-themes';
 import { Search, Plus, LayoutTemplate, RefreshCw, Layers, Calendar, Pencil, Trash2, ToggleLeft, ToggleRight, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { templatesApi } from '@/lib/api';
+import { usePermission } from '@/hooks/usePermission';
 import { Modal } from '@/components/ui/Modal';
 import { toast } from 'sonner';
 import type { TemplateFlow } from '@/types';
@@ -15,6 +16,7 @@ export default function PlantillasPage() {
   const { theme } = useTheme();
   const isLight = theme === 'light';
   const router  = useRouter();
+  const { can } = usePermission();
 
   const [templates, setTemplates] = useState<TemplateFlow[]>([]);
   const [total, setTotal]         = useState(0);
@@ -142,11 +144,13 @@ export default function PlantillasPage() {
           <button onClick={load} className="p-2.5 rounded-xl transition-colors" style={{ color: tc.m }}>
             <RefreshCw className="w-4 h-4" />
           </button>
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={() => setCreateModal(true)}
-            className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white font-medium">
-            <Plus className="w-4 h-4" /> Nueva Plantilla
-          </motion.button>
+          {can('settings.editar') && (
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              onClick={() => setCreateModal(true)}
+              className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white font-medium">
+              <Plus className="w-4 h-4" /> Nueva Plantilla
+            </motion.button>
+          )}
         </div>
       </div>
 
@@ -173,11 +177,13 @@ export default function PlantillasPage() {
           </div>
           <p className="font-semibold mb-1" style={{ color: tc.p }}>No hay plantillas</p>
           <p className="text-sm mb-4" style={{ color: tc.m }}>Crea una plantilla para comenzar</p>
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={() => setCreateModal(true)}
-            className="btn-primary px-5 py-2.5 rounded-xl text-sm text-white font-semibold">
-            <Plus className="w-4 h-4 inline mr-1.5" /> Nueva Plantilla
-          </motion.button>
+          {can('settings.editar') && (
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              onClick={() => setCreateModal(true)}
+              className="btn-primary px-5 py-2.5 rounded-xl text-sm text-white font-semibold">
+              <Plus className="w-4 h-4 inline mr-1.5" /> Nueva Plantilla
+            </motion.button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -234,26 +240,32 @@ export default function PlantillasPage() {
                 <div className="flex items-center gap-1 pt-1"
                   style={{ borderTop: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}` }}>
                   {/* Editar */}
-                  <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
-                    onClick={ev => openEdit(ev, t)}
-                    title="Editar"
-                    className="p-1.5 rounded-lg" style={{ color: '#60a5fa' }}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </motion.button>
+                  {can('settings.editar') && (
+                    <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
+                      onClick={ev => openEdit(ev, t)}
+                      title="Editar"
+                      className="p-1.5 rounded-lg" style={{ color: '#60a5fa' }}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </motion.button>
+                  )}
                   {/* Toggle */}
-                  <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
-                    onClick={ev => handleToggle(ev, t)}
-                    title={t.isActive ? 'Desactivar' : 'Activar'}
-                    className="p-1.5 rounded-lg" style={{ color: t.isActive ? '#34d399' : '#94a3b8' }}>
-                    {t.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                  </motion.button>
+                  {can('settings.editar') && (
+                    <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
+                      onClick={ev => handleToggle(ev, t)}
+                      title={t.isActive ? 'Desactivar' : 'Activar'}
+                      className="p-1.5 rounded-lg" style={{ color: t.isActive ? '#34d399' : '#94a3b8' }}>
+                      {t.isActive ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                    </motion.button>
+                  )}
                   {/* Eliminar */}
-                  <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
-                    onClick={ev => openDelete(ev, t)}
-                    title="Eliminar"
-                    className="p-1.5 rounded-lg" style={{ color: '#f87171' }}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </motion.button>
+                  {can('settings.editar') && (
+                    <motion.button whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
+                      onClick={ev => openDelete(ev, t)}
+                      title="Eliminar"
+                      className="p-1.5 rounded-lg" style={{ color: '#f87171' }}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </motion.button>
+                  )}
                   {/* Abrir constructor */}
                   <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                     onClick={() => router.push(`/implementacion/plantillas/${t.id}`)}

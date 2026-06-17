@@ -144,10 +144,10 @@ export default function ProyectosPage() {
                       </td>
                       <td className="px-4 py-3.5">
                         <p className="text-xs" style={{ color: tc.m }}>
-                          {new Date(p.startDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                          {new Date(p.startDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', timeZone: 'UTC' })}
                         </p>
                         <p className="text-xs" style={{ color: tc.m }}>
-                          → {new Date(p.endDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          → {new Date(p.endDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}
                         </p>
                       </td>
                       <td className="px-4 py-3.5">

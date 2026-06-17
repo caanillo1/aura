@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import {
   GripVertical, Plus, Pencil, Trash2, ChevronRight, ExternalLink,
-  Layers, Flag, Clock, Settings, Calendar,
+  Layers, Flag, Clock, Settings, Calendar, CheckSquare, Square, Minus,
 } from 'lucide-react';
 import {
   DragDropContext, Droppable, Draggable, type DropResult,
@@ -24,7 +24,7 @@ const PRIORITY_STYLE: Record<string, { color: string; bg: string }> = {
 };
 
 const fmt = (d?: string | null) =>
-  d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' }) : null;
+  d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC' }) : null;
 
 export default function TemplateConstructorPage() {
   const { id } = useParams<{ id: string }>();
@@ -45,13 +45,14 @@ export default function TemplateConstructorPage() {
   });
   const [savingMod, setSavingMod]       = useState(false);
 
-  // ── Library picker (assign existing module) ──
-  const [libModal, setLibModal]         = useState(false);
-  const [libModules, setLibModules]     = useState<TemplateModule[]>([]);
-  const [libLoading, setLibLoading]     = useState(false);
-  const [libSearch, setLibSearch]       = useState('');
-  const [libSelected, setLibSelected]   = useState<TemplateModule | null>(null);
-  const [assigning, setAssigning]       = useState(false);
+  // ── Library picker (assign existing modules — multi-select) ──
+  const [libModal, setLibModal]           = useState(false);
+  const [libModules, setLibModules]       = useState<TemplateModule[]>([]);
+  const [libLoading, setLibLoading]       = useState(false);
+  const [libSearch, setLibSearch]         = useState('');
+  const [libSelectedIds, setLibSelectedIds] = useState<Set<string>>(new Set());
+  const [assigning, setAssigning]         = useState(false);
+  const [assignProgress, setAssignProgress] = useState<{ done: number; total: number; name: string } | null>(null);
 
   // ── Template edit modal ──
   const [editModal, setEditModal]       = useState(false);
@@ -107,7 +108,7 @@ export default function TemplateConstructorPage() {
 
   /* ── Module CRUD ── */
   const openCreateMod = async () => {
-    setLibSelected(null);
+    setLibSelectedIds(new Set());
     setLibSearch('');
     setLibModal(true);
     setLibLoading(true);
@@ -119,17 +120,53 @@ export default function TemplateConstructorPage() {
     finally { setLibLoading(false); }
   };
 
+  const toggleLibSelect = (mod: TemplateModule) =>
+    setLibSelectedIds(prev => {
+      const n = new Set(prev);
+      n.has(mod.id) ? n.delete(mod.id) : n.add(mod.id);
+      return n;
+    });
+
+  const filteredLibModules = libModules.filter(m =>
+    !libSearch ||
+    m.name.toLowerCase().includes(libSearch.toLowerCase()) ||
+    (m.description ?? '').toLowerCase().includes(libSearch.toLowerCase())
+  );
+  const allLibFiltered    = filteredLibModules.length > 0 && filteredLibModules.every(m => libSelectedIds.has(m.id));
+  const someLibFiltered   = filteredLibModules.some(m => libSelectedIds.has(m.id));
+
+  const toggleSelectAllLib = () => {
+    if (allLibFiltered) {
+      setLibSelectedIds(prev => { const n = new Set(prev); filteredLibModules.forEach(m => n.delete(m.id)); return n; });
+    } else {
+      setLibSelectedIds(prev => { const n = new Set(prev); filteredLibModules.forEach(m => n.add(m.id)); return n; });
+    }
+  };
+
   const handleAssign = async () => {
-    if (!libSelected) return;
+    const toAssign = libModules.filter(m => libSelectedIds.has(m.id));
+    if (!toAssign.length) return;
     setAssigning(true);
-    try {
-      await templatesApi.assignModule(id, libSelected.id);
-      toast.success(`Módulo "${libSelected.name}" asignado`);
-      setLibModal(false);
-      load();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message ?? 'Error al asignar módulo');
-    } finally { setAssigning(false); }
+    setAssignProgress({ done: 0, total: toAssign.length, name: toAssign[0].name });
+    let ok = 0;
+    for (let i = 0; i < toAssign.length; i++) {
+      const mod = toAssign[i];
+      setAssignProgress({ done: i, total: toAssign.length, name: mod.name });
+      try {
+        await templatesApi.assignModule(id, mod.id);
+        ok++;
+      } catch { /* continue with others */ }
+      setAssignProgress({ done: i + 1, total: toAssign.length, name: mod.name });
+    }
+    setAssigning(false);
+    setAssignProgress(null);
+    if (ok === toAssign.length) {
+      toast.success(`${ok} módulo${ok !== 1 ? 's' : ''} asignado${ok !== 1 ? 's' : ''}`);
+    } else {
+      toast.warning(`${ok} asignado${ok !== 1 ? 's' : ''}, ${toAssign.length - ok} con error`);
+    }
+    setLibModal(false);
+    load();
   };
 
   const openEditMod = (m: TemplateModule) => {
@@ -248,7 +285,7 @@ export default function TemplateConstructorPage() {
       {/* Layout */}
       <div className="flex gap-4 items-start">
         {/* ── Panel izquierdo: módulos ── */}
-        <div className="w-72 shrink-0 space-y-2">
+        <div className="w-72 shrink-0 flex flex-col gap-2">
           <div className="flex items-center justify-between px-1">
             <p className="text-xs font-bold uppercase tracking-wide" style={{ color: tc.m }}>
               Módulos ({template.modules.length})
@@ -260,6 +297,7 @@ export default function TemplateConstructorPage() {
             </button>
           </div>
 
+          <div className="overflow-y-auto pr-0.5" style={{ maxHeight: 'calc(100vh - 260px)', scrollbarWidth: 'thin' }}>
           <DragDropContext onDragEnd={onDragEnd}>
             <Droppable droppableId="modules">
               {(provided) => (
@@ -287,7 +325,7 @@ export default function TemplateConstructorPage() {
                             <p className="text-sm font-medium truncate" style={{ color: tc.p }}>{mod.name}</p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               <p className="text-[10px]" style={{ color: tc.m }}>
-                                {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
+                                {(mod.phases ?? []).length} fase{(mod.phases ?? []).length !== 1 ? 's' : ''}
                               </p>
                               {(mod.days || mod.estimatedDays) > 0 && (
                                 <span className="text-[10px] font-mono" style={{ color: tc.m }}>
@@ -318,6 +356,7 @@ export default function TemplateConstructorPage() {
               )}
             </Droppable>
           </DragDropContext>
+          </div>
         </div>
 
         {/* ── Panel derecho: vista de fases y actividades (solo lectura) ── */}
@@ -337,8 +376,8 @@ export default function TemplateConstructorPage() {
                 <div>
                   <p className="font-bold" style={{ color: tc.p }}>{currentMod.name}</p>
                   <div className="flex items-center gap-3 mt-0.5 flex-wrap text-xs" style={{ color: tc.m }}>
-                    <span>{currentMod.phases.length} fase{currentMod.phases.length !== 1 ? 's' : ''}</span>
-                    <span>{currentMod.phases.reduce((s, ph) => s + ph.activities.length, 0)} actividades</span>
+                    <span>{(currentMod.phases ?? []).length} fase{(currentMod.phases ?? []).length !== 1 ? 's' : ''}</span>
+                    <span>{(currentMod.phases ?? []).reduce((s, ph) => s + (ph.activities?.length ?? 0), 0)} actividades</span>
                     {currentMod.startDate && (
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />{fmt(currentMod.startDate)} → {fmt(currentMod.endDate)}
@@ -353,8 +392,8 @@ export default function TemplateConstructorPage() {
                 </Link>
               </div>
 
-              {currentMod.phases.length === 0 ? (
-                <div className="px-5 py-10 text-center">
+              {(currentMod.phases ?? []).length === 0 ? (
+                <div className="px-5 py-10 text-center flex-1">
                   <p className="text-sm" style={{ color: tc.m }}>Este módulo no tiene fases</p>
                   <Link href={`/implementacion/modulos/${currentMod.id}`}
                     className="inline-flex items-center gap-1.5 text-xs mt-3 px-3 py-1.5 rounded-lg font-medium"
@@ -364,7 +403,7 @@ export default function TemplateConstructorPage() {
                 </div>
               ) : (
                 <div className="divide-y" style={{ borderColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }}>
-                  {currentMod.phases.map(phase => {
+                  {(currentMod.phases ?? []).map(phase => {
                     const isExpanded = expandedPhases.has(phase.id);
                     const phaseColor = phase.color ?? '#60a5fa';
                     return (
@@ -520,81 +559,125 @@ export default function TemplateConstructorPage() {
         </form>
       </Modal>
 
-      {/* Modal — Biblioteca de módulos */}
-      <Modal open={libModal} onClose={() => setLibModal(false)} title="Agregar módulo desde biblioteca" width="max-w-lg">
-        <div className="space-y-4">
-          <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: tc.m }}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input className="input-glass w-full rounded-xl pl-9 pr-4 py-2 text-sm"
-              placeholder="Buscar módulo..."
-              value={libSearch} onChange={e => setLibSearch(e.target.value)} />
+      {/* Modal — Biblioteca de módulos (multi-select) */}
+      <Modal open={libModal} onClose={() => { if (!assigning) setLibModal(false); }}
+        title="Agregar módulos desde biblioteca" width="max-w-lg">
+        <div className="space-y-3">
+
+          {/* Buscador + select-all */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: tc.m }}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input className="input-glass w-full rounded-xl pl-9 pr-4 py-2 text-sm"
+                placeholder="Buscar módulo..."
+                value={libSearch} onChange={e => setLibSearch(e.target.value)}
+                disabled={assigning} />
+            </div>
+            {filteredLibModules.length > 0 && (
+              <button onClick={toggleSelectAllLib} disabled={assigning}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium shrink-0 disabled:opacity-40"
+                style={{ border: '1px solid rgba(96,165,250,0.30)', color: '#60a5fa', background: 'rgba(96,165,250,0.08)' }}>
+                {allLibFiltered
+                  ? <><CheckSquare className="w-3.5 h-3.5" /> Todo</>
+                  : someLibFiltered
+                    ? <><Minus className="w-3.5 h-3.5" /> Todo</>
+                    : <><Square className="w-3.5 h-3.5" /> Todo</>}
+              </button>
+            )}
           </div>
 
-          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+          {/* Contador de seleccionados */}
+          {libSelectedIds.size > 0 && (
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl text-xs"
+              style={{ background: 'rgba(96,165,250,0.10)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa' }}>
+              <span className="font-semibold">{libSelectedIds.size} módulo{libSelectedIds.size !== 1 ? 's' : ''} seleccionado{libSelectedIds.size !== 1 ? 's' : ''}</span>
+              <button onClick={() => setLibSelectedIds(new Set())} className="underline opacity-70 hover:opacity-100">
+                Limpiar
+              </button>
+            </div>
+          )}
+
+          {/* Lista de módulos */}
+          <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
             {libLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: 'var(--border-subtle)' }} />
               ))
-            ) : libModules.filter(m =>
-                !libSearch || m.name.toLowerCase().includes(libSearch.toLowerCase()) ||
-                (m.description ?? '').toLowerCase().includes(libSearch.toLowerCase())
-              ).length === 0 ? (
+            ) : filteredLibModules.length === 0 ? (
               <p className="text-center py-8 text-sm" style={{ color: tc.m }}>
-                {libModules.length === 0
-                  ? 'No hay módulos activos disponibles en la biblioteca'
-                  : 'Sin coincidencias'}
+                {libModules.length === 0 ? 'No hay módulos activos disponibles en la biblioteca' : 'Sin coincidencias'}
               </p>
-            ) : (
-              libModules
-                .filter(m =>
-                  !libSearch || m.name.toLowerCase().includes(libSearch.toLowerCase()) ||
-                  (m.description ?? '').toLowerCase().includes(libSearch.toLowerCase())
-                )
-                .map(mod => {
-                  const isSelected = libSelected?.id === mod.id;
-                  return (
-                    <motion.button key={mod.id} onClick={() => setLibSelected(isSelected ? null : mod)}
-                      whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                      className="w-full text-left px-4 py-3 rounded-xl transition-all border"
-                      style={{
-                        background: isSelected ? 'rgba(96,165,250,0.12)' : 'transparent',
-                        borderColor: isSelected ? 'rgba(96,165,250,0.40)' : 'rgba(255,255,255,0.08)',
-                      }}>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs px-2 py-0.5 rounded shrink-0"
-                          style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa' }}>
-                          {mod.code}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm" style={{ color: isSelected ? '#60a5fa' : tc.p }}>{mod.name}</p>
-                          {mod.description && (
-                            <p className="text-xs truncate mt-0.5" style={{ color: tc.m }}>{mod.description}</p>
-                          )}
-                        </div>
-                        {isSelected && (
-                          <svg className="w-4 h-4 shrink-0" style={{ color: '#60a5fa' }} fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </div>
-                    </motion.button>
-                  );
-                })
-            )}
+            ) : filteredLibModules.map(mod => {
+              const isSelected = libSelectedIds.has(mod.id);
+              return (
+                <motion.button key={mod.id} onClick={() => toggleLibSelect(mod)}
+                  disabled={assigning}
+                  whileHover={{ scale: 1.005 }} whileTap={{ scale: 0.995 }}
+                  className="w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center gap-3 disabled:opacity-40"
+                  style={{
+                    background: isSelected ? 'rgba(96,165,250,0.10)' : 'transparent',
+                    border: `1px solid ${isSelected ? 'rgba(96,165,250,0.40)' : (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)')}`,
+                  }}>
+                  {/* Checkbox icon */}
+                  <span className="shrink-0">
+                    {isSelected
+                      ? <CheckSquare className="w-4 h-4" style={{ color: '#60a5fa' }} />
+                      : <Square className="w-4 h-4" style={{ color: tc.m, opacity: 0.5 }} />}
+                  </span>
+                  {/* Code badge */}
+                  <span className="font-mono text-xs px-2 py-0.5 rounded shrink-0"
+                    style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa' }}>
+                    {mod.code}
+                  </span>
+                  {/* Name + description */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm" style={{ color: isSelected ? '#60a5fa' : tc.p }}>{mod.name}</p>
+                    {mod.description && (
+                      <p className="text-xs truncate mt-0.5" style={{ color: tc.m }}>{mod.description}</p>
+                    )}
+                  </div>
+                  {/* Phase count badge */}
+                  {(mod as any)._count?.phases != null && (
+                    <span className="text-[10px] shrink-0 px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(167,139,250,0.10)', color: '#a78bfa' }}>
+                      {(mod as any)._count.phases} fase{(mod as any)._count.phases !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </motion.button>
+              );
+            })}
           </div>
 
-          <div className="flex gap-3 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-            <button onClick={() => setLibModal(false)}
-              className="px-4 py-2.5 rounded-xl text-sm"
+          {/* Barra de progreso (visible mientras asigna) */}
+          {assigning && assignProgress && (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between text-xs" style={{ color: 'var(--text-secondary)' }}>
+                <span className="truncate">Asignando: <span className="font-semibold" style={{ color: tc.p }}>{assignProgress.name}</span></span>
+                <span className="shrink-0 ml-2 font-mono">{assignProgress.done} / {assignProgress.total}</span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <div className="h-full rounded-full transition-all duration-300"
+                  style={{ width: `${Math.round((assignProgress.done / assignProgress.total) * 100)}%`, background: 'linear-gradient(90deg,#3b82f6,#60a5fa)' }} />
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1 border-t" style={{ borderColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)' }}>
+            <button onClick={() => setLibModal(false)} disabled={assigning}
+              className="px-4 py-2.5 rounded-xl text-sm disabled:opacity-40"
               style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
               Cancelar
             </button>
-            <button onClick={handleAssign} disabled={!libSelected || assigning}
-              className="flex-1 btn-primary py-2.5 rounded-xl text-sm text-white font-semibold disabled:opacity-50">
-              {assigning ? 'Asignando...' : libSelected ? `Asignar "${libSelected.name}"` : 'Selecciona un módulo'}
+            <button onClick={handleAssign} disabled={libSelectedIds.size === 0 || assigning}
+              className="flex-1 btn-primary py-2.5 rounded-xl text-sm text-white font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+              {assigning
+                ? <><span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Asignando...</>
+                : libSelectedIds.size === 0
+                  ? 'Selecciona al menos un módulo'
+                  : <><CheckSquare className="w-4 h-4" /> Agregar {libSelectedIds.size} módulo{libSelectedIds.size !== 1 ? 's' : ''}</>}
             </button>
           </div>
         </div>

@@ -1,11 +1,18 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate, buildMeta } from '../common/dto/pagination.dto';
-import { GenerateProjectDto, LoadTemplateDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto } from './dto/project.dto';
+import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto } from './dto/project.dto';
+import { EventsGateway } from '../gateway/events.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: EventsGateway,
+    private notifications: NotificationsService,
+  ) {}
 
   async findAll(companyId: string, dto: ProjectFilterDto) {
     const { take, skip } = paginate(dto.page, dto.limit);
@@ -37,6 +44,28 @@ export class ProjectsService {
     return { data, meta: buildMeta(total, dto.page ?? 1, dto.limit ?? 20) };
   }
 
+  async modulesByServiceOrder(companyId: string, serviceOrderId: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { serviceOrderId, serviceOrder: { companyId } },
+      select: {
+        id: true,
+        name: true,
+        modules: {
+          orderBy: { order: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            phases: {
+              orderBy: { order: 'asc' },
+              select: { id: true, name: true, color: true, slug: true },
+            },
+          },
+        },
+      },
+    });
+    return project ?? { id: null, name: null, modules: [] };
+  }
+
   async findOne(companyId: string, id: string) {
     const project = await this.prisma.project.findFirst({
       where: { id, serviceOrder: { companyId } },
@@ -44,7 +73,7 @@ export class ProjectsService {
         serviceOrder: {
           select: {
             id: true, osNumber: true, product: true,
-            client: { select: { id: true, businessName: true } },
+            client: { select: { id: true, businessName: true, city: true, municipioId: true } },
           },
         },
         templateFlow: { select: { id: true, name: true } },
@@ -85,10 +114,29 @@ export class ProjectsService {
       where: { id: projectId, serviceOrder: { companyId } },
     });
     if (!project) throw new NotFoundException('Proyecto no encontrado');
-    return this.prisma.project.update({
+
+    const updated = await this.prisma.project.update({
       where: { id: projectId },
       data: { status: dto.status },
     });
+
+    const STATUS_LABEL: Record<string, string> = {
+      activo: 'Activo', completado: 'Completado', pausado: 'Pausado',
+      cancelado: 'Cancelado', pendiente: 'Pendiente',
+    };
+    this.notifications.broadcastToAgents(
+      companyId,
+      {
+        type: 'proyecto',
+        title: `Proyecto "${project.name}": estado → ${STATUS_LABEL[dto.status] ?? dto.status}`,
+        entityType: 'project',
+        entityId: projectId,
+      },
+      this.gateway,
+    );
+    this.gateway.dashboardUpdate(companyId, { type: 'project_status_changed', payload: { id: projectId } });
+
+    return updated;
   }
 
   // ── Fases ─────────────────────────────────────────────────────────────────
@@ -111,10 +159,31 @@ export class ProjectsService {
   // ── Actividades ───────────────────────────────────────────────────────────
 
   async updateActivity(companyId: string, activityId: string, dto: UpdateActivityDto) {
+    // Single query: fetch everything needed for recalc (sibling activities, phases, modules)
     const activity = await this.prisma.activity.findFirst({
       where: { id: activityId, phase: { projectModule: { project: { serviceOrder: { companyId } } } } },
+      select: {
+        phaseId: true, progressPercent: true, status: true, actualStartDate: true, actualEndDate: true,
+        phase: {
+          select: {
+            projectModuleId: true,
+            activities: { select: { id: true, progressPercent: true, status: true } },
+            projectModule: {
+              select: {
+                projectId: true,
+                phases: { select: { id: true, progressPercent: true } },
+                project: { select: { modules: { select: { id: true, progressPercent: true } } } },
+              },
+            },
+          },
+        },
+      },
     });
     if (!activity) throw new NotFoundException('Actividad no encontrada');
+
+    const phaseId   = activity.phaseId;
+    const moduleId  = activity.phase.projectModuleId;
+    const projectId = activity.phase.projectModule.projectId;
 
     const data: any = {};
     if (dto.status !== undefined) {
@@ -131,14 +200,42 @@ export class ProjectsService {
     if (dto.actualStartDate !== undefined) data.actualStartDate = dto.actualStartDate ? new Date(dto.actualStartDate) : null;
     if (dto.actualEndDate !== undefined) data.actualEndDate = dto.actualEndDate ? new Date(dto.actualEndDate) : null;
     if (dto.executionDate !== undefined) data.executionDate = dto.executionDate ? new Date(dto.executionDate) : null;
+
+    const start = data.actualStartDate !== undefined ? data.actualStartDate : activity.actualStartDate;
+    const end   = data.actualEndDate   !== undefined ? data.actualEndDate   : activity.actualEndDate;
+    data.calculatedDays = (start && end)
+      ? Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000))
+      : 0;
     if (dto.assignedToId !== undefined) data.assignedToId = dto.assignedToId || null;
     if (dto.clientStaffId !== undefined) data.clientStaffId = dto.clientStaffId || null;
 
-    const updated = await this.prisma.activity.update({
-      where: { id: activityId },
-      data,
-    });
-    await this.recalcPhase(activity.phaseId);
+    // Compute new values for this activity, then derive cascade averages in memory
+    const newPct    = data.progressPercent !== undefined ? data.progressPercent : Number(activity.progressPercent);
+    const newStatus = data.status ?? activity.status;
+
+    const sibActs = activity.phase.activities.map(a =>
+      a.id === activityId ? { progressPercent: newPct, status: newStatus } : { progressPercent: Number(a.progressPercent), status: a.status }
+    );
+    const phaseAvg = sibActs.length ? sibActs.reduce((s, a) => s + a.progressPercent, 0) / sibActs.length : 0;
+    let phaseStatus = 'pendiente';
+    if (sibActs.length && sibActs.every(a => a.status === 'completado')) phaseStatus = 'completado';
+    else if (sibActs.some(a => a.status === 'en_progreso' || a.status === 'completado')) phaseStatus = 'en_progreso';
+
+    const moduleAvg = activity.phase.projectModule.phases.length
+      ? activity.phase.projectModule.phases.reduce((s, p) => s + (p.id === phaseId ? phaseAvg : Number(p.progressPercent)), 0) / activity.phase.projectModule.phases.length
+      : 0;
+    const projectAvg = activity.phase.projectModule.project.modules.length
+      ? activity.phase.projectModule.project.modules.reduce((s, m) => s + (m.id === moduleId ? moduleAvg : Number(m.progressPercent)), 0) / activity.phase.projectModule.project.modules.length
+      : 0;
+
+    // Single transaction — all 4 writes in one DB round trip
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.activity.update({ where: { id: activityId }, data }),
+      this.prisma.phase.update({ where: { id: phaseId }, data: { progressPercent: phaseAvg, status: phaseStatus } }),
+      this.prisma.projectModule.update({ where: { id: moduleId }, data: { progressPercent: moduleAvg } }),
+      this.prisma.project.update({ where: { id: projectId }, data: { progressPercent: projectAvg } }),
+    ]);
+
     return updated;
   }
 
@@ -154,6 +251,12 @@ export class ProjectsService {
     const phaseCode = (phase as any).slug?.toUpperCase() ?? 'ACT';
     const code = `${phaseCode}-${nextNum}`;
 
+    const actStart = dto.actualStartDate ? new Date(dto.actualStartDate) : null;
+    const actEnd   = dto.actualEndDate   ? new Date(dto.actualEndDate)   : null;
+    const calcDays = actStart && actEnd
+      ? Math.max(0, Math.round((actEnd.getTime() - actStart.getTime()) / 86400000))
+      : 0;
+
     const activity = await this.prisma.activity.create({
       data: {
         phaseId,
@@ -166,8 +269,9 @@ export class ProjectsService {
         plannedHours: dto.plannedHours ?? 0,
         plannedStartDate: dto.plannedStartDate ? new Date(dto.plannedStartDate) : null,
         plannedEndDate: dto.plannedEndDate ? new Date(dto.plannedEndDate) : null,
-        actualStartDate: dto.actualStartDate ? new Date(dto.actualStartDate) : null,
-        actualEndDate: dto.actualEndDate ? new Date(dto.actualEndDate) : null,
+        actualStartDate: actStart,
+        actualEndDate: actEnd,
+        calculatedDays: calcDays,
         assignedToId: dto.assignedToId || null,
         clientStaffId: dto.clientStaffId || null,
       },
@@ -209,59 +313,186 @@ export class ProjectsService {
     await this.wipeProjectData(this.prisma, projectId);
 
     // Tx 2: crear nueva estructura desde la plantilla
-    const phaseDateMap = new Map((dto.phaseDates ?? []).map((d) => [d.templatePhaseId, d]));
+    const phaseDateMap  = new Map((dto.phaseDates ?? []).map((d) => [d.templatePhaseId, d]));
+    const excludedSet   = new Set(dto.excludedModuleIds ?? []);
 
     await this.prisma.project.update({
       where: { id: projectId },
       data: { templateFlowId: dto.templateFlowId, progressPercent: 0 },
     });
 
-    for (const tMod of template.modules) {
+    const moduleRows:   any[] = [];
+    const phaseRows:    any[] = [];
+    const activityRows: any[] = [];
+
+    for (const tMod of template.modules.filter(m => !excludedSet.has(m.id))) {
+      const modId = randomUUID();
       const modPhaseDates = tMod.phases.map(p => phaseDateMap.get(p.id)).filter(Boolean);
       const modStart = modPhaseDates.find(d => d?.startDate)
         ? new Date(modPhaseDates.filter(d => d?.startDate).map(d => d!.startDate!).sort()[0])
-        : undefined;
+        : null;
       const modEnd = modPhaseDates.find(d => d?.endDate)
         ? new Date(modPhaseDates.filter(d => d?.endDate).map(d => d!.endDate!).sort().reverse()[0])
-        : undefined;
+        : null;
 
-      const pMod = await this.prisma.projectModule.create({
-        data: { projectId, name: tMod.name, order: tMod.order, startDate: modStart, endDate: modEnd },
-      });
+      moduleRows.push({ id: modId, projectId, name: tMod.name, order: tMod.order, startDate: modStart, endDate: modEnd });
 
       for (const tPhase of tMod.phases) {
+        const phaseId = randomUUID();
         const phDates = phaseDateMap.get(tPhase.id);
-        const phStart = phDates?.startDate ? new Date(phDates.startDate) : undefined;
-        const phEnd   = phDates?.endDate   ? new Date(phDates.endDate)   : undefined;
+        const phStart = phDates?.startDate ? new Date(phDates.startDate) : null;
+        const phEnd   = phDates?.endDate   ? new Date(phDates.endDate)   : null;
 
-        const phase = await this.prisma.phase.create({
-          data: {
-            projectModuleId: pMod.id,
-            name: tPhase.name, slug: tPhase.slug, order: tPhase.order,
-            color: tPhase.color, icon: tPhase.icon, status: 'pendiente',
-            startDate: phStart, endDate: phEnd,
-          },
+        phaseRows.push({
+          id: phaseId, projectModuleId: modId,
+          name: tPhase.name, slug: tPhase.slug, order: tPhase.order,
+          color: tPhase.color, icon: tPhase.icon, status: 'pendiente',
+          startDate: phStart, endDate: phEnd,
         });
 
         for (const tAct of tPhase.activities) {
-          await this.prisma.activity.create({
-            data: {
-              phaseId: phase.id,
-              code: tAct.code, name: tAct.name, description: tAct.description,
-              order: tAct.order, plannedHours: tAct.estimatedHours,
-              priority: tAct.priority, status: 'pendiente',
-              actualStartDate: phStart,
-              actualEndDate: phEnd,
-            },
+          activityRows.push({
+            id: randomUUID(), phaseId,
+            code: tAct.code, name: tAct.name, description: tAct.description,
+            order: tAct.order, plannedHours: tAct.estimatedHours,
+            priority: tAct.priority, status: 'pendiente',
+            actualStartDate: phStart, actualEndDate: phEnd,
+            assignedToId:  phDates?.agentLeaderId  || null,
+            clientStaffId: phDates?.clientLeaderId || null,
           });
         }
       }
+    }
+
+    if (moduleRows.length) {
+      await this.prisma.projectModule.createMany({ data: moduleRows });
+      if (phaseRows.length)    await this.prisma.phase.createMany({ data: phaseRows });
+      if (activityRows.length) await this.prisma.activity.createMany({ data: activityRows });
     }
 
     return this.prisma.project.findUnique({
       where: { id: projectId },
       include: { serviceOrder: { select: { osNumber: true, product: true } }, _count: { select: { modules: true } } },
     });
+  }
+
+  // ── Agregar módulos desde plantilla (sin borrar los existentes) ──────────
+
+  async addModules(companyId: string, projectId: string, dto: AddModulesDto) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, serviceOrder: { companyId } },
+    });
+    if (!project) throw new NotFoundException('Proyecto no encontrado');
+
+    const template = await this.prisma.templateFlow.findFirst({
+      where: { id: dto.templateFlowId, companyId },
+      include: {
+        modules: {
+          orderBy: { order: 'asc' },
+          include: { phases: { orderBy: { order: 'asc' }, include: { activities: { orderBy: { order: 'asc' } } } } },
+        },
+      },
+    });
+    if (!template) throw new NotFoundException('Plantilla no encontrada');
+
+    const selectedSet  = new Set(dto.selectedModuleIds);
+    const phaseDateMap = new Map((dto.phaseDates ?? []).map((d) => [d.templatePhaseId, d]));
+
+    const selectedModules = template.modules.filter(m => selectedSet.has(m.id));
+
+    const lastMod = await this.prisma.projectModule.findFirst({
+      where: { projectId },
+      orderBy: { order: 'desc' },
+      select: { order: true },
+    });
+    let nextOrder = (lastMod?.order ?? 0) + 1;
+
+    const moduleRows:   any[] = [];
+    const phaseRows:    any[] = [];
+    const activityRows: any[] = [];
+
+    for (const tMod of selectedModules) {
+      const modId = randomUUID();
+      const modPhaseDates = tMod.phases.map(p => phaseDateMap.get(p.id)).filter(Boolean);
+      const modStart = modPhaseDates.find(d => d?.startDate)
+        ? new Date(modPhaseDates.filter(d => d?.startDate).map(d => d!.startDate!).sort()[0])
+        : null;
+      const modEnd = modPhaseDates.find(d => d?.endDate)
+        ? new Date(modPhaseDates.filter(d => d?.endDate).map(d => d!.endDate!).sort().reverse()[0])
+        : null;
+
+      moduleRows.push({ id: modId, projectId, name: tMod.name, order: nextOrder++, startDate: modStart, endDate: modEnd });
+
+      for (const tPhase of tMod.phases) {
+        const phaseId = randomUUID();
+        const phDates = phaseDateMap.get(tPhase.id);
+        const phStart = phDates?.startDate ? new Date(phDates.startDate) : null;
+        const phEnd   = phDates?.endDate   ? new Date(phDates.endDate)   : null;
+
+        phaseRows.push({
+          id: phaseId, projectModuleId: modId,
+          name: tPhase.name, slug: tPhase.slug, order: tPhase.order,
+          color: tPhase.color, icon: tPhase.icon, status: 'pendiente',
+          startDate: phStart, endDate: phEnd,
+          responsibleId: phDates?.agentLeaderId  || null,
+          clientStaffId: phDates?.clientLeaderId || null,
+        });
+
+        for (const tAct of tPhase.activities) {
+          activityRows.push({
+            id: randomUUID(), phaseId,
+            code: tAct.code, name: tAct.name, description: tAct.description,
+            order: tAct.order, plannedHours: tAct.estimatedHours,
+            priority: tAct.priority, status: 'pendiente',
+            actualStartDate: phStart, actualEndDate: phEnd,
+            assignedToId:    phDates?.agentLeaderId  || null,
+            clientStaffId:   phDates?.clientLeaderId || null,
+          });
+        }
+      }
+    }
+
+    if (moduleRows.length) {
+      await this.prisma.projectModule.createMany({ data: moduleRows });
+      if (phaseRows.length)    await this.prisma.phase.createMany({ data: phaseRows });
+      if (activityRows.length) await this.prisma.activity.createMany({ data: activityRows });
+    }
+
+    return this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { serviceOrder: { select: { osNumber: true, product: true } }, _count: { select: { modules: true } } },
+    });
+  }
+
+  // ── Eliminar módulo ──────────────────────────────────────────────────────
+
+  async deleteModule(companyId: string, moduleId: string) {
+    const mod = await this.prisma.projectModule.findFirst({
+      where: { id: moduleId, project: { serviceOrder: { companyId } } },
+      select: { id: true, projectId: true },
+    });
+    if (!mod) throw new NotFoundException('Módulo no encontrado');
+
+    const activities = await this.prisma.activity.findMany({
+      where: { phase: { projectModuleId: moduleId } },
+      select: { id: true },
+    });
+    const activityIds = activities.map(a => a.id);
+
+    if (activityIds.length) {
+      await Promise.all([
+        this.prisma.visitActivity.deleteMany({ where: { activityId: { in: activityIds } } }),
+        this.prisma.activityDependency.deleteMany({
+          where: { OR: [{ activityId: { in: activityIds } }, { dependsOnActivityId: { in: activityIds } }] },
+        }),
+      ]);
+      await this.prisma.activity.deleteMany({ where: { id: { in: activityIds } } });
+    }
+
+    await this.prisma.phase.deleteMany({ where: { projectModuleId: moduleId } });
+    await this.prisma.projectModule.delete({ where: { id: moduleId } });
+    await this.recalcProject(mod.projectId);
+    return { message: 'Módulo eliminado' };
   }
 
   // ── Eliminar proyecto ──────────────────────────────────────────────────────
@@ -271,6 +502,13 @@ export class ProjectsService {
       where: { id: projectId, serviceOrder: { companyId } },
     });
     if (!project) throw new NotFoundException('Proyecto no encontrado');
+
+    const actaCount = await this.prisma.acta.count({ where: { projectId } });
+    if (actaCount > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar el proyecto porque tiene ${actaCount} acta${actaCount !== 1 ? 's' : ''} asociada${actaCount !== 1 ? 's' : ''}. Elimina las actas primero desde la sección de actas del proyecto.`,
+      );
+    }
 
     await this.wipeProjectData(this.prisma, projectId);
     return this.prisma.project.delete({ where: { id: projectId } });
@@ -282,39 +520,23 @@ export class ProjectsService {
   //   VisitActivity / ActivityDependency → Activity → Phase → ProjectModule
 
   private async wipeProjectData(tx: any, projectId: string) {
-    const phases = await tx.phase.findMany({
-      where: { projectModule: { projectId } },
+    const activities = await tx.activity.findMany({
+      where: { phase: { projectModule: { projectId } } },
       select: { id: true },
     });
-    const phaseIds = phases.map((p: any) => p.id);
+    const activityIds = activities.map((a: any) => a.id);
 
-    if (phaseIds.length) {
-      const activities = await tx.activity.findMany({
-        where: { phaseId: { in: phaseIds } },
-        select: { id: true },
-      });
-      const activityIds = activities.map((a: any) => a.id);
-
-      if (activityIds.length) {
-        // Tablas que referencian Activity con onDelete: NoAction
-        await tx.visitActivity.deleteMany({ where: { activityId: { in: activityIds } } });
-        await tx.activityDependency.deleteMany({
-          where: {
-            OR: [
-              { activityId: { in: activityIds } },
-              { dependsOnActivityId: { in: activityIds } },
-            ],
-          },
-        });
-        // Activity (ActivityThread y SubActivity tienen onDelete: Cascade en DB)
-        await tx.activity.deleteMany({ where: { id: { in: activityIds } } });
-      }
-
-      // Phase (ahora sin actividades que la bloqueen)
-      await tx.phase.deleteMany({ where: { id: { in: phaseIds } } });
+    if (activityIds.length) {
+      await Promise.all([
+        tx.visitActivity.deleteMany({ where: { activityId: { in: activityIds } } }),
+        tx.activityDependency.deleteMany({
+          where: { OR: [{ activityId: { in: activityIds } }, { dependsOnActivityId: { in: activityIds } }] },
+        }),
+      ]);
+      await tx.activity.deleteMany({ where: { id: { in: activityIds } } });
     }
 
-    // ProjectModule (ahora sin fases)
+    await tx.phase.deleteMany({ where: { projectModule: { projectId } } });
     await tx.projectModule.deleteMany({ where: { projectId } });
   }
 
@@ -358,41 +580,37 @@ export class ProjectsService {
   // ── Generar proyecto ──────────────────────────────────────────────────────
 
   async generateFromServiceOrder(companyId: string, serviceOrderId: string, dto: GenerateProjectDto) {
-    const os = await this.prisma.serviceOrder.findFirst({ where: { id: serviceOrderId, companyId } });
-    if (!os) throw new NotFoundException('Orden de servicio no encontrada');
-
-    const existing = await this.prisma.project.findUnique({ where: { serviceOrderId } });
-    if (existing) throw new ConflictException('Esta OS ya tiene un proyecto generado');
-
-    const template = await this.prisma.templateFlow.findFirst({
-      where: { id: dto.templateFlowId, companyId },
-      include: {
-        modules: {
-          orderBy: { order: 'asc' },
-          include: { phases: { orderBy: { order: 'asc' }, include: { activities: { orderBy: { order: 'asc' } } } } },
+    // Validate in parallel to avoid sequential round trips
+    const [os, existing, template] = await Promise.all([
+      this.prisma.serviceOrder.findFirst({ where: { id: serviceOrderId, companyId } }),
+      this.prisma.project.findUnique({ where: { serviceOrderId } }),
+      this.prisma.templateFlow.findFirst({
+        where: { id: dto.templateFlowId, companyId },
+        include: {
+          modules: {
+            orderBy: { order: 'asc' },
+            include: { phases: { orderBy: { order: 'asc' }, include: { activities: { orderBy: { order: 'asc' } } } } },
+          },
         },
-      },
-    });
-    if (!template) throw new NotFoundException('Plantilla no encontrada');
+      }),
+    ]);
 
-    const project = await this.prisma.project.create({
-      data: {
-        serviceOrderId,
-        templateFlowId: dto.templateFlowId,
-        name: dto.name ?? `${os.product} — ${new Date().getFullYear()}`,
-        description: dto.description,
-        startDate: os.startDate,
-        endDate: os.endDate,
-        status: 'activo',
-      },
-    });
+    if (!os) throw new NotFoundException('Orden de servicio no encontrada');
+    if (existing) throw new ConflictException('Esta OS ya tiene un proyecto generado');
+    if (!template) throw new NotFoundException('Plantilla no encontrada');
 
     const phaseDateMap = new Map((dto.phaseDates ?? []).map((d) => [d.templatePhaseId, d]));
     const excludedSet  = new Set(dto.excludedModuleIds ?? []);
-
     const filteredModules = template.modules.filter(m => !excludedSet.has(m.id));
 
+    // Pre-generate all IDs so we can build bulk-insert payloads without chained awaits
+    const projectId = randomUUID();
+    const modulesData: any[] = [];
+    const phasesData:  any[] = [];
+    const activitiesData: any[] = [];
+
     for (const tMod of filteredModules) {
+      const modId = randomUUID();
       const modPhaseDates = tMod.phases.map(p => phaseDateMap.get(p.id)).filter(Boolean);
       const modStart = modPhaseDates.find(d => d?.startDate)
         ? new Date(modPhaseDates.filter(d => d?.startDate).map(d => d!.startDate!).sort()[0])
@@ -401,43 +619,60 @@ export class ProjectsService {
         ? new Date(modPhaseDates.filter(d => d?.endDate).map(d => d!.endDate!).sort().reverse()[0])
         : undefined;
 
-      const pMod = await this.prisma.projectModule.create({
-        data: { projectId: project.id, name: tMod.name, order: tMod.order, startDate: modStart, endDate: modEnd },
-      });
+      modulesData.push({ id: modId, projectId, name: tMod.name, order: tMod.order, startDate: modStart, endDate: modEnd });
 
       for (const tPhase of tMod.phases) {
+        const phaseId = randomUUID();
         const phDates = phaseDateMap.get(tPhase.id);
         const phStart = phDates?.startDate ? new Date(phDates.startDate) : undefined;
         const phEnd   = phDates?.endDate   ? new Date(phDates.endDate)   : undefined;
 
-        const phase = await this.prisma.phase.create({
-          data: {
-            projectModuleId: pMod.id,
-            name: tPhase.name, slug: tPhase.slug, order: tPhase.order,
-            color: tPhase.color, icon: tPhase.icon, status: 'pendiente',
-            startDate: phStart, endDate: phEnd,
-            responsibleId:  phDates?.agentLeaderId  || null,
-            clientStaffId:  phDates?.clientLeaderId || null,
-          },
+        phasesData.push({
+          id: phaseId,
+          projectModuleId: modId,
+          name: tPhase.name, slug: tPhase.slug, order: tPhase.order,
+          color: tPhase.color, icon: tPhase.icon, status: 'pendiente',
+          startDate: phStart, endDate: phEnd,
+          responsibleId:  phDates?.agentLeaderId  || null,
+          clientStaffId:  phDates?.clientLeaderId || null,
         });
 
         for (const tAct of tPhase.activities) {
-          await this.prisma.activity.create({
-            data: {
-              phaseId: phase.id,
-              code: tAct.code, name: tAct.name, description: tAct.description,
-              order: tAct.order, plannedHours: tAct.estimatedHours,
-              priority: tAct.priority, status: 'pendiente',
-              actualStartDate: phStart,
-              actualEndDate: phEnd,
-            },
+          activitiesData.push({
+            phaseId,
+            code: tAct.code, name: tAct.name, description: tAct.description,
+            order: tAct.order, plannedHours: tAct.estimatedHours,
+            priority: tAct.priority, status: 'pendiente',
+            actualStartDate: phStart,
+            actualEndDate: phEnd,
+            assignedToId:  phDates?.agentLeaderId  || null,
+            clientStaffId: phDates?.clientLeaderId || null,
           });
         }
       }
     }
 
+    // 4 bulk operations in one transaction instead of N×M×K sequential round trips
+    await this.prisma.$transaction(async (tx) => {
+      await tx.project.create({
+        data: {
+          id: projectId,
+          serviceOrderId,
+          templateFlowId: dto.templateFlowId,
+          name: dto.name ?? `${os.product} — ${new Date().getFullYear()}`,
+          description: dto.description,
+          startDate: os.startDate,
+          endDate: os.endDate,
+          status: 'activo',
+        },
+      });
+      if (modulesData.length)    await tx.projectModule.createMany({ data: modulesData });
+      if (phasesData.length)     await tx.phase.createMany({ data: phasesData });
+      if (activitiesData.length) await tx.activity.createMany({ data: activitiesData });
+    });
+
     return this.prisma.project.findUnique({
-      where: { id: project.id },
+      where: { id: projectId },
       include: { serviceOrder: { select: { osNumber: true, product: true } }, _count: { select: { modules: true } } },
     });
   }

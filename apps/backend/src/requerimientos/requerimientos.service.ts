@@ -294,7 +294,7 @@ export class RequerimientosService {
       where: { id: { in: rows.map(r => r.id) }, companyId },
       select: { id: true, numero: true },
     });
-    const reqMap    = new Map(found.map(r => [r.id, r]));
+    const reqMap    = new Map<string, typeof found[0]>(found.map(r => [r.id, r]));
     const validRows   = rows.filter(r => reqMap.has(r.id));
     const invalidRows = rows.filter(r => !reqMap.has(r.id));
 

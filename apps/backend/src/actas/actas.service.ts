@@ -460,10 +460,10 @@ export class ActasService {
         }),
       ]);
       if (linkedActivities.length) {
-        const updatesMap = new Map(
+        const updatesMap = new Map<string, { status: string; progressPercent: number }>(
           linkedActivities.map(aa => {
             const status = aa.status ?? 'completado';
-            return [aa.activityId, { status, progressPercent: this.statusToProgress(status) }];
+            return [aa.activityId, { status, progressPercent: this.statusToProgress(status) }] as [string, { status: string; progressPercent: number }];
           }),
         );
         // Pre-fetch activities with phase siblings for avg computation
@@ -649,7 +649,7 @@ export class ActasService {
       where: { actaId, phaseId: { not: null } },
       select: { phaseId: true },
     });
-    const phaseIds = [...new Set(compromisos.map(c => c.phaseId!))];
+    const phaseIds: string[] = [...new Set(compromisos.map(c => c.phaseId!))];
     if (!phaseIds.length) return;
 
     // One query for all phases' activities
@@ -696,10 +696,10 @@ export class ActasService {
     });
     if (!acta || !acta.actaActividades.length) return;
 
-    const updatesMap = new Map(
+    const updatesMap = new Map<string, { status: string; progressPercent: number }>(
       acta.actaActividades.map(aa => {
         const status = aa.status ?? 'completado';
-        return [aa.activityId, { status, progressPercent: this.statusToProgress(status) }];
+        return [aa.activityId, { status, progressPercent: this.statusToProgress(status) }] as [string, { status: string; progressPercent: number }];
       }),
     );
 

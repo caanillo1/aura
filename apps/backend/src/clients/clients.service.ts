@@ -23,7 +23,7 @@ export class ClientsService {
 
   async findAll(companyId: string, dto: PaginationDto) {
     const { take, skip } = paginate(dto.page, dto.limit);
-    const where: Prisma.ClientWhereInput = { companyId };
+    const where: { companyId: string; OR?: object[] } = { companyId };
     if (dto.search) {
       where.OR = [
         { businessName:   { contains: dto.search } },

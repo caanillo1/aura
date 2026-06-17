@@ -77,7 +77,7 @@ export class ServiceOrdersService {
 
   async findAll(companyId: string, dto: ServiceOrderFilterDto) {
     const { take, skip } = paginate(dto.page, dto.limit);
-    const where: Prisma.ServiceOrderWhereInput = { companyId };
+    const where: { companyId: string; OR?: object[]; status?: string; clientId?: string } = { companyId };
     if (dto.search) {
       where.OR = [
         { osNumber: { contains: dto.search } },

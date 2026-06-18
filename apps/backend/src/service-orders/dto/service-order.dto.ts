@@ -1,5 +1,5 @@
 import {
-  IsString, IsNotEmpty, IsOptional, IsDateString, IsInt, IsUUID, IsIn, Min,
+  IsString, IsNotEmpty, IsOptional, IsDateString, IsInt, IsUUID, IsIn, Min, IsBoolean,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -43,6 +43,7 @@ export class AddNoteDto {
   @ApiProperty() @IsString() @IsIn(['baja', 'media', 'alta', 'critica']) noteLevel: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['proximos_logros', 'riesgo_critico']) noteSubtype?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() noteMitigation?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() notifyClient?: boolean;
 }
 
 export class AddImplementerDto {

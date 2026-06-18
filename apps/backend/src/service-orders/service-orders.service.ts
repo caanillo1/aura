@@ -259,6 +259,17 @@ export class ServiceOrdersService {
       this.gateway,
     );
 
+    if (dto.notifyClient && dto.noteType !== 'interna') {
+      this.notifyNote(companyId, id, userId, {
+        noteText:       dto.note.trim(),
+        noteType:       dto.noteType as 'general' | 'interna',
+        noteLevel:      dto.noteLevel,
+        noteSubtype:    dto.noteSubtype ?? null,
+        noteMitigation: dto.noteMitigation ?? null,
+        notifyClient:   true,
+      }).catch(() => {});
+    }
+
     return this.findOne(companyId, id);
   }
 
@@ -289,7 +300,7 @@ export class ServiceOrdersService {
     });
 
     // Load recipients from both schedules (stored in systemConfig as JSON)
-    const [weeklyCfg, bimensualCfg] = await Promise.all([
+    const [weeklyCfg, bimensualCfg, osExtra] = await Promise.all([
       this.prisma.systemConfig.findUnique({
         where: { companyId_configKey: { companyId, configKey: `informe_weekly_${osId}` } },
         select: { configValue: true },
@@ -298,13 +309,21 @@ export class ServiceOrdersService {
         where: { companyId_configKey: { companyId, configKey: `informe_bimensual_${osId}` } },
         select: { configValue: true },
       }),
+      this.prisma.serviceOrder.findUnique({
+        where: { id: osId },
+        select: { clientLeader: { select: { email: true } } },
+      }),
     ]);
     const parseDestination = (cfg: { configValue: string | null } | null): string[] => {
       try { return JSON.parse(cfg?.configValue ?? '{}')?.destinatarios ?? []; } catch { return []; }
     };
+    const clientLeaderEmail = dto.notifyClient && dto.noteType !== 'interna'
+      ? (osExtra?.clientLeader?.email ?? null)
+      : null;
     const allRecipients = Array.from(new Set([
       ...parseDestination(weeklyCfg),
       ...parseDestination(bimensualCfg),
+      ...(clientLeaderEmail ? [clientLeaderEmail] : []),
     ]));
     if (!allRecipients.length) return { sent: 0 };
 

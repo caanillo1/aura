@@ -182,7 +182,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
                       whileHover={{ x: isCollapsed ? 0 : 4, scale: isCollapsed ? 1 : 1.01 }}
                       transition={{ duration: 0.15 }}
                       onClick={() => !isCollapsed && toggleExpand(item.label)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer group ${isCollapsed ? 'justify-center' : ''} ${childActive ? 'sidebar-item-active' : ''}`}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer group ${isCollapsed ? 'justify-center' : 'shine-on-hover'} ${childActive ? 'sidebar-item-active' : ''}`}
                     >
                       <Icon className="w-5 h-5 shrink-0 transition-colors" style={{ color: iconColor(childActive) }} />
                       <AnimatePresence>
@@ -264,8 +264,9 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
                               <li key={child.href}>
                                 <Link href={child.href} onClick={onClose}>
                                   <motion.div
-                                    whileHover={{ x: 2 }}
-                                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all cursor-pointer"
+                                    whileHover={{ x: 3, scale: 1.01 }}
+                                    transition={{ duration: 0.12 }}
+                                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all cursor-pointer shine-on-hover"
                                     style={{
                                       background: childIsActive
                                         ? isLight ? 'rgba(30,58,95,0.10)' : 'rgba(59,130,246,0.12)'
@@ -300,7 +301,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
                     <motion.div
                       whileHover={{ x: isCollapsed ? 0 : 4, scale: isCollapsed ? 1 : 1.01 }}
                       transition={{ duration: 0.15 }}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer group relative ${isCollapsed ? 'justify-center' : ''} ${active ? 'sidebar-item-active' : ''}`}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer group relative ${isCollapsed ? 'justify-center' : 'shine-on-hover'} ${active ? 'sidebar-item-active' : ''}`}
                     >
                       <Icon className="w-5 h-5 shrink-0 transition-colors" style={{ color: iconColor(active) }} />
                       <AnimatePresence>

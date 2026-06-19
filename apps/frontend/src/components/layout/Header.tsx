@@ -46,9 +46,9 @@ export function Header({ onMenuToggle }: HeaderProps) {
       style={{
         background: 'var(--header-bg)',
         borderBottom: '1px solid var(--header-border)',
-        backdropFilter: 'blur(24px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-        boxShadow: '0 1px 0 var(--border-subtle)',
+        backdropFilter: 'blur(32px) saturate(200%)',
+        WebkitBackdropFilter: 'blur(32px) saturate(200%)',
+        boxShadow: 'var(--header-shadow)',
       }}
     >
       <div className="flex items-center gap-3">
@@ -70,7 +70,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
         {/* Search / Command Palette trigger */}
         <button
           onClick={openPalette}
-          className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-lg transition-all text-xs font-medium"
+          className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-lg transition-all text-xs font-medium shine-on-hover"
           style={{
             background: 'var(--input-bg)',
             border: '1px solid var(--input-border)',

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -72,6 +72,8 @@ export default function OrdenDetailPage() {
   const [conActasAutoEmail, setConActasAutoEmail]       = useState<{ destinatarios: string[]; asunto?: string } | null>(null);
   const [ejecutivoAutoEmail, setEjecutivoAutoEmail]     = useState<{ destinatarios: string[]; asunto?: string } | null>(null);
   const [showReportMenu, setShowReportMenu]     = useState(false);
+  const [reportMenuPos, setReportMenuPos]       = useState({ top: 0, right: 0 });
+  const reportBtnRef = useRef<HTMLButtonElement>(null);
   const [downloadingPlan, setDownloadingPlan]   = useState(false);
 
   // Email manual del informe
@@ -673,8 +675,16 @@ export default function OrdenDetailPage() {
 
           {/* Dropdown Ver Informe */}
           <div className="relative">
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-              onClick={() => setShowReportMenu(v => !v)}
+            <motion.button
+              ref={reportBtnRef}
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                if (reportBtnRef.current) {
+                  const r = reportBtnRef.current.getBoundingClientRect();
+                  setReportMenuPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
+                }
+                setShowReportMenu(v => !v);
+              }}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
               style={{ background: 'var(--accent-violet-bg)', border: '1px solid var(--accent-violet-border)', color: 'var(--accent-violet)' }}>
               <BarChart3 className="w-4 h-4" />
@@ -685,14 +695,24 @@ export default function OrdenDetailPage() {
             {showReportMenu && (
               <>
                 {/* Backdrop */}
-                <div className="fixed inset-0 z-10" onClick={() => setShowReportMenu(false)} />
-                {/* Menu */}
-                <div className="absolute right-0 top-full mt-1.5 z-20 w-56 rounded-xl overflow-hidden shadow-xl"
-                  style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
+                <div className="fixed inset-0 z-[200]" onClick={() => setShowReportMenu(false)} />
+                {/* Menu — fixed so escapa cualquier stacking context del padre */}
+                <div
+                  className="fixed z-[201] w-56 rounded-2xl overflow-hidden shadow-2xl"
+                  style={{
+                    top: reportMenuPos.top,
+                    right: reportMenuPos.right,
+                    background: 'var(--card-bg)',
+                    border: '1px solid var(--border-strong)',
+                    backdropFilter: 'blur(24px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.20)',
+                  }}
+                >
                   {/* Informe Ejecutivo */}
                   <button onClick={() => { setShowInforme(true); setShowReportMenu(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-white/5">
-                    <BarChart3 className="w-4 h-4 shrink-0" style={{ color: '#a78bfa' }} />
+                    <BarChart3 className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-violet)' }} />
                     <div>
                       <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Informe Ejecutivo</p>
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Resumen de avance y equipo</p>
@@ -702,7 +722,7 @@ export default function OrdenDetailPage() {
                   <button onClick={() => { setShowInformeActas(true); setShowReportMenu(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-white/5"
                     style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                    <FileText className="w-4 h-4 shrink-0" style={{ color: '#a78bfa' }} />
+                    <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-violet)' }} />
                     <div>
                       <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Informe con Actas</p>
                       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Incluye todas las actas</p>
@@ -713,8 +733,8 @@ export default function OrdenDetailPage() {
                     className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-white/5 disabled:opacity-50"
                     style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     {downloadingPlan
-                      ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: '#60a5fa' }} />
-                      : <ClipboardList className="w-4 h-4 shrink-0" style={{ color: '#60a5fa' }} />}
+                      ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: 'var(--accent-blue)' }} />
+                      : <ClipboardList className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-blue)' }} />}
                     <div>
                       <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                         {downloadingPlan ? 'Generando…' : 'Plan de Trabajo'}

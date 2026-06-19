@@ -126,8 +126,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
   const sidebarStyle = {
     background: 'var(--sidebar-bg)',
     borderRight: '1px solid var(--sidebar-border)',
-    backdropFilter: 'blur(32px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(32px) saturate(180%)',
+    backdropFilter: 'blur(72px) saturate(240%)',
+    WebkitBackdropFilter: 'blur(72px) saturate(240%)',
     boxShadow: 'var(--sidebar-shadow)',
   };
 

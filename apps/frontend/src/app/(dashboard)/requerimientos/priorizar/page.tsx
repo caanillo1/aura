@@ -53,21 +53,38 @@ interface Req {
 }
 
 // ── Paletas ───────────────────────────────────────────────────────────────────
-const PRIO_STYLE: Record<Prioridad, { color: string; bg: string; icon: string }> = {
-  Crítico: { color: '#dc2626', bg: 'rgba(220,38,38,0.13)',  icon: '🔴' },
-  Alta:    { color: '#f97316', bg: 'rgba(249,115,22,0.13)', icon: '🟠' },
-  Media:   { color: '#eab308', bg: 'rgba(234,179,8,0.12)',  icon: '🟡' },
-  Baja:    { color: '#22c55e', bg: 'rgba(34,197,94,0.11)',  icon: '🟢' },
-};
+// Computed inside the component using isLight — see getPrioStyle / getEstStyle below.
+function getPrioStyle(light: boolean): Record<Prioridad, { color: string; bg: string; icon: string }> {
+  return light ? {
+    Crítico: { color: '#991B1B', bg: 'rgba(153,27,27,0.09)',   icon: '🔴' },
+    Alta:    { color: '#C2410C', bg: 'rgba(194,65,12,0.09)',   icon: '🟠' },
+    Media:   { color: '#B45309', bg: 'rgba(180,83,9,0.09)',    icon: '🟡' },
+    Baja:    { color: '#047857', bg: 'rgba(4,120,87,0.09)',    icon: '🟢' },
+  } : {
+    Crítico: { color: '#f87171', bg: 'rgba(248,113,113,0.13)', icon: '🔴' },
+    Alta:    { color: '#fb923c', bg: 'rgba(249,115,22,0.13)',  icon: '🟠' },
+    Media:   { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  icon: '🟡' },
+    Baja:    { color: '#34d399', bg: 'rgba(34,197,94,0.11)',   icon: '🟢' },
+  };
+}
 
-const EST_STYLE: Record<Estado, { color: string; bg: string; dot: string }> = {
-  Elaborado:    { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',   dot: '#60a5fa' },
-  Priorizado:   { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', dot: '#a78bfa' },
-  Devuelto:     { color: '#fb923c', bg: 'rgba(251,146,60,0.12)',   dot: '#fb923c' },
-  Negado:       { color: '#f87171', bg: 'rgba(248,113,113,0.12)',  dot: '#f87171' },
-  Repriorizado: { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',   dot: '#fbbf24' },
-  Entregado:    { color: '#34d399', bg: 'rgba(52,211,153,0.11)',   dot: '#34d399' },
-};
+function getEstStyle(light: boolean): Record<Estado, { color: string; bg: string; dot: string }> {
+  return light ? {
+    Elaborado:    { color: '#1D4ED8', bg: 'rgba(29,78,216,0.08)',   dot: '#1D4ED8' },
+    Priorizado:   { color: '#6D28D9', bg: 'rgba(109,40,217,0.08)', dot: '#6D28D9' },
+    Devuelto:     { color: '#C2410C', bg: 'rgba(194,65,12,0.08)',   dot: '#C2410C' },
+    Negado:       { color: '#B91C1C', bg: 'rgba(185,28,28,0.08)',   dot: '#B91C1C' },
+    Repriorizado: { color: '#B45309', bg: 'rgba(180,83,9,0.08)',    dot: '#B45309' },
+    Entregado:    { color: '#047857', bg: 'rgba(4,120,87,0.08)',    dot: '#047857' },
+  } : {
+    Elaborado:    { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',   dot: '#60a5fa' },
+    Priorizado:   { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', dot: '#a78bfa' },
+    Devuelto:     { color: '#fb923c', bg: 'rgba(251,146,60,0.12)',   dot: '#fb923c' },
+    Negado:       { color: '#f87171', bg: 'rgba(248,113,113,0.12)',  dot: '#f87171' },
+    Repriorizado: { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',   dot: '#fbbf24' },
+    Entregado:    { color: '#34d399', bg: 'rgba(52,211,153,0.11)',   dot: '#34d399' },
+  };
+}
 
 const ESTADOS: Estado[] = ['Elaborado','Priorizado','Devuelto','Negado','Repriorizado','Entregado'];
 const PRIORIDADES: Prioridad[] = ['Crítico','Alta','Media','Baja'];
@@ -257,7 +274,9 @@ export default function PriorizarPage() {
   const rowBorder = isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.06)';
   const tc = isLight
     ? { p:'#0a1628', s:'#1a3050', m:'#4a6080' }
-    : { p:'#e2e8f0', s:'#94a3b8', m:'#6b82a0' };
+    : { p:'#e2e8f0', s:'#94a3b8', m:'#7a94b0' };
+  const PRIO_STYLE = getPrioStyle(isLight);
+  const EST_STYLE  = getEstStyle(isLight);
 
   // ── Carga de datos ────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -1193,11 +1212,10 @@ export default function PriorizarPage() {
                             <td className="px-3 py-3 max-w-[220px]">
                               <p className="font-medium text-sm leading-tight truncate" style={{ color: tc.p }}>{req.titulo}</p>
                               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                <span className="font-mono text-[10px] font-bold" style={{ color: '#60a5fa' }}>{req.numero}</span>
+                                <span className="font-mono text-[10px] font-bold" style={{ color: 'var(--accent-blue)' }}>{req.numero}</span>
                                 <span className="text-[10px]" style={{ color: tc.m }}>{req.tipo}</span>
                                 {req.ticketRubi && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md font-mono"
-                                    style={{ background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>
+                                  <span className="badge-violet text-[10px] px-1.5 py-0.5 rounded-md font-mono">
                                     {req.ticketRubi}
                                   </span>
                                 )}
@@ -1208,7 +1226,7 @@ export default function PriorizarPage() {
                             <td className="px-3 py-3 text-xs" style={{ color: tc.s }}>
                               <p className="font-medium">{req.client?.businessName ?? '—'}</p>
                               {req.serviceOrder && (
-                                <p className="text-[10px] font-mono mt-0.5" style={{ color: '#60a5fa' }}>{req.serviceOrder.osNumber}</p>
+                                <p className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--accent-blue)' }}>{req.serviceOrder.osNumber}</p>
                               )}
                             </td>
 
@@ -1219,7 +1237,11 @@ export default function PriorizarPage() {
                                   <p className="text-xs font-medium" style={{ color: tc.s }}>{req.templateModule.name}</p>
                                   {req.templatePhase && (
                                     <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md mt-0.5"
-                                      style={{ background: `${req.templatePhase.color}18`, color: req.templatePhase.color, border: `1px solid ${req.templatePhase.color}40` }}>
+                                      style={{
+                                        background: `${req.templatePhase.color}${isLight ? '14' : '18'}`,
+                                        color: isLight ? tc.s : req.templatePhase.color,
+                                        border: `1px solid ${req.templatePhase.color}${isLight ? '55' : '40'}`,
+                                      }}>
                                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: req.templatePhase.color }} />
                                       {req.templatePhase.name}
                                     </span>

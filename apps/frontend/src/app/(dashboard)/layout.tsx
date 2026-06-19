@@ -73,22 +73,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div
       className="flex h-screen overflow-hidden relative"
       style={{
-        /* Canvas sobre el que flotan los paneles de cristal */
         background: isLight
-          ? 'linear-gradient(145deg, #B8D0F8 0%, #C4BAFF 28%, #BDD8FF 58%, #C8DAFF 100%)'
+          ? 'var(--bg-base)'
           : 'radial-gradient(ellipse at 80% 5%, #0d1d42 0%, #05091a 48%, #020510 100%)',
       }}
     >
-      {isLight ? (
-        /* Orbs luz — fuentes de color visibles a través del cristal */
-        <>
-          <div style={{ ...orb, top: '-12%',  right: '-6%',  width: 680, height: 680, background: 'radial-gradient(circle, rgba(79,70,229,0.52) 0%, transparent 62%)',   animation: 'orbFloat 14s ease-in-out infinite' }} />
-          <div style={{ ...orb, bottom: '-18%', left: '-8%', width: 620, height: 620, background: 'radial-gradient(circle, rgba(37,99,235,0.58) 0%, transparent 60%)',   animation: 'orbFloat 18s ease-in-out infinite reverse' }} />
-          <div style={{ ...orb, top: '35%',   left: '28%',   width: 480, height: 480, background: 'radial-gradient(circle, rgba(139,92,246,0.35) 0%, transparent 62%)',  animation: 'orbFloat 11s ease-in-out infinite' }} />
-          <div style={{ ...orb, top: '10%',   right: '28%',  width: 320, height: 320, background: 'radial-gradient(circle, rgba(14,165,233,0.40) 0%, transparent 62%)',  animation: 'orbFloat 16s ease-in-out infinite reverse' }} />
-        </>
-      ) : (
-        /* Orbs oscuro — más saturados para verse a través del cristal negro */
+      {/* Orbs — solo en dark mode */}
+      {!isLight && (
         <>
           <div style={{ ...orb, top: '-18%',  right: '-8%',  width: 720, height: 720, background: 'radial-gradient(circle, rgba(37,99,235,0.58) 0%, transparent 60%)',   animation: 'orbFloat 16s ease-in-out infinite' }} />
           <div style={{ ...orb, bottom: '-22%', left: '-10%', width: 660, height: 660, background: 'radial-gradient(circle, rgba(79,70,229,0.48) 0%, transparent 60%)',   animation: 'orbFloat 20s ease-in-out infinite reverse' }} />

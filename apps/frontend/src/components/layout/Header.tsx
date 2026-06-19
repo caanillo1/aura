@@ -46,8 +46,8 @@ export function Header({ onMenuToggle }: HeaderProps) {
       style={{
         background: 'var(--header-bg)',
         borderBottom: '1px solid var(--header-border)',
-        backdropFilter: 'blur(72px) saturate(240%)',
-        WebkitBackdropFilter: 'blur(72px) saturate(240%)',
+        backdropFilter: 'blur(24px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
         boxShadow: 'var(--header-shadow)',
       }}
     >

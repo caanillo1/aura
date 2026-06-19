@@ -5,9 +5,7 @@ import { AppModule } from './app.module';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Cargar .env.staging si NODE_ENV=staging, de lo contrario .env
-const envFile = process.env.NODE_ENV === 'staging' ? '.env.staging' : '.env';
-dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

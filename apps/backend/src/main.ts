@@ -2,6 +2,12 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Cargar .env.staging si NODE_ENV=staging, de lo contrario .env
+const envFile = process.env.NODE_ENV === 'staging' ? '.env.staging' : '.env';
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes';
 import {
   Clock, Users, Info, FolderKanban, Send, Plus, X, Layers, Pencil, Check, Star,
   GraduationCap, CheckCircle2, AlertCircle, Loader2, FolderOpen, BarChart3, MessageSquare,
-  Lock, Globe, Target, ShieldAlert, Mail, CalendarClock, RefreshCw, ToggleLeft, ToggleRight, FileText,
+  Lock, Globe, Target, ShieldAlert, Mail, CalendarClock, RefreshCw, ToggleLeft, ToggleRight, FileText, Trash2,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import { DocumentosSection } from '@/components/ui/DocumentosSection';
@@ -472,6 +472,15 @@ export default function OrdenDetailPage() {
     finally { setSavingNote(false); }
   };
 
+  const handleDeleteHistory = async (historyId: string) => {
+    if (!confirm('¿Eliminar esta entrada del historial? Esta acción no se puede deshacer.')) return;
+    try {
+      await serviceOrdersApi.deleteHistoryEntry(id, historyId);
+      toast.success('Entrada eliminada');
+      load();
+    } catch { toast.error('Error al eliminar la entrada'); }
+  };
+
   const loadCapacitaciones = async () => {
     if (!os) return;
     setCapLoading(true);
@@ -932,13 +941,13 @@ export default function OrdenDetailPage() {
 
                     return (
                       <motion.div key={h.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.05 }} className="flex gap-4 relative">
+                        transition={{ delay: i * 0.05 }} className="flex gap-4 relative group">
                         <div className="w-3.5 h-3.5 rounded-full shrink-0 mt-1 z-10"
                           style={{ background: dotColor, boxShadow: `0 0 0 3px ${dotColor}25` }} />
                         <div className="flex-1 rounded-xl p-3"
                           style={{ background: isLight ? 'rgba(30,60,120,0.04)' : 'rgba(255,255,255,0.04)', border: rowBorder }}>
 
-                          {/* Header: badges + fecha */}
+                          {/* Header: badges + fecha + eliminar */}
                           <div className="flex items-center justify-between flex-wrap gap-2 mb-1.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {isNota ? (
@@ -981,9 +990,20 @@ export default function OrdenDetailPage() {
                                 </span>
                               )}
                             </div>
-                            <span className="text-xs" style={{ color: tc.m }}>
-                              {new Date(h.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs" style={{ color: tc.m }}>
+                                {new Date(h.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                              {can('orders.editar') && (
+                                <button
+                                  onClick={() => handleDeleteHistory((h as any).id)}
+                                  className="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/10"
+                                  title="Eliminar entrada"
+                                >
+                                  <Trash2 className="w-3 h-3 text-red-400" />
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           {/* Comentario */}

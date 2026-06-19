@@ -453,6 +453,17 @@ export class ServiceOrdersService {
     return { message: 'Implementador removido' };
   }
 
+  async deleteHistoryEntry(companyId: string, osId: string, historyId: string) {
+    await this.findOne(companyId, osId);
+    const entry = await this.prisma.serviceOrderHistory.findFirst({
+      where: { id: historyId, serviceOrderId: osId },
+    });
+    if (!entry) throw new NotFoundException('Entrada de historial no encontrada');
+    await this.prisma.serviceOrderHistory.delete({ where: { id: historyId } });
+    this.invalidatePdfCache(osId);
+    return { ok: true };
+  }
+
   async bulkDelete(companyId: string, ids: string[]) {
     const results: { id: string; osNumber: string; ok: boolean; error?: string }[] = [];
     for (const id of ids) {
@@ -509,7 +520,7 @@ export class ServiceOrdersService {
                     select: {
                       id: true, name: true, code: true, status: true, priority: true,
                       progressPercent: true, plannedStartDate: true, plannedEndDate: true,
-                      actualEndDate: true,
+                      actualEndDate: true, executionDate: true,
                       assignedTo: { select: { firstName: true, lastName: true } },
                     },
                   },

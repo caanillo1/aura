@@ -232,6 +232,14 @@ export class ServiceOrdersController {
     return this.svc.removeImplementer(user.companyId, id, userId);
   }
 
+  @Delete(':id/history/:historyId')
+  @Roles(...ALL_ROLES)
+  @Permissions('orders.editar')
+  @ApiOperation({ summary: 'Eliminar entrada del historial (nota o cambio de estado)' })
+  deleteHistory(@GetUser() user: JwtUser, @Param('id') id: string, @Param('historyId') historyId: string) {
+    return this.svc.deleteHistoryEntry(user.companyId, id, historyId);
+  }
+
   @Post('bulk-delete')
   @Roles(...ALL_ROLES)
   @Permissions('orders.eliminar')

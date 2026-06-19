@@ -269,7 +269,10 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
   const blockedActs    = allActivities.filter((a: any) => a.status === 'bloqueado').length;
   const pendActs       = allActivities.filter((a: any) => a.status === 'pendiente').length;
   const totalActs      = allActivities.length;
-  const progressPct    = totalActs > 0 ? Math.round((doneActs / totalActs) * 100) : 0;
+  // Promedio ponderado: completado=100%, en_progreso=50%, pendiente/bloqueado=0%
+  const progressPct    = totalActs > 0
+    ? Math.round(allActivities.reduce((s: number, a: any) => s + Number(a.progressPercent ?? 0), 0) / totalActs)
+    : 0;
   const actasByType    = (t: string) => (actas as any[]).filter(a => a.type === t);
   const firmadas       = (actas as any[]).filter(a => a.status === 'firmada').length;
 
@@ -1115,7 +1118,9 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
                     {(project.modules as any[]).map((mod: any) => {
                       const modActs = (mod.phases ?? []).flatMap((p: any) => p.activities ?? []);
                       const modDone = modActs.filter((a: any) => a.status === 'completado').length;
-                      const pct    = modActs.length > 0 ? Math.round((modDone / modActs.length) * 100) : 0;
+                      const pct    = modActs.length > 0
+                        ? Math.round(modActs.reduce((s: number, a: any) => s + Number(a.progressPercent ?? 0), 0) / modActs.length)
+                        : 0;
                       return (
                         <div key={mod.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                           <div style={{ width: 190, fontSize: 9.5, fontWeight: 600, color: '#374151',
@@ -1150,6 +1155,7 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
                     <th style={{ ...TH(), textAlign: 'center', width: 40 }}>%</th>
                     <th style={{ ...TH(), width: 80 }}>Inicio</th>
                     <th style={{ ...TH(), width: 80 }}>Fin</th>
+                    <th style={{ ...TH(), width: 80 }}>Ejecución</th>
                     <th style={TH()}>Responsable</th>
                   </tr></thead>
                   <tbody>
@@ -1168,6 +1174,7 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
                           </td>
                           <td style={TD()}>{fmt(a.plannedStartDate)}</td>
                           <td style={TD()}>{fmt(a.plannedEndDate)}</td>
+                          <td style={TD()}>{fmt(a.executionDate)}</td>
                           <td style={TD()}>{assignee}</td>
                         </tr>
                       );

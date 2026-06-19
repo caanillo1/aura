@@ -653,10 +653,11 @@ export default function OrdenDetailPage() {
       <BackButton href="/implementacion/ordenes" label="Órdenes de Servicio" />
 
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="rounded-2xl p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', backdropFilter: 'blur(20px) saturate(160%)' }}>
         <div>
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="font-mono font-bold text-lg" style={{ color: '#60a5fa' }}>{os.osNumber}</span>
+            <span className="font-mono font-bold text-lg" style={{ color: 'var(--accent-blue)' }}>{os.osNumber}</span>
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
               style={{ background: ss.bg, color: ss.color, border: `1px solid ${ss.color}40` }}>
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: ss.color }} />
@@ -675,7 +676,7 @@ export default function OrdenDetailPage() {
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => setShowReportMenu(v => !v)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.30)', color: '#a78bfa' }}>
+              style={{ background: 'var(--accent-violet-bg)', border: '1px solid var(--accent-violet-border)', color: 'var(--accent-violet)' }}>
               <BarChart3 className="w-4 h-4" />
               Ver Informe
               <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showReportMenu ? 'rotate-180' : ''}`} />
@@ -730,7 +731,7 @@ export default function OrdenDetailPage() {
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={() => { setEmailTo(''); setEmailSubject(''); setEmailReportType('ejecutivo'); setEmailModal(true); }}
             className="flex items-center justify-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.20)', color: '#a78bfa' }}
+            style={{ background: 'var(--accent-violet-bg)', border: '1px solid var(--accent-violet-border)', color: 'var(--accent-violet)' }}
             title="Enviar informe por correo">
             <Mail className="w-4 h-4" />
           </motion.button>
@@ -739,7 +740,7 @@ export default function OrdenDetailPage() {
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={openAutoModal}
             className="flex items-center justify-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.20)', color: '#a78bfa' }}
+            style={{ background: 'var(--accent-violet-bg)', border: '1px solid var(--accent-violet-border)', color: 'var(--accent-violet)' }}
             title="Automatización de correos">
             <CalendarClock className="w-4 h-4" />
           </motion.button>
@@ -749,7 +750,7 @@ export default function OrdenDetailPage() {
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={openStatusModal}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-              style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.30)', color: '#60a5fa' }}>
+              style={{ background: 'var(--accent-blue-bg)', border: '1px solid var(--accent-blue-border)', color: 'var(--accent-blue)' }}>
               <Send className="w-4 h-4" /> Cambiar estado
             </motion.button>
           )}
@@ -787,7 +788,7 @@ export default function OrdenDetailPage() {
               {!editMode && can('orders.editar') ? (
                 <button onClick={openEdit}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                  style={{ background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa' }}>
+                  style={{ background: 'var(--accent-blue-bg)', border: '1px solid var(--accent-blue-border)', color: 'var(--accent-blue)' }}>
                   <Pencil className="w-3.5 h-3.5" /> Editar
                 </button>
               ) : (

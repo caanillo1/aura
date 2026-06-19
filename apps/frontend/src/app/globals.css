@@ -99,10 +99,38 @@
 :root {
   --bg-card:       var(--card-bg);
   --bg-card-hover: var(--card-hover);
+
+  /* Acentos — dark mode: colores claros sobre fondo oscuro */
+  --accent-blue:          #60a5fa;
+  --accent-blue-bg:       rgba(96, 165, 250, 0.12);
+  --accent-blue-border:   rgba(96, 165, 250, 0.28);
+  --accent-violet:        #a78bfa;
+  --accent-violet-bg:     rgba(167, 139, 250, 0.12);
+  --accent-violet-border: rgba(167, 139, 250, 0.28);
+  --accent-green:         #34d399;
+  --accent-green-bg:      rgba(52, 211, 153, 0.12);
+  --accent-amber:         #fbbf24;
+  --accent-amber-bg:      rgba(251, 191, 36, 0.12);
+  --accent-red:           #f87171;
+  --accent-red-bg:        rgba(248, 113, 113, 0.12);
 }
 .light {
   --bg-card:       var(--card-bg);
   --bg-card-hover: var(--card-hover);
+
+  /* Acentos — light mode: colores más saturados sobre fondo claro */
+  --accent-blue:          #2563eb;
+  --accent-blue-bg:       rgba(37, 99, 235, 0.10);
+  --accent-blue-border:   rgba(37, 99, 235, 0.28);
+  --accent-violet:        #6d28d9;
+  --accent-violet-bg:     rgba(109, 40, 217, 0.10);
+  --accent-violet-border: rgba(109, 40, 217, 0.25);
+  --accent-green:         #059669;
+  --accent-green-bg:      rgba(5, 150, 105, 0.10);
+  --accent-amber:         #d97706;
+  --accent-amber-bg:      rgba(217, 119, 6, 0.10);
+  --accent-red:           #dc2626;
+  --accent-red-bg:        rgba(220, 38, 38, 0.10);
 }
 
 /* ══════════════════════════════════════════════════════════════

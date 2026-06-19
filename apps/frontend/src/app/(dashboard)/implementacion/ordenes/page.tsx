@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Search, RefreshCw, Plus, ClipboardList, Trash2, X, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { serviceOrdersApi, clientsApi } from '@/lib/api';
 import { usePermission } from '@/hooks/usePermission';
 import { toast } from 'sonner';
@@ -22,6 +23,7 @@ export default function OrdenesPage() {
   const { theme } = useTheme();
   const isLight = theme === 'light';
   const { can } = usePermission();
+  const router = useRouter();
 
   const [orders, setOrders]   = useState<ServiceOrder[]>([]);
   const [total, setTotal]     = useState(0);
@@ -206,7 +208,8 @@ export default function OrdenesPage() {
 
       {/* Tabla */}
       <div className="rounded-2xl overflow-hidden" style={tableStyle}>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px] text-sm">
           <thead>
             <tr style={{ borderBottom: rowBorder, background: headBg }}>
               {selectMode && (
@@ -246,7 +249,10 @@ export default function OrdenesPage() {
                       className="transition-colors cursor-pointer"
                       onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isLight ? 'rgba(30,60,120,0.03)' : 'rgba(255,255,255,0.03)'; }}
                       onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
-                      onClick={() => { if (selectMode) toggleSelect(os.id); }}>
+                      onClick={() => {
+                        if (selectMode) toggleSelect(os.id);
+                        else router.push(`/implementacion/ordenes/${os.id}`);
+                      }}>
                       {selectMode && (
                         <td className="pl-4 pr-2 py-3.5 w-8" onClick={e => e.stopPropagation()}>
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(os.id)}
@@ -325,6 +331,7 @@ export default function OrdenesPage() {
             }
           </tbody>
         </table>
+        </div>
         {!loading && orders.length === 0 && (
           <div className="py-16 text-center text-sm" style={{ color: tc.m }}>
             No se encontraron órdenes de servicio

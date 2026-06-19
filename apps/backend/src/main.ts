@@ -21,10 +21,13 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // CORS
-  app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') ?? ['http://localhost:3000'],
-    credentials: true,
-  });
+  const rawOrigins = process.env.ALLOWED_ORIGINS?.split(',') ?? ['http://localhost:3000'];
+  for (const o of rawOrigins) {
+    if (!/^https?:\/\//.test(o.trim())) {
+      throw new Error(`ALLOWED_ORIGINS: "${o.trim()}" le falta el protocolo (https://). Corrige el .env y reinicia.`);
+    }
+  }
+  app.enableCors({ origin: rawOrigins.map((o) => o.trim()), credentials: true });
 
   // Validación global
   app.useGlobalPipes(

@@ -1,5 +1,5 @@
 'use client';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Menu } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth.store';
 import { usePathname } from 'next/navigation';
@@ -20,7 +20,9 @@ const PAGE_TITLES: Record<string, string> = {
   '/configuracion':               'Configuración',
 };
 
-export function Header() {
+interface HeaderProps { onMenuToggle?: () => void }
+
+export function Header({ onMenuToggle }: HeaderProps) {
   const { user } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
@@ -46,9 +48,20 @@ export function Header() {
         boxShadow: '0 1px 0 var(--border-subtle)',
       }}
     >
-      <h1 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>
-        {title}
-      </h1>
+      <div className="flex items-center gap-3">
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={onMenuToggle}
+          className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+          style={{ color: 'var(--text-secondary)' }}
+          aria-label="Abrir menú"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <h1 className="font-semibold text-base" style={{ color: 'var(--text-primary)' }}>
+          {title}
+        </h1>
+      </div>
 
       <div className="flex items-center gap-2">
         {/* Toggle tema */}

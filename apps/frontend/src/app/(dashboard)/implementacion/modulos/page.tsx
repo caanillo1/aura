@@ -5,6 +5,7 @@ import { usePermission } from '@/hooks/usePermission';
 import { useTheme } from 'next-themes';
 import { Search, RefreshCw, Layers, ChevronRight, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Download, Upload, FileSpreadsheet, AlertCircle, CheckSquare, Square, Minus } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { templatesApi } from '@/lib/api';
 import { Modal } from '@/components/ui/Modal';
@@ -240,6 +241,8 @@ export default function ModulosPage() {
   const [importProgress, setImportProgress]  = useState<{ done: number; total: number; current: string } | null>(null);
   const [importModuleErrors, setImportModuleErrors] = useState<string[]>([]);
 
+  const router = useRouter();
+
   const tc = isLight
     ? { p: '#0a1628', s: '#1a3050', m: '#4a6080' }
     : { p: '#e2e8f0', s: '#94a3b8', m: '#6b82a0' };
@@ -424,7 +427,7 @@ export default function ModulosPage() {
   return (
     <div className="space-y-5 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-bold text-xl flex items-center gap-2" style={{ color: tc.p }}>
             <Layers className="w-5 h-5 text-blue-400" /> Biblioteca de Módulos
@@ -461,7 +464,7 @@ export default function ModulosPage() {
       </div>
 
       {/* Búsqueda */}
-      <div className="relative max-w-sm">
+      <div className="relative w-full sm:max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: tc.m }} />
         <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
           placeholder="Buscar por nombre o descripción..."
@@ -495,7 +498,8 @@ export default function ModulosPage() {
 
       {/* Tabla */}
       <div className="rounded-2xl overflow-hidden" style={tableStyle}>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] text-sm">
           <thead>
             <tr style={{ borderBottom: rowBorder, background: headBg }}>
               {/* Checkbox select-all */}
@@ -530,12 +534,13 @@ export default function ModulosPage() {
                   <motion.tr key={mod.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                     transition={{ delay: i * 0.02 }}
                     style={{ borderBottom: rowBorder, background: isSelected ? (isLight ? 'rgba(248,113,113,0.04)' : 'rgba(248,113,113,0.06)') : 'transparent' }}
-                    className="transition-colors"
+                    className="transition-colors cursor-pointer"
+                    onClick={() => router.push(`/implementacion/modulos/${mod.id}`)}
                     onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = isLight ? 'rgba(30,60,120,0.03)' : 'rgba(255,255,255,0.03)'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = isSelected ? (isLight ? 'rgba(248,113,113,0.04)' : 'rgba(248,113,113,0.06)') : 'transparent'; }}>
 
                     {/* Checkbox */}
-                    <td className="px-4 py-3.5 w-10">
+                    <td className="px-4 py-3.5 w-10" onClick={e => e.stopPropagation()}>
                       <button onClick={() => toggleSelect(mod.id)} className="flex items-center justify-center w-full">
                         {isSelected
                           ? <CheckSquare className="w-4 h-4" style={{ color: '#f87171' }} />
@@ -594,7 +599,7 @@ export default function ModulosPage() {
                     </td>
 
                     {/* Acciones */}
-                    <td className="px-4 py-3.5">
+                    <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         {/* Editar */}
                         {can('settings.editar') && (
@@ -647,6 +652,7 @@ export default function ModulosPage() {
             }
           </tbody>
         </table>
+        </div>
         {!loading && modules.length === 0 && (
           <div className="py-16 text-center text-sm" style={{ color: tc.m }}>
             No hay módulos — crea uno con el botón "Nuevo módulo"

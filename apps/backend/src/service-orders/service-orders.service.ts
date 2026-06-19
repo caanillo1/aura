@@ -503,7 +503,7 @@ export class ServiceOrdersService {
     const [company, project, requerimientos, clientStaff, noteHistory] = await Promise.all([
       this.prisma.company.findUnique({
         where: { id: companyId },
-        select: { name: true, commercialName: true, nit: true, logo: true, logoData: true, primaryColor: true, address: true, city: true, phone: true, email: true, website: true },
+        select: { name: true, commercialName: true, nit: true, logo: true, logoData: true, primaryColor: true, secondaryColor: true, address: true, city: true, phone: true, email: true, website: true },
       }),
       this.prisma.project.findUnique({
         where: { serviceOrderId: id },

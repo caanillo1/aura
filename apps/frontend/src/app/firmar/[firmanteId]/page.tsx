@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { SignaturePad, type SignaturePadRef } from '@/components/ui/SignaturePad';
 import { publicActasApi } from '@/lib/api';
-import { downloadActaPdf } from '@/lib/pdf';
 import { ActaDocumento } from '@/components/actas/ActaDocumento';
 import {
   PenLine, Upload, RotateCcw, CheckCircle2, AlertCircle,
@@ -156,17 +155,26 @@ export default function PublicSignPage() {
   };
 
   const handleDownload = async () => {
-    // En estado pendiente el documento puede estar colapsado; montarlo antes de capturar.
-    const needsShow = !done && !showDoc;
-    if (needsShow) setShowDoc(true);
     setDownloading(true);
-    if (needsShow) await new Promise(r => setTimeout(r, 200));
     try {
-      const tipo = TYPE_LABEL[actaFull?.type ?? ''] ?? 'acta';
-      await downloadActaPdf('acta-print', `${tipo}-${actaFull?.numero ?? 'doc'}.pdf`);
+      const company = actaFull?.project?.serviceOrder?.company;
+      const res = await fetch('/api/generate-acta-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acta: actaFull, company }),
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `acta-${actaFull?.type ?? 'doc'}-${actaFull?.numero ?? 'doc'}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('[download-acta-pdf]', e);
     } finally {
       setDownloading(false);
-      if (needsShow) setShowDoc(false);
     }
   };
 

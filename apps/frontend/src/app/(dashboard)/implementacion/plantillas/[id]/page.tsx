@@ -259,16 +259,16 @@ export default function TemplateConstructorPage() {
       <BackButton href="/implementacion/plantillas" label="Plantillas" />
 
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="font-bold text-xl" style={{ color: tc.p }}>{template.name}</h2>
             <span className="text-xs px-2 py-0.5 rounded-full font-bold"
               style={{ background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>v{template.version}</span>
           </div>
           {template.description && <p className="text-sm mt-0.5" style={{ color: tc.m }}>{template.description}</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <a href="/implementacion/modulos"
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium"
             style={{ border: '1px solid var(--border-subtle)', color: tc.m }}>
@@ -282,10 +282,10 @@ export default function TemplateConstructorPage() {
         </div>
       </div>
 
-      {/* Layout */}
-      <div className="flex gap-4 items-start">
+      {/* Layout — apilado en móvil, lado a lado en lg+ */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {/* ── Panel izquierdo: módulos ── */}
-        <div className="w-72 shrink-0 flex flex-col gap-2">
+        <div className="w-full lg:w-72 lg:shrink-0 flex flex-col gap-2">
           <div className="flex items-center justify-between px-1">
             <p className="text-xs font-bold uppercase tracking-wide" style={{ color: tc.m }}>
               Módulos ({template.modules.length})
@@ -372,7 +372,7 @@ export default function TemplateConstructorPage() {
           ) : (
             <div className="rounded-2xl overflow-hidden" style={glass()}>
               {/* Header */}
-              <div className="flex items-start justify-between px-5 py-4" style={{ borderBottom: rowBorder }}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between px-5 py-4" style={{ borderBottom: rowBorder }}>
                 <div>
                   <p className="font-bold" style={{ color: tc.p }}>{currentMod.name}</p>
                   <div className="flex items-center gap-3 mt-0.5 flex-wrap text-xs" style={{ color: tc.m }}>
@@ -386,7 +386,7 @@ export default function TemplateConstructorPage() {
                   </div>
                 </div>
                 <Link href={`/implementacion/modulos/${currentMod.id}`}
-                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium shrink-0 transition-all hover:opacity-80"
+                  className="self-start sm:self-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium shrink-0 transition-all hover:opacity-80"
                   style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
                   <ExternalLink className="w-3.5 h-3.5" /> Configurar módulo
                 </Link>
@@ -432,13 +432,13 @@ export default function TemplateConstructorPage() {
                               exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.18, ease: 'easeInOut' }}
                               className="overflow-hidden">
                               {phase.activities.length === 0 ? (
-                                <p className="text-xs px-12 py-3" style={{ color: tc.m }}>Sin actividades</p>
+                                <p className="text-xs px-4 sm:px-12 py-3" style={{ color: tc.m }}>Sin actividades</p>
                               ) : (
                                 <div>
                                   {phase.activities.map(act => {
                                     const ps = PRIORITY_STYLE[act.priority] ?? PRIORITY_STYLE.media;
                                     return (
-                                      <div key={act.id} className="flex items-start gap-3 px-12 py-2.5"
+                                      <div key={act.id} className="flex items-start gap-3 px-4 sm:px-12 py-2.5"
                                         style={{ borderTop: rowBorder }}>
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-center gap-2 flex-wrap">

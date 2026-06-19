@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth.store';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -10,10 +10,12 @@ import { usersApi } from '@/lib/api';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const { isAuthenticated, setPermissions } = useAuthStore();
   const { theme } = useTheme();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     setHydrated(true);
@@ -22,6 +24,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (hydrated && !isAuthenticated) router.push('/login');
   }, [hydrated, isAuthenticated, router]);
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   // Refresca permisos desde el servidor en cada carga del dashboard
   // así los cambios de roles toman efecto sin necesidad de re-login
@@ -68,15 +75,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </>
       )}
 
-      {/* Sidebar */}
-      <div className="relative z-10 h-full">
-        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((p) => !p)} />
-      </div>
+      {/* Sidebar — renders desktop in-flow + mobile overlay internally */}
+      <Sidebar
+        collapsed={collapsed}
+        onToggle={() => setCollapsed((p) => !p)}
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
+      />
 
       {/* Contenido principal */}
-      <div className="flex flex-col flex-1 overflow-hidden relative z-10">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">
+      <div className="flex flex-col flex-1 overflow-hidden relative z-10 min-h-0">
+        <Header onMenuToggle={() => setMobileOpen((p) => !p)} />
+        <main
+          className="flex-1 overflow-y-auto p-3 md:p-6 min-h-0"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
           {children}
         </main>
       </div>

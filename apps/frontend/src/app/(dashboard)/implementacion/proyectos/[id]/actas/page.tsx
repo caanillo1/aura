@@ -8,7 +8,6 @@ import {
   CheckCircle2, Clock, X, Link2, PenLine, Upload, RotateCcw, Lock, Shield, Settings, Mail,
 } from 'lucide-react';
 import { actasApi, projectsApi, clientsApi, usersApi, companyApi, municipiosApi, type CreateActaPayload, type ActaActividadPayload } from '@/lib/api';
-import { downloadActaPdf } from '@/lib/pdf';
 import { SignaturePad, type SignaturePadRef } from '@/components/ui/SignaturePad';
 import { ActaDocumento } from '@/components/actas/ActaDocumento';
 import { MunicipioSearch } from '@/components/ui/MunicipioSearch';
@@ -428,7 +427,6 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
 }) {
   const inputRowStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: tc.s };
   const [agentSigning, setAgentSigning] = useState<number | null>(null);
-  const [cargoFilter, setCargoFilter] = useState('');
 
   const update = (i: number, k: keyof Firmante, v: string | number) =>
     setRows(rows.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
@@ -464,10 +462,6 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
     }]);
   };
 
-  const filteredStaff = clientStaff?.filter(s =>
-    !cargoFilter || (s.jobTitle ?? '').toLowerCase().includes(cargoFilter.toLowerCase())
-  ) ?? [];
-
   const handleAgentSign = async (i: number, r: Firmante) => {
     if (!r.id) { toast.error('Guarda el acta primero para poder firmar'); return; }
     if (!userSignature) { onSetupSignature?.(); return; }
@@ -493,44 +487,39 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
+      {/* Header: título + botón manual */}
+      <div className="flex items-center justify-between mb-2.5">
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: tc.m }}>Firmantes</span>
-        <div className="flex items-center gap-2">
+        <button onClick={add} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
+          style={{ background: 'rgba(52,211,153,0.10)', color: '#34d399', border: '1px solid rgba(52,211,153,0.20)' }}>
+          <Plus className="w-3 h-3" /> Agregar manual
+        </button>
+      </div>
+      {/* Selectores rápidos desde listas */}
+      {((agents && agents.length > 0) || (clientStaff && clientStaff.length > 0)) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
           {agents && agents.length > 0 && (
             <select defaultValue="" onChange={e => { if (e.target.value) { addFromAgent(e.target.value); e.target.value = ''; } }}
-              className="text-xs px-2 py-1 rounded"
+              className="w-full text-xs px-3 py-2 rounded-xl outline-none"
               style={{ background: '#1e2537', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', colorScheme: 'dark' as const }}>
-              <option value="">+ Del agente</option>
+              <option value="">Agregar del equipo →</option>
               {agents.map(a => (
                 <option key={a.id} value={a.id}>{a.firstName} {a.lastName}{a.jobTitle ? ` — ${a.jobTitle}` : ''}</option>
               ))}
             </select>
           )}
           {clientStaff && clientStaff.length > 0 && (
-            <div className="flex items-center gap-1">
-              <input
-                value={cargoFilter}
-                onChange={e => setCargoFilter(e.target.value)}
-                placeholder="Filtrar cargo..."
-                className="text-xs px-2 py-1 rounded outline-none"
-                style={{ background: '#1e2537', border: '1px solid rgba(255,255,255,0.12)', color: '#e2e8f0', width: 90 }}
-              />
-              <select defaultValue="" onChange={e => { if (e.target.value) { addFromStaff(e.target.value); e.target.value = ''; } }}
-                className="text-xs px-2 py-1 rounded"
-                style={{ background: '#1e2537', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', colorScheme: 'dark' as const }}>
-                <option value="">+ Del cliente</option>
-                {filteredStaff.map(s => (
-                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` — ${s.jobTitle}` : ''}</option>
-                ))}
-              </select>
-            </div>
+            <select defaultValue="" onChange={e => { if (e.target.value) { addFromStaff(e.target.value); e.target.value = ''; } }}
+              className="w-full text-xs px-3 py-2 rounded-xl outline-none"
+              style={{ background: '#1e2537', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', colorScheme: 'dark' as const }}>
+              <option value="">Agregar del cliente →</option>
+              {clientStaff.map(s => (
+                <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` — ${s.jobTitle}` : ''}</option>
+              ))}
+            </select>
           )}
-          <button onClick={add} className="flex items-center gap-1 text-xs px-2 py-1 rounded"
-            style={{ background: 'rgba(52,211,153,0.10)', color: '#34d399', border: '1px solid rgba(52,211,153,0.20)' }}>
-            <Plus className="w-3 h-3" /> Manual
-          </button>
         </div>
-      </div>
+      )}
 
       {/* Aviso si el agente no tiene firma configurada */}
       {!userSignature && (
@@ -548,77 +537,102 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
         const hasSig = r.signatureData;
         const firmId = r.id;
         const isSigning = agentSigning === i;
+        const isClient = r.signerType === 'client';
         return (
-          <div key={i} className="mb-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 mb-2">
-              <input placeholder="Nombre" value={r.nombre} onChange={e => update(i, 'nombre', e.target.value)}
-                className="text-sm px-2 py-1.5 rounded-lg outline-none" style={inputRowStyle} />
-              <input placeholder="Cargo" value={r.cargo} onChange={e => update(i, 'cargo', e.target.value)}
-                className="text-sm px-2 py-1.5 rounded-lg outline-none" style={inputRowStyle} />
-              <input placeholder="Empresa" value={r.empresa} onChange={e => update(i, 'empresa', e.target.value)}
-                className="text-sm px-2 py-1.5 rounded-lg outline-none" style={inputRowStyle} />
-              <button onClick={() => del(i)} className="p-1.5 rounded" style={{ color: '#f87171' }}><Trash2 className="w-3.5 h-3.5" /></button>
-            </div>
-            <div className="flex gap-2 mb-2">
-              <input
-                type="email"
-                placeholder="Correo electrónico para notificación de firma"
-                value={r.email ?? ''}
-                onChange={e => update(i, 'email', e.target.value)}
-                className="flex-1 text-sm px-2 py-1.5 rounded-lg outline-none"
-                style={inputRowStyle}
-              />
-              <input
-                type="tel"
-                placeholder="WhatsApp (10 dígitos)"
-                value={(r as any).telefono ?? ''}
-                onChange={e => update(i, 'telefono', e.target.value)}
-                className="w-44 text-sm px-2 py-1.5 rounded-lg outline-none"
-                style={inputRowStyle}
-              />
+          <div key={i} className="mb-3 rounded-xl overflow-hidden"
+            style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${isClient ? 'rgba(96,165,250,0.18)' : 'rgba(167,139,250,0.18)'}`,
+            }}>
+            {/* Card header: tipo badge + eliminar */}
+            <div className="flex items-center justify-between px-3 py-2 border-b"
+              style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.025)' }}>
+              <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
+                style={{
+                  background: isClient ? 'rgba(96,165,250,0.12)' : 'rgba(167,139,250,0.12)',
+                  color: isClient ? '#60a5fa' : '#a78bfa',
+                }}>
+                {isClient ? 'Firmante · Cliente' : 'Firmante · Agente'}
+              </span>
+              <button onClick={() => del(i)} className="p-1.5 rounded-lg transition-colors hover:bg-red-500/10"
+                style={{ color: '#f87171' }}>
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              {hasSig ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <img src={hasSig} alt="firma" className="h-8 bg-white rounded px-1" style={{ maxWidth: 120 }} />
-                  <span className="text-xs font-medium" style={{ color: '#34d399' }}>
-                    <CheckCircle2 className="w-3 h-3 inline mr-1" />
-                    {r.signerType === 'client' ? 'Firmado (cliente)' : 'Firmado (agente)'}
-                  </span>
-                </div>
-              ) : (
-                <>
-                  {/* Solo mostrar "Firmar agente" si es fila del agente */}
-                  {r.signerType !== 'client' && (
-                    <button onClick={() => handleAgentSign(i, r)} disabled={isSigning}
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
-                      style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)', opacity: isSigning ? 0.7 : 1 }}>
-                      {isSigning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PenLine className="w-3.5 h-3.5" />}
-                      {isSigning ? 'Firmando...' : 'Firmar (agente)'}
-                    </button>
-                  )}
-                  {/* Solo mostrar "Enlace cliente" si es fila del cliente */}
-                  {r.signerType !== 'agent' && firmId && (
-                    <button onClick={() => copySignLink(r)}
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
-                      style={{ background: 'rgba(167,139,250,0.10)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.20)' }}>
-                      <Link2 className="w-3.5 h-3.5" /> Enlace cliente
-                    </button>
-                  )}
-                  {r.signerType !== 'agent' && !firmId && (
-                    <span className="text-xs" style={{ color: '#94a3b8' }}>Guarda el acta primero para enviar enlace al cliente</span>
-                  )}
-                </>
-              )}
-            </div>
+            {/* Campos */}
+            <div className="p-3 space-y-2.5">
+              {/* Nombre — ancho completo */}
+              <input placeholder="Nombre completo" value={r.nombre}
+                onChange={e => update(i, 'nombre', e.target.value)}
+                className="w-full text-sm px-3 py-2 rounded-lg outline-none" style={inputRowStyle} />
 
-            {hasSig && r.signedAt && (
-              <p className="text-[10px] mt-1" style={{ color: '#94a3b8' }}>
-                {new Date(r.signedAt).toLocaleDateString('es-CO')}
-                {r.signerType === 'client' ? ' · cliente' : ' · agente'}
-              </p>
-            )}
+              {/* Cargo + Empresa en dos columnas */}
+              <div className="grid grid-cols-2 gap-2">
+                <input placeholder="Cargo" value={r.cargo}
+                  onChange={e => update(i, 'cargo', e.target.value)}
+                  className="text-sm px-3 py-2 rounded-lg outline-none" style={inputRowStyle} />
+                <input placeholder="Empresa" value={r.empresa}
+                  onChange={e => update(i, 'empresa', e.target.value)}
+                  className="text-sm px-3 py-2 rounded-lg outline-none" style={inputRowStyle} />
+              </div>
+
+              {/* Correo + Teléfono: apilados en mobile, lado a lado en sm+ */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <input type="email" placeholder="Correo electrónico" value={r.email ?? ''}
+                  onChange={e => update(i, 'email', e.target.value)}
+                  className="text-sm px-3 py-2 rounded-lg outline-none" style={inputRowStyle} />
+                <input type="tel" placeholder="WhatsApp (10 dígitos)" value={(r as any).telefono ?? ''}
+                  onChange={e => update(i, 'telefono', e.target.value)}
+                  className="text-sm px-3 py-2 rounded-lg outline-none" style={inputRowStyle} />
+              </div>
+
+              {/* Zona de firma */}
+              <div className="pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                {hasSig ? (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="bg-white rounded-lg px-2 py-1 inline-flex">
+                      <img src={hasSig} alt="firma" className="h-9" style={{ maxWidth: 130 }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold flex items-center gap-1" style={{ color: '#34d399' }}>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {isClient ? 'Firmado · cliente' : 'Firmado · agente'}
+                      </p>
+                      {r.signedAt && (
+                        <p className="text-[10px] mt-0.5" style={{ color: '#94a3b8' }}>
+                          {new Date(r.signedAt).toLocaleDateString('es-CO')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {r.signerType !== 'client' && (
+                      <button onClick={() => handleAgentSign(i, r)} disabled={isSigning}
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
+                        style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)', opacity: isSigning ? 0.7 : 1 }}>
+                        {isSigning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PenLine className="w-3.5 h-3.5" />}
+                        {isSigning ? 'Firmando...' : 'Firmar como agente'}
+                      </button>
+                    )}
+                    {r.signerType !== 'agent' && firmId && (
+                      <button onClick={() => copySignLink(r)}
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
+                        style={{ background: 'rgba(167,139,250,0.10)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.20)' }}>
+                        <Link2 className="w-3.5 h-3.5" /> Enlace para cliente
+                      </button>
+                    )}
+                    {r.signerType !== 'agent' && !firmId && (
+                      <p className="text-xs italic" style={{ color: '#94a3b8' }}>Guarda el acta para generar enlace de firma</p>
+                    )}
+                    {!hasSig && r.signerType !== 'client' && r.signerType !== 'agent' && (
+                      <p className="text-xs italic" style={{ color: '#94a3b8' }}>Pendiente de firma</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         );
       })}
@@ -1952,33 +1966,61 @@ function PrintView({ acta, project, company, userSignature, onClose, onConfigure
   onClose: () => void; onConfigureBranding: () => void;
 }) {
   const isBrandConfigured = !!(company?.logoData);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    setDownloading(true);
+    try {
+      const res = await fetch('/api/generate-acta-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acta: { ...acta, project }, company }),
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `acta-${acta.tipo ?? acta.type ?? 'doc'}-${acta.numero ?? 'doc'}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('[download-acta-pdf]', e);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex',
       alignItems: 'flex-start', justifyContent: 'center', paddingTop: 16, paddingBottom: 32,
       overflowY: 'auto', background: 'rgba(0,0,0,0.88)' }}>
-      <div style={{ position: 'relative', width: '100%', maxWidth: 820, margin: '0 16px' }}>
+      <div style={{ position: 'relative', width: '100%', maxWidth: 820, margin: '0 auto', padding: '0 12px' }}>
 
         {/* Toolbar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          marginBottom: 12, padding: '0 4px' }}>
+          marginBottom: 12, padding: '0 2px', flexWrap: 'wrap', gap: 8 }}>
           <button onClick={onConfigureBranding} style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px',
             borderRadius: 12, fontSize: 12, fontWeight: 500, cursor: 'pointer',
             ...(isBrandConfigured
               ? { background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)' }
               : { background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }) }}>
             ⚙ {isBrandConfigured ? 'Editar branding' : 'Configurar branding'}
           </button>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => downloadActaPdf('acta-print', `acta-${acta.numero ?? 'doc'}.pdf`)} style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px',
-              borderRadius: 12, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-              background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}>
-              <Printer className="w-4 h-4" /> Descargar PDF
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={handleDownloadPdf} disabled={downloading} style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
+              borderRadius: 12, fontSize: 13, fontWeight: 500, cursor: downloading ? 'wait' : 'pointer',
+              background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)',
+              opacity: downloading ? 0.7 : 1 }}>
+              {downloading
+                ? <RefreshCw className="w-4 h-4 animate-spin" />
+                : <Printer className="w-4 h-4" />}
+              {downloading ? 'Generando...' : 'Descargar PDF'}
             </button>
             <button onClick={onClose} style={{ padding: 8, borderRadius: 12, cursor: 'pointer',
-              color: '#94a3b8', background: 'transparent', border: 'none' }}>
+              color: '#94a3b8', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -1986,7 +2028,7 @@ function PrintView({ acta, project, company, userSignature, onClose, onConfigure
 
         {!isBrandConfigured && (
           <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 16px', borderRadius: 12, fontSize: 12,
+            padding: '10px 16px', borderRadius: 12, fontSize: 12, flexWrap: 'wrap',
             background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', color: '#fbbf24' }}>
             ⚙ Logo no configurado — se usaran colores predeterminados.
             <button onClick={onConfigureBranding} style={{ textDecoration: 'underline', fontWeight: 600,

@@ -714,20 +714,20 @@ function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdat
                           {act.code}
                         </span>
                         <span className="flex-1 text-sm truncate" style={{ color: tc.s }}>{act.name}</span>
-                        <span className="text-[11px] px-1.5 py-0.5 rounded shrink-0"
+                        <span className="hidden sm:inline-flex text-[11px] px-1.5 py-0.5 rounded shrink-0"
                           style={{ background: prio.bg, color: prio.color }}>
                           {act.priority}
                         </span>
-                        <div className="w-14 shrink-0">
+                        <div className="hidden sm:flex flex-col w-14 shrink-0">
                           <span className="text-[10px] block text-right mb-0.5" style={{ color: tc.m }}>{actPct.toFixed(0)}%</span>
                           <ProgressBar pct={actPct} color={aCfg.color} height={3} />
                         </div>
                         {can('activities.manage') && (
                           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                             onClick={() => setSelected(act)}
-                            className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1"
+                            className="shrink-0 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium flex items-center gap-1"
                             style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)' }}>
-                            <Pencil className="w-3 h-3" /> Editar
+                            <Pencil className="w-3 h-3" /> <span className="hidden sm:inline">Editar</span>
                           </motion.button>
                         )}
                       </div>
@@ -1121,7 +1121,7 @@ export default function ProjectDetailPage() {
 
       {/* Header */}
       <div style={cardStyle}>
-        <div className="flex items-start justify-between flex-wrap gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-1">
               <h2 className="font-bold text-xl truncate" style={{ color: tc.p }}>{project.name}</h2>
@@ -1156,8 +1156,8 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="text-right mr-2">
+          <div className="flex items-center gap-2 sm:flex-shrink-0">
+            <div className="mr-2">
               <p className="text-xs" style={{ color: tc.m }}>Progreso global</p>
               <p className="text-2xl font-bold" style={{ color: '#60a5fa' }}>{pct.toFixed(0)}%</p>
             </div>
@@ -1279,47 +1279,72 @@ export default function ProjectDetailPage() {
           </motion.button>
         </div>
       ) : (
-        <div className="grid grid-cols-[220px_1fr] gap-4">
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[220px_1fr]">
           {/* Panel izquierdo — módulos */}
-          <div className="space-y-2">
-            {modules.map((mod, idx) => {
-              const modPct = Number(mod.progressPercent) || 0;
-              const isActive = idx === activeModIdx;
-              return (
-                <motion.div key={mod.id}
-                  whileHover={{ scale: 1.01 }}
-                  className="rounded-xl transition-all cursor-pointer"
-                  style={{
-                    background: isActive
-                      ? 'rgba(96,165,250,0.12)'
-                      : (isLight ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.04)'),
-                    border: `1px solid ${isActive ? 'rgba(96,165,250,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                    backdropFilter: 'blur(12px)',
-                  }}
-                  onClick={() => setActiveModIdx(idx)}>
-                  <div className="p-3">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-xs font-semibold truncate flex-1" style={{ color: isActive ? '#60a5fa' : tc.s }}>
-                        {mod.name}
-                      </span>
-                      <button
-                        onClick={e => { e.stopPropagation(); setDeleteModuleId(mod.id); setDeleteModuleName(mod.name); }}
-                        style={{ color: '#f87171' }}
-                        title="Eliminar módulo">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                      <span className="text-[10px] font-mono shrink-0" style={{ color: isActive ? '#60a5fa' : tc.m }}>
-                        {modPct.toFixed(0)}%
-                      </span>
+          <div>
+            {/* Mobile: tabs horizontales desplazables */}
+            <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {modules.map((mod, idx) => {
+                const modPct = Number(mod.progressPercent) || 0;
+                const isActive = idx === activeModIdx;
+                return (
+                  <button key={mod.id}
+                    onClick={() => setActiveModIdx(idx)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                    style={{
+                      background: isActive ? 'rgba(96,165,250,0.15)' : (isLight ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.04)'),
+                      border: `1px solid ${isActive ? 'rgba(96,165,250,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                      color: isActive ? '#60a5fa' : tc.s,
+                    }}>
+                    <span className="max-w-[120px] truncate">{mod.name}</span>
+                    <span className="font-mono text-[10px] shrink-0" style={{ color: isActive ? '#60a5fa' : tc.m }}>
+                      {modPct.toFixed(0)}%
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {/* Desktop: cards verticales */}
+            <div className="hidden lg:flex lg:flex-col gap-2">
+              {modules.map((mod, idx) => {
+                const modPct = Number(mod.progressPercent) || 0;
+                const isActive = idx === activeModIdx;
+                return (
+                  <motion.div key={mod.id}
+                    whileHover={{ scale: 1.01 }}
+                    className="rounded-xl transition-all cursor-pointer"
+                    style={{
+                      background: isActive
+                        ? 'rgba(96,165,250,0.12)'
+                        : (isLight ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.04)'),
+                      border: `1px solid ${isActive ? 'rgba(96,165,250,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                      backdropFilter: 'blur(12px)',
+                    }}
+                    onClick={() => setActiveModIdx(idx)}>
+                    <div className="p-3">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-xs font-semibold truncate flex-1" style={{ color: isActive ? '#60a5fa' : tc.s }}>
+                          {mod.name}
+                        </span>
+                        <button
+                          onClick={e => { e.stopPropagation(); setDeleteModuleId(mod.id); setDeleteModuleName(mod.name); }}
+                          style={{ color: '#f87171' }}
+                          title="Eliminar módulo">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        <span className="text-[10px] font-mono shrink-0" style={{ color: isActive ? '#60a5fa' : tc.m }}>
+                          {modPct.toFixed(0)}%
+                        </span>
+                      </div>
+                      <ProgressBar pct={modPct} color={isActive ? '#60a5fa' : '#6b82a0'} height={3} />
+                      <p className="text-[10px] mt-1.5" style={{ color: tc.m }}>
+                        {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
+                      </p>
                     </div>
-                    <ProgressBar pct={modPct} color={isActive ? '#60a5fa' : '#6b82a0'} height={3} />
-                    <p className="text-[10px] mt-1.5" style={{ color: tc.m }}>
-                      {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                </motion.div>
-              );
-            })}
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Panel derecho — fases y actividades */}
@@ -1346,7 +1371,8 @@ export default function ProjectDetailPage() {
                     { key: 'bloqueado',   label: 'Bloqueado'   },
                   ];
                   return (
-                    <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="overflow-x-auto pb-0.5" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className="flex items-center gap-1.5 min-w-max">
                       {filters.map(({ key, label }) => {
                         const active = filterStatus === key;
                         const cfg = key ? ACTIVITY_STATUS[key] : null;
@@ -1375,6 +1401,7 @@ export default function ProjectDetailPage() {
                           </button>
                         );
                       })}
+                    </div>
                     </div>
                   );
                 })()}

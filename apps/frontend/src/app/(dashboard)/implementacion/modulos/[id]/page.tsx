@@ -288,7 +288,7 @@ export default function ModuleDetailPage() {
                           <div ref={draggable.innerRef} {...draggable.draggableProps}
                             style={{ borderBottom: sep, ...draggable.draggableProps.style }}>
                             {/* Phase header */}
-                            <div className="flex items-center gap-2 px-4 py-3">
+                            <div className="flex items-center gap-2 px-4 py-3 flex-wrap">
                               <span {...draggable.dragHandleProps} className="cursor-grab p-1 rounded" style={{ color: tc.m }}>
                                 <GripVertical className="w-4 h-4" />
                               </span>
@@ -343,27 +343,27 @@ export default function ModuleDetailPage() {
                                                     <span {...dp3.dragHandleProps} className="cursor-grab shrink-0" style={{ color: tc.m }}>
                                                       <GripVertical className="w-3.5 h-3.5" />
                                                     </span>
-                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 hidden xs:inline"
                                                       style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>
                                                       {act.code}
                                                     </span>
-                                                    <span className="text-xs font-medium flex-1 truncate" style={{ color: tc.p }}>{act.name}</span>
-                                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                                                    <span className="text-xs font-medium flex-1 min-w-0 truncate" style={{ color: tc.p }}>{act.name}</span>
+                                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 hidden sm:inline-flex items-center gap-0.5"
                                                       style={{ background: prio.bg, color: prio.color }}>
-                                                      <Flag className="w-2.5 h-2.5 inline mr-0.5" />{prio.label}
+                                                      <Flag className="w-2.5 h-2.5" />{prio.label}
                                                     </span>
-                                                    <span className="flex items-center gap-0.5 text-[10px] shrink-0" style={{ color: tc.m }}>
+                                                    <span className="flex items-center gap-0.5 text-[10px] shrink-0 hidden sm:flex" style={{ color: tc.m }}>
                                                       <Clock className="w-3 h-3" />{act.estimatedHours}h
                                                     </span>
                                                     <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                                                       onClick={() => openEditActivity(phase.id, act)}
-                                                      className="p-1 rounded shrink-0" style={{ color: '#60a5fa' }}>
-                                                      <Pencil className="w-3 h-3" />
+                                                      className="p-1.5 rounded shrink-0" style={{ color: '#60a5fa' }}>
+                                                      <Pencil className="w-3.5 h-3.5" />
                                                     </motion.button>
                                                     <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                                                       onClick={() => handleDeleteActivity(act.id)}
-                                                      className="p-1 rounded shrink-0" style={{ color: '#f87171' }}>
-                                                      <Trash2 className="w-3 h-3" />
+                                                      className="p-1.5 rounded shrink-0" style={{ color: '#f87171' }}>
+                                                      <Trash2 className="w-3.5 h-3.5" />
                                                     </motion.button>
                                                   </div>
                                                 )}

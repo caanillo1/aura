@@ -99,7 +99,12 @@ export function InformeDocument({ data, includeActas = false }: Props) {
   const { pc, sc, onPc } = deriveBrand(company);
   const tasks             = os.projectTasks ?? [];
   const { total: totalActs, done: doneActs, inProg: inProgActs,
-          blocked: blockedActs, pend: pendActs, pct: progressPct } = deriveActivityStats(tasks);
+          blocked: blockedActs, pend: pendActs, pct: countPct } = deriveActivityStats(tasks);
+  // Use the stored project.progressPercent (average-of-averages) so the gauge
+  // matches what the service order tab shows. Fall back to count-based if unavailable.
+  const progressPct = project?.progressPercent != null
+    ? Math.round(Number(project.progressPercent))
+    : countPct;
 
   const reportTitle = includeActas ? 'Informe Ejecutivo con Actas' : 'Informe Ejecutivo';
 

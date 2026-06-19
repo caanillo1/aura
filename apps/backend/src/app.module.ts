@@ -21,6 +21,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AppService } from './app.service';
     GatewayModule,
     NotificationsModule,
     WhatsAppModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [

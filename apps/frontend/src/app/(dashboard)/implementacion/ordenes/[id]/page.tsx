@@ -6,7 +6,8 @@ import { useTheme } from 'next-themes';
 import {
   Clock, Users, Info, FolderKanban, Send, Plus, X, Layers, Pencil, Check, Star,
   GraduationCap, CheckCircle2, AlertCircle, Loader2, FolderOpen, BarChart3, MessageSquare,
-  Lock, Globe, Target, ShieldAlert, Mail, CalendarClock, RefreshCw, ToggleLeft, ToggleRight, FileText, Trash2,
+  Lock, Globe, Target, ShieldAlert, Mail, CalendarClock, RefreshCw, ToggleLeft, ToggleRight,
+  FileText, Trash2, ChevronDown, ClipboardList,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import { DocumentosSection } from '@/components/ui/DocumentosSection';
@@ -65,11 +66,13 @@ export default function OrdenDetailPage() {
   const [implRole, setImplRole]     = useState('apoyo');
   const [savingImpl, setSavingImpl] = useState(false);
 
-  // Informe ejecutivo
+  // Informes
   const [showInforme, setShowInforme]           = useState(false);
   const [showInformeActas, setShowInformeActas] = useState(false);
   const [conActasAutoEmail, setConActasAutoEmail]       = useState<{ destinatarios: string[]; asunto?: string } | null>(null);
   const [ejecutivoAutoEmail, setEjecutivoAutoEmail]     = useState<{ destinatarios: string[]; asunto?: string } | null>(null);
+  const [showReportMenu, setShowReportMenu]     = useState(false);
+  const [downloadingPlan, setDownloadingPlan]   = useState(false);
 
   // Email manual del informe
   const [emailModal, setEmailModal]         = useState(false);
@@ -568,6 +571,59 @@ export default function OrdenDetailPage() {
     } finally { setGeneratingProj(false); }
   };
 
+  const handleDownloadPlan = async () => {
+    if (!os) return;
+    setDownloadingPlan(true);
+    setShowReportMenu(false);
+    try {
+      // Fetch the same executive-report data (includes project.modules hierarchy)
+      const raw = await serviceOrdersApi.executiveReport(os.id);
+      const project = raw.project;
+      // Flatten activities into projectTasks (same shape as backend transformPdfData)
+      const projectTasks = (project?.modules ?? []).flatMap((mod: any) =>
+        (mod.phases ?? []).flatMap((phase: any) =>
+          (phase.activities ?? []).map((act: any) => ({
+            id:                   act.id,
+            module:               mod.name,
+            phase:                phase.name,
+            code:                 act.code,
+            taskName:             act.name,
+            status:               act.status,
+            completionPercentage: Number(act.progressPercent ?? 0),
+            assignedUser:         act.assignedTo ?? null,
+            plannedStartDate:     act.plannedStartDate ?? phase.startDate ?? mod.startDate ?? null,
+            plannedEndDate:       act.plannedEndDate   ?? phase.endDate   ?? mod.endDate   ?? null,
+            executionDate:        act.executionDate    ?? null,
+            actualEndDate:        act.actualEndDate    ?? null,
+          }))
+        )
+      );
+      const data = {
+        company:     raw.company,
+        os:          { ...raw.os, client: raw.os?.client ?? os.client, projectTasks },
+        project,
+        generatedAt: new Date().toISOString(),
+      };
+      const res = await fetch('/api/generate-plan-trabajo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data }),
+      });
+      if (!res.ok) throw new Error('Error generando PDF');
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `plan-trabajo-${os.osNumber ?? 'doc'}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Error al generar el Plan de Trabajo');
+    } finally {
+      setDownloadingPlan(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-5 max-w-5xl">
@@ -597,7 +653,7 @@ export default function OrdenDetailPage() {
       <BackButton href="/implementacion/ordenes" label="Órdenes de Servicio" />
 
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-mono font-bold text-lg" style={{ color: '#60a5fa' }}>{os.osNumber}</span>
@@ -610,34 +666,85 @@ export default function OrdenDetailPage() {
           <h2 className="font-bold text-xl mt-1" style={{ color: tc.p }}>{os.product}</h2>
           <p className="text-sm" style={{ color: tc.m }}>{os.client.businessName} · {os.client.nit}</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={() => setShowInforme(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.30)', color: '#a78bfa' }}>
-            <BarChart3 className="w-4 h-4" /> Informe Ejecutivo
-          </motion.button>
+
+        {/* Acciones */}
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+
+          {/* Dropdown Ver Informe */}
+          <div className="relative">
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              onClick={() => setShowReportMenu(v => !v)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.30)', color: '#a78bfa' }}>
+              <BarChart3 className="w-4 h-4" />
+              Ver Informe
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showReportMenu ? 'rotate-180' : ''}`} />
+            </motion.button>
+
+            {showReportMenu && (
+              <>
+                {/* Backdrop */}
+                <div className="fixed inset-0 z-10" onClick={() => setShowReportMenu(false)} />
+                {/* Menu */}
+                <div className="absolute right-0 top-full mt-1.5 z-20 w-56 rounded-xl overflow-hidden shadow-xl"
+                  style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
+                  {/* Informe Ejecutivo */}
+                  <button onClick={() => { setShowInforme(true); setShowReportMenu(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-white/5">
+                    <BarChart3 className="w-4 h-4 shrink-0" style={{ color: '#a78bfa' }} />
+                    <div>
+                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Informe Ejecutivo</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Resumen de avance y equipo</p>
+                    </div>
+                  </button>
+                  {/* Informe con Actas */}
+                  <button onClick={() => { setShowInformeActas(true); setShowReportMenu(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-white/5"
+                    style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    <FileText className="w-4 h-4 shrink-0" style={{ color: '#a78bfa' }} />
+                    <div>
+                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Informe con Actas</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Incluye todas las actas</p>
+                    </div>
+                  </button>
+                  {/* Plan de Trabajo */}
+                  <button onClick={handleDownloadPlan} disabled={downloadingPlan}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-white/5 disabled:opacity-50"
+                    style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                    {downloadingPlan
+                      ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: '#60a5fa' }} />
+                      : <ClipboardList className="w-4 h-4 shrink-0" style={{ color: '#60a5fa' }} />}
+                    <div>
+                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {downloadingPlan ? 'Generando…' : 'Plan de Trabajo'}
+                      </p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>PDF con todas las actividades</p>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Enviar por correo */}
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={() => { setEmailTo(''); setEmailSubject(''); setEmailReportType('ejecutivo'); setEmailModal(true); }}
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+            className="flex items-center justify-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
             style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.20)', color: '#a78bfa' }}
             title="Enviar informe por correo">
             <Mail className="w-4 h-4" />
           </motion.button>
+
+          {/* Automatización */}
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={openAutoModal}
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+            className="flex items-center justify-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
             style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.20)', color: '#a78bfa' }}
             title="Automatización de correos">
             <CalendarClock className="w-4 h-4" />
           </motion.button>
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={() => setShowInformeActas(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
-            style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.30)', color: '#a78bfa' }}
-            title="Informe ejecutivo con todas las actas adjuntas">
-            <FileText className="w-4 h-4" /> Informe con Actas
-          </motion.button>
+
+          {/* Cambiar estado */}
           {can('orders.editar') && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={openStatusModal}
@@ -649,19 +756,21 @@ export default function OrdenDetailPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
-        {TABS.map(({ key, label, icon: Icon }) => (
-          <button key={key} onClick={() => {
-            setTab(key);
-            if (key === 'capacitaciones' && !capLoaded) loadCapacitaciones();
-            if (key === 'correos' && !correosLoaded) loadCorreos();
-          }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === key ? 'btn-primary text-white' : ''}`}
-            style={tab !== key ? { color: 'var(--text-secondary)' } : {}}>
-            <Icon className="w-4 h-4" /> {label}
-          </button>
-        ))}
+      {/* Tabs — scroll horizontal en móvil */}
+      <div className="overflow-x-auto pb-0.5" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex gap-1 p-1 rounded-xl w-fit min-w-max" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => {
+              setTab(key);
+              if (key === 'capacitaciones' && !capLoaded) loadCapacitaciones();
+              if (key === 'correos' && !correosLoaded) loadCorreos();
+            }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap shrink-0 ${tab === key ? 'btn-primary text-white' : ''}`}
+              style={tab !== key ? { color: 'var(--text-secondary)' } : {}}>
+              <Icon className="w-4 h-4" /> {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tab: Información */}

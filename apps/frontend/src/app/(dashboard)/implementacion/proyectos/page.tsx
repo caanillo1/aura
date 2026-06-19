@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Search, RefreshCw, FolderKanban } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { projectsApi } from '@/lib/api';
 import { toast } from 'sonner';
 import type { Project } from '@/types';
@@ -25,6 +26,8 @@ export default function ProyectosPage() {
   const [search, setSearch]     = useState('');
   const [fStatus, setFStatus]   = useState('');
   const [loading, setLoading]   = useState(true);
+
+  const router = useRouter();
 
   const tc = isLight
     ? { p: '#0a1628', s: '#1a3050', m: '#4a6080' }
@@ -87,7 +90,8 @@ export default function ProyectosPage() {
 
       {/* Tabla */}
       <div className="rounded-2xl overflow-hidden" style={tableStyle}>
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr style={{ borderBottom: rowBorder, background: headBg }}>
               {['Proyecto', 'Cliente', 'OS Vinculada', 'Estado', 'Progreso', 'Fechas', ''].map(h => (
@@ -112,7 +116,8 @@ export default function ProyectosPage() {
                     <motion.tr key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.03 }}
                       style={{ borderBottom: rowBorder }}
-                      className="transition-colors"
+                      className="transition-colors cursor-pointer"
+                      onClick={() => router.push(`/implementacion/proyectos/${p.id}`)}
                       onMouseEnter={e => (e.currentTarget.style.background = isLight ? 'rgba(30,60,120,0.03)' : 'rgba(255,255,255,0.03)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <td className="px-4 py-3.5">
@@ -150,7 +155,7 @@ export default function ProyectosPage() {
                           → {new Date(p.endDate).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })}
                         </p>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
                         <Link href={`/implementacion/proyectos/${p.id}`}>
                           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                             className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
@@ -165,6 +170,7 @@ export default function ProyectosPage() {
             }
           </tbody>
         </table>
+        </div>
         {!loading && projects.length === 0 && (
           <div className="py-16 text-center text-sm" style={{ color: tc.m }}>
             No se encontraron proyectos — genera uno desde una Orden de Servicio

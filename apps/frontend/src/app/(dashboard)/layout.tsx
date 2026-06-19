@@ -56,16 +56,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       className="flex h-screen overflow-hidden relative"
       style={{
         background: isLight
-          ? 'linear-gradient(135deg, #4a7fc1 0%, #6b9fd8 25%, #8b7ac8 60%, #5a7ec0 100%)'
+          ? 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 30%, #2563eb 65%, #3b82f6 100%)'
           : 'radial-gradient(ellipse at top right, #0f1f3d 0%, #060d1c 50%, #050810 100%)',
       }}
     >
       {/* Orbs glassmorphism — dan profundidad al blur en ambos modos */}
       {isLight ? (
         <>
-          <div className="absolute pointer-events-none z-0" style={{ top: '-15%', right: '-8%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(70,140,230,0.38) 0%, transparent 65%)', animation: 'orbFloat 14s ease-in-out infinite' }} />
-          <div className="absolute pointer-events-none z-0" style={{ bottom: '-20%', left: '-8%', width: 580, height: 580, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.28) 0%, transparent 65%)', animation: 'orbFloat 18s ease-in-out infinite reverse' }} />
-          <div className="absolute pointer-events-none z-0" style={{ top: '35%', left: '30%', width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(56,189,248,0.20) 0%, transparent 65%)', animation: 'orbFloat 11s ease-in-out infinite' }} />
+          <div className="absolute pointer-events-none z-0" style={{ top: '-15%', right: '-8%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(96,165,250,0.35) 0%, transparent 65%)', animation: 'orbFloat 14s ease-in-out infinite' }} />
+          <div className="absolute pointer-events-none z-0" style={{ bottom: '-20%', left: '-8%', width: 580, height: 580, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.25) 0%, transparent 65%)', animation: 'orbFloat 18s ease-in-out infinite reverse' }} />
+          <div className="absolute pointer-events-none z-0" style={{ top: '35%', left: '30%', width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(147,197,253,0.22) 0%, transparent 65%)', animation: 'orbFloat 11s ease-in-out infinite' }} />
         </>
       ) : (
         <>

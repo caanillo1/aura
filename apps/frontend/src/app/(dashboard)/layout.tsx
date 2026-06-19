@@ -5,33 +5,28 @@ import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth.store';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { CommandPalette } from '@/components/ui/CommandPalette';
 import { Toaster } from 'sonner';
 import { usersApi } from '@/lib/api';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrated, setHydrated]     = useState(false);
+  const [cmdOpen, setCmdOpen]       = useState(false);
   const { isAuthenticated, setPermissions } = useAuthStore();
   const { theme } = useTheme();
-  const router = useRouter();
+  const router   = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  useEffect(() => { setHydrated(true); }, []);
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) router.push('/login');
   }, [hydrated, isAuthenticated, router]);
 
-  // Close mobile drawer on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-  // Refresca permisos desde el servidor en cada carga del dashboard
-  // así los cambios de roles toman efecto sin necesidad de re-login
   useEffect(() => {
     if (!hydrated || !isAuthenticated) return;
     usersApi.getMe().then((me: any) => {
@@ -43,9 +38,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }).catch(() => {});
   }, [hydrated, isAuthenticated, setPermissions]);
 
-  // Mientras el store rehidrata desde localStorage, mostrar fondo oscuro sin redirigir
+  // Ctrl+K and custom event trigger
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCmdOpen((p) => !p);
+      }
+    };
+    const onCustom = () => setCmdOpen(true);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('aura:command', onCustom);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('aura:command', onCustom);
+    };
+  }, []);
+
   if (!hydrated) return (
-    <div style={{ minHeight: '100vh', background: 'radial-gradient(ellipse at top right, #0f1f3d 0%, #060d1c 50%, #050810 100%)' }} />
+    <div style={{ minHeight: '100vh', background: '#020617' }} />
   );
   if (!isAuthenticated) return null;
 
@@ -56,18 +67,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       className="flex h-screen overflow-hidden relative"
       style={{
         background: isLight
-          ? 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 30%, #2563eb 65%, #3b82f6 100%)'
+          ? 'var(--bg-base)'
           : 'radial-gradient(ellipse at top right, #0f1f3d 0%, #060d1c 50%, #050810 100%)',
       }}
     >
-      {/* Orbs glassmorphism — dan profundidad al blur en ambos modos */}
-      {isLight ? (
-        <>
-          <div className="absolute pointer-events-none z-0" style={{ top: '-15%', right: '-8%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(96,165,250,0.35) 0%, transparent 65%)', animation: 'orbFloat 14s ease-in-out infinite' }} />
-          <div className="absolute pointer-events-none z-0" style={{ bottom: '-20%', left: '-8%', width: 580, height: 580, borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.25) 0%, transparent 65%)', animation: 'orbFloat 18s ease-in-out infinite reverse' }} />
-          <div className="absolute pointer-events-none z-0" style={{ top: '35%', left: '30%', width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(147,197,253,0.22) 0%, transparent 65%)', animation: 'orbFloat 11s ease-in-out infinite' }} />
-        </>
-      ) : (
+      {/* Dark mode depth orbs */}
+      {!isLight && (
         <>
           <div className="absolute pointer-events-none z-0" style={{ top: '-20%', right: '-10%', width: 700, height: 700, borderRadius: '50%', background: 'radial-gradient(circle, rgba(45,80,134,0.35) 0%, transparent 65%)', animation: 'orbFloat 16s ease-in-out infinite' }} />
           <div className="absolute pointer-events-none z-0" style={{ bottom: '-20%', left: '-10%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(30,58,95,0.40) 0%, transparent 65%)', animation: 'orbFloat 20s ease-in-out infinite reverse' }} />
@@ -75,7 +80,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </>
       )}
 
-      {/* Sidebar — renders desktop in-flow + mobile overlay internally */}
       <Sidebar
         collapsed={collapsed}
         onToggle={() => setCollapsed((p) => !p)}
@@ -83,7 +87,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         onMobileClose={() => setMobileOpen(false)}
       />
 
-      {/* Contenido principal */}
       <div className="flex flex-col flex-1 overflow-hidden relative z-10 min-h-0">
         <Header onMenuToggle={() => setMobileOpen((p) => !p)} />
         <main
@@ -92,8 +95,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         >
           {children}
         </main>
+
+        {/* Footer status bar */}
+        <div
+          className="hidden md:flex items-center justify-between px-5 shrink-0"
+          style={{
+            height: 26,
+            background: isLight ? 'rgba(15,23,42,0.06)' : 'rgba(2,6,23,0.90)',
+            borderTop: `1px solid ${isLight ? 'rgba(15,23,42,0.07)' : 'rgba(255,255,255,0.05)'}`,
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <span className="text-[10px] font-mono tracking-widest" style={{ color: 'var(--text-muted)' }}>
+            AURA ERP · Sistemas Infotec
+          </span>
+          <span className="text-[10px] font-mono flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" style={{ boxShadow: '0 0 4px #34d399' }} />
+            Conectado
+            <span className="opacity-40 ml-2">Ctrl+K Buscar</span>
+          </span>
+        </div>
       </div>
 
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
       <Toaster richColors position="top-right" />
 
       <style jsx global>{`

@@ -117,17 +117,8 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
   const hasActiveChild = (children?: SubItem[]): boolean =>
     Boolean(children?.some((c) => pathname === c.href || pathname.startsWith(c.href + '/')));
 
-  const itemStyle = (active: boolean) => ({
-    background: active
-      ? isLight ? 'rgba(30,58,95,0.13)' : 'rgba(59,130,246,0.15)'
-      : 'transparent',
-    border: active
-      ? isLight ? '1px solid rgba(30,58,95,0.22)' : '1px solid rgba(59,130,246,0.28)'
-      : '1px solid transparent',
-  });
-
   const iconColor = (active: boolean) =>
-    active ? (isLight ? '#1e3a5f' : '#60a5fa') : 'var(--text-muted)';
+    active ? (isLight ? '#2563EB' : '#60a5fa') : 'var(--text-muted)';
 
   const textColor = (active: boolean) =>
     active ? 'var(--text-primary)' : 'var(--text-secondary)';
@@ -188,10 +179,10 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
                 return (
                   <li key={item.label} className="relative">
                     <motion.div
-                      whileHover={{ x: isCollapsed ? 0 : 2 }}
+                      whileHover={{ x: isCollapsed ? 0 : 4, scale: isCollapsed ? 1 : 1.01 }}
+                      transition={{ duration: 0.15 }}
                       onClick={() => !isCollapsed && toggleExpand(item.label)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer group ${isCollapsed ? 'justify-center' : ''}`}
-                      style={itemStyle(childActive)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer group ${isCollapsed ? 'justify-center' : ''} ${childActive ? 'sidebar-item-active' : ''}`}
                     >
                       <Icon className="w-5 h-5 shrink-0 transition-colors" style={{ color: iconColor(childActive) }} />
                       <AnimatePresence>
@@ -307,9 +298,9 @@ export function Sidebar({ collapsed, onToggle, mobileOpen = false, onMobileClose
                 <li key={item.href}>
                   <Link href={item.href!} onClick={onClose}>
                     <motion.div
-                      whileHover={{ x: isCollapsed ? 0 : 2 }}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer group relative ${isCollapsed ? 'justify-center' : ''}`}
-                      style={itemStyle(active)}
+                      whileHover={{ x: isCollapsed ? 0 : 4, scale: isCollapsed ? 1 : 1.01 }}
+                      transition={{ duration: 0.15 }}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all cursor-pointer group relative ${isCollapsed ? 'justify-center' : ''} ${active ? 'sidebar-item-active' : ''}`}
                     >
                       <Icon className="w-5 h-5 shrink-0 transition-colors" style={{ color: iconColor(active) }} />
                       <AnimatePresence>

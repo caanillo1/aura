@@ -1,5 +1,5 @@
 'use client';
-import { Sun, Moon, Menu } from 'lucide-react';
+import { Sun, Moon, Menu, Search, Command } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth.store';
 import { usePathname } from 'next/navigation';
@@ -37,9 +37,12 @@ export function Header({ onMenuToggle }: HeaderProps) {
     ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
     : 'AU';
 
+  const openPalette = () =>
+    window.dispatchEvent(new CustomEvent('aura:command'));
+
   return (
     <header
-      className="h-14 flex items-center justify-between px-6 shrink-0 transition-colors"
+      className="h-14 flex items-center justify-between px-4 sm:px-6 shrink-0 transition-colors"
       style={{
         background: 'var(--header-bg)',
         borderBottom: '1px solid var(--header-border)',
@@ -63,12 +66,40 @@ export function Header({ onMenuToggle }: HeaderProps) {
         </h1>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
+        {/* Search / Command Palette trigger */}
+        <button
+          onClick={openPalette}
+          className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-lg transition-all text-xs font-medium"
+          style={{
+            background: 'var(--input-bg)',
+            border: '1px solid var(--input-border)',
+            color: 'var(--text-muted)',
+          }}
+          title="Buscar (Ctrl+K)"
+        >
+          <Search className="w-3.5 h-3.5" />
+          <span>Buscar...</span>
+          <span className="flex items-center gap-0.5 ml-1 opacity-60">
+            <kbd className="text-[10px] font-mono">⌘K</kbd>
+          </span>
+        </button>
+
+        {/* Icon-only search on mobile */}
+        <button
+          onClick={openPalette}
+          className="sm:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+          style={{ color: 'var(--text-secondary)' }}
+          aria-label="Buscar"
+        >
+          <Search className="w-4 h-4" />
+        </button>
+
         {/* Toggle tema */}
         {mounted && (
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-white/10"
             style={{ color: 'var(--text-secondary)' }}
             title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
           >
@@ -83,9 +114,9 @@ export function Header({ onMenuToggle }: HeaderProps) {
         <NotificationBell />
 
         {/* Avatar */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 ml-1">
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0"
             style={{ background: 'linear-gradient(135deg, #1E3A5F, #2D5086)' }}
           >
             {initials}

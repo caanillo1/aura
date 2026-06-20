@@ -6,18 +6,22 @@ import { CreateCotizacionDto, UpdateCotizacionDto, CotizacionFilterDto } from '.
 export class ComercialService {
   constructor(private prisma: PrismaService) {}
 
-  private select = {
+  private readonly listSelect = {
     id: true, numero: true, titulo: true, status: true, valor: true,
     validHasta: true, createdAt: true, prospecto: true, contacto: true, email: true,
     descripcion: true, notas: true,
     client: { select: { id: true, businessName: true } },
     createdBy: { select: { firstName: true, lastName: true } },
-  };
+  } as const;
 
-  private detailSelect = {
-    ...this.select,
-    items: { select: { id: true, descripcion: true, cantidad: true, valorUnitario: true, descuento: true } },
-  };
+  private readonly detailSelect = {
+    id: true, numero: true, titulo: true, status: true, valor: true,
+    validHasta: true, createdAt: true, prospecto: true, contacto: true, email: true,
+    descripcion: true, notas: true,
+    client:    { select: { id: true, businessName: true } },
+    createdBy: { select: { firstName: true, lastName: true } },
+    items:     { select: { id: true, descripcion: true, cantidad: true, valorUnitario: true, descuento: true } },
+  } as const;
 
   private async nextNumero(companyId: string): Promise<string> {
     const last = await this.prisma.cotizacion.findFirst({
@@ -48,7 +52,7 @@ export class ComercialService {
           ],
         }),
       },
-      select: this.select,
+      select: this.listSelect,
       orderBy: { createdAt: 'desc' },
     });
   }

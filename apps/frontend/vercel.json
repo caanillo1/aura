@@ -1,0 +1,3 @@
+{
+  "installCommand": "cd ../.. && pnpm install --filter \"./apps/frontend...\" --no-frozen-lockfile"
+}

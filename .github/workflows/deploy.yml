@@ -47,7 +47,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --filter "./apps/frontend..." --no-frozen-lockfile
 
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest

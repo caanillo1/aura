@@ -269,10 +269,13 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
   const blockedActs    = allActivities.filter((a: any) => a.status === 'bloqueado').length;
   const pendActs       = allActivities.filter((a: any) => a.status === 'pendiente').length;
   const totalActs      = allActivities.length;
-  // Promedio ponderado: completado=100%, en_progreso=50%, pendiente/bloqueado=0%
-  const progressPct    = totalActs > 0
-    ? Math.round(allActivities.reduce((s: number, a: any) => s + Number(a.progressPercent ?? 0), 0) / totalActs)
-    : 0;
+  // Use the DB-stored value (average-of-averages through module→phase→activity hierarchy)
+  // so the preview matches the project view and the downloaded PDF.
+  const progressPct    = project?.progressPercent != null
+    ? Math.round(Number(project.progressPercent))
+    : (totalActs > 0
+        ? Math.round(allActivities.reduce((s: number, a: any) => s + Number(a.progressPercent ?? 0), 0) / totalActs)
+        : 0);
   const actasByType    = (t: string) => (actas as any[]).filter(a => a.type === t);
   const firmadas       = (actas as any[]).filter(a => a.status === 'firmada').length;
 
@@ -1118,9 +1121,11 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
                     {(project.modules as any[]).map((mod: any) => {
                       const modActs = (mod.phases ?? []).flatMap((p: any) => p.activities ?? []);
                       const modDone = modActs.filter((a: any) => a.status === 'completado').length;
-                      const pct    = modActs.length > 0
-                        ? Math.round(modActs.reduce((s: number, a: any) => s + Number(a.progressPercent ?? 0), 0) / modActs.length)
-                        : 0;
+                      const pct    = mod.progressPercent != null
+                        ? Math.round(Number(mod.progressPercent))
+                        : (modActs.length > 0
+                            ? Math.round(modActs.reduce((s: number, a: any) => s + Number(a.progressPercent ?? 0), 0) / modActs.length)
+                            : 0);
                       return (
                         <div key={mod.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                           <div style={{ width: 190, fontSize: 9.5, fontWeight: 600, color: '#374151',

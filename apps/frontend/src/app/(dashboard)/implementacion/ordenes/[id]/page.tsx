@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -674,13 +675,13 @@ export default function OrdenDetailPage() {
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
 
           {/* Dropdown Ver Informe */}
-          <div className="relative">
+          <div ref={reportBtnRef} className="relative inline-block">
             <motion.button
-              ref={reportBtnRef}
               whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => {
-                if (reportBtnRef.current) {
-                  const r = reportBtnRef.current.getBoundingClientRect();
+                const el = reportBtnRef.current;
+                if (el) {
+                  const r = el.getBoundingClientRect();
                   setReportMenuPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
                 }
                 setShowReportMenu(v => !v);
@@ -691,61 +692,58 @@ export default function OrdenDetailPage() {
               Ver Informe
               <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showReportMenu ? 'rotate-180' : ''}`} />
             </motion.button>
-
-            {showReportMenu && (
-              <>
-                {/* Backdrop */}
-                <div className="fixed inset-0 z-[200]" onClick={() => setShowReportMenu(false)} />
-                {/* Menu — fixed so escapa cualquier stacking context del padre */}
-                <div
-                  className="fixed z-[201] w-56 rounded-2xl overflow-hidden shadow-2xl"
-                  style={{
-                    top: reportMenuPos.top,
-                    right: reportMenuPos.right,
-                    background: 'var(--card-bg)',
-                    border: '1px solid var(--border-strong)',
-                    backdropFilter: 'blur(24px) saturate(180%)',
-                    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.35), 0 4px 16px rgba(0,0,0,0.20)',
-                  }}
-                >
-                  {/* Informe Ejecutivo */}
-                  <button onClick={() => { setShowInforme(true); setShowReportMenu(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-white/5">
-                    <BarChart3 className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-violet)' }} />
-                    <div>
-                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Informe Ejecutivo</p>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Resumen de avance y equipo</p>
-                    </div>
-                  </button>
-                  {/* Informe con Actas */}
-                  <button onClick={() => { setShowInformeActas(true); setShowReportMenu(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-white/5"
-                    style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                    <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-violet)' }} />
-                    <div>
-                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Informe con Actas</p>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Incluye todas las actas</p>
-                    </div>
-                  </button>
-                  {/* Plan de Trabajo */}
-                  <button onClick={handleDownloadPlan} disabled={downloadingPlan}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-white/5 disabled:opacity-50"
-                    style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                    {downloadingPlan
-                      ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: 'var(--accent-blue)' }} />
-                      : <ClipboardList className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-blue)' }} />}
-                    <div>
-                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {downloadingPlan ? 'Generando…' : 'Plan de Trabajo'}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>PDF con todas las actividades</p>
-                    </div>
-                  </button>
-                </div>
-              </>
-            )}
           </div>
+
+          {/* Portal: menú fuera de cualquier stacking context */}
+          {showReportMenu && typeof window !== 'undefined' && createPortal(
+            <>
+              <div className="fixed inset-0 z-[500]" onClick={() => setShowReportMenu(false)} />
+              <div
+                className="fixed z-[501] w-60 rounded-2xl overflow-hidden"
+                style={{
+                  top: reportMenuPos.top,
+                  right: reportMenuPos.right,
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border-strong)',
+                  backdropFilter: 'blur(24px) saturate(180%)',
+                  WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.40), 0 4px 16px rgba(0,0,0,0.25)',
+                }}
+              >
+                <button onClick={() => { setShowInforme(true); setShowReportMenu(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left text-sm transition-colors hover:bg-white/5">
+                  <BarChart3 className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-violet)' }} />
+                  <div>
+                    <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Informe Ejecutivo</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Resumen de avance y equipo</p>
+                  </div>
+                </button>
+                <button onClick={() => { setShowInformeActas(true); setShowReportMenu(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left text-sm transition-colors hover:bg-white/5"
+                  style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                  <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-violet)' }} />
+                  <div>
+                    <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Informe con Actas</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Incluye todas las actas</p>
+                  </div>
+                </button>
+                <button onClick={handleDownloadPlan} disabled={downloadingPlan}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left text-sm transition-colors hover:bg-white/5 disabled:opacity-50"
+                  style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                  {downloadingPlan
+                    ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" style={{ color: 'var(--accent-blue)' }} />
+                    : <ClipboardList className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-blue)' }} />}
+                  <div>
+                    <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {downloadingPlan ? 'Generando…' : 'Plan de Trabajo'}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>PDF con todas las actividades</p>
+                  </div>
+                </button>
+              </div>
+            </>,
+            document.body
+          )}
 
           {/* Enviar por correo */}
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}

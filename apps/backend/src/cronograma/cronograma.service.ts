@@ -69,15 +69,21 @@ export class CronogramaService {
   }
 
   private async sendVisitEmail(companyId: string, bloque: any) {
-    const agente = await this.prisma.user.findUnique({
-      where: { id: bloque.agente.id },
-      select: { email: true, firstName: true },
+    if (!bloque.serviceOrder?.id) return; // sin OS no hay líder de cliente
+
+    // Obtener líder de cliente de la OS
+    const so = await this.prisma.serviceOrder.findUnique({
+      where: { id: bloque.serviceOrder.id },
+      select: {
+        clientLeader: { select: { firstName: true, lastName: true, email: true } },
+      },
     });
-    if (!agente?.email) return;
+    const lider = so?.clientLeader;
+    if (!lider?.email) return;
 
     const payload = {
       bloqueId: bloque.id, companyId,
-      nombre: agente.firstName,
+      nombre: lider.firstName,
       titulo: bloque.titulo,
       fecha: bloque.fecha,
       horaInicio: bloque.horaInicio,
@@ -91,36 +97,69 @@ export class CronogramaService {
     const cancelUrl = `${frontUrl}/cronograma/responder?token=${token}&action=cancel`;
 
     const fechaFmt = dayjs(bloque.fecha).format('DD/MM/YYYY');
-    const clienteNombre = bloque.client?.businessName ?? 'Sin cliente';
+    const clienteNombre = bloque.client?.businessName ?? '';
     const soInfo = bloque.serviceOrder ? `OS ${bloque.serviceOrder.osNumber} — ${bloque.serviceOrder.product}` : '';
 
     const html = `
 <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a1628;color:#e2e8f0;border-radius:16px;overflow:hidden">
   <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:32px 28px">
-    <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff">Nueva visita programada</h1>
-    <p style="margin:8px 0 0;font-size:14px;color:#93c5fd">Tienes una cita agendada en el cronograma</p>
+    <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff">Visita programada — confirmación requerida</h1>
+    <p style="margin:8px 0 0;font-size:14px;color:#93c5fd">Se ha agendado una visita en su empresa</p>
   </div>
   <div style="padding:28px">
-    <p style="margin:0 0 20px;font-size:15px;color:#cbd5e1">Hola <strong style="color:#e2e8f0">${agente.firstName}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#cbd5e1">Estimado/a <strong style="color:#e2e8f0">${lider.firstName} ${lider.lastName}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#94a3b8">Le informamos que se ha programado una visita de nuestro equipo. Le pedimos confirmar o cancelar esta cita:</p>
     <div style="background:#0f2040;border:1px solid #1e3a5f;border-radius:12px;padding:20px;margin-bottom:24px">
       <table style="width:100%;border-collapse:collapse">
         <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;width:120px">Actividad</td><td style="padding:6px 0;font-size:14px;font-weight:600;color:#e2e8f0">${bloque.titulo}</td></tr>
         <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Fecha</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${fechaFmt}</td></tr>
         <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Horario</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${bloque.horaInicio} – ${bloque.horaFin}</td></tr>
-        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Cliente</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${clienteNombre}</td></tr>
+        ${clienteNombre ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Empresa</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${clienteNombre}</td></tr>` : ''}
         ${soInfo ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Orden</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${soInfo}</td></tr>` : ''}
       </table>
     </div>
-    <p style="margin:0 0 20px;font-size:14px;color:#94a3b8">Por favor confirma tu disponibilidad para esta visita:</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#94a3b8">Al hacer clic en cualquiera de los botones, se le pedirá validar su número de documento de identidad:</p>
     <div style="display:flex;gap:12px;flex-wrap:wrap">
       <a href="${acceptUrl}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:700;font-size:14px">✓ Confirmar visita</a>
       <a href="${cancelUrl}" style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:700;font-size:14px">✗ Cancelar visita</a>
     </div>
-    <p style="margin:24px 0 0;font-size:12px;color:#475569">Este enlace expira en 7 días. Si no reconoces esta solicitud, ignora este correo.</p>
+    <p style="margin:24px 0 0;font-size:12px;color:#475569">Este enlace expira en 7 días. Si no esperaba esta visita, puede ignorar este correo o cancelarla.</p>
   </div>
 </div>`;
 
-    await this.mail.sendFromCompany(companyId, [agente.email], `Visita agendada: ${bloque.titulo} — ${fechaFmt}`, html);
+    await this.mail.sendFromCompany(companyId, [lider.email], `Visita programada — ${fechaFmt}: ${bloque.titulo}`, html);
+  }
+
+  private async sendCancelNotificationToAgent(companyId: string, bloque: any, lider: { firstName: string; lastName: string }, motivo?: string) {
+    const agente = await this.prisma.user.findUnique({
+      where: { id: bloque.agenteId },
+      select: { email: true, firstName: true },
+    });
+    if (!agente?.email) return;
+
+    const fechaFmt = dayjs(bloque.fecha).format('DD/MM/YYYY');
+    const html = `
+<div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a1628;color:#e2e8f0;border-radius:16px;overflow:hidden">
+  <div style="background:linear-gradient(135deg,#7f1d1d,#dc2626);padding:32px 28px">
+    <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff">Visita cancelada por el cliente</h1>
+    <p style="margin:8px 0 0;font-size:14px;color:#fca5a5">El líder de cliente ha cancelado la siguiente visita</p>
+  </div>
+  <div style="padding:28px">
+    <p style="margin:0 0 20px;font-size:15px;color:#cbd5e1">Hola <strong style="color:#e2e8f0">${agente.firstName}</strong>,</p>
+    <div style="background:#0f2040;border:1px solid #7f1d1d;border-radius:12px;padding:20px;margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse">
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;width:140px">Actividad</td><td style="padding:6px 0;font-size:14px;font-weight:600;color:#e2e8f0">${bloque.titulo}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Fecha</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${fechaFmt}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Horario</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${bloque.horaInicio} – ${bloque.horaFin}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Cancelado por</td><td style="padding:6px 0;font-size:14px;color:#fca5a5">${lider.firstName} ${lider.lastName}</td></tr>
+        ${motivo ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;vertical-align:top">Motivo</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${motivo}</td></tr>` : ''}
+      </table>
+    </div>
+    <p style="font-size:13px;color:#64748b">Por favor coordina una nueva fecha con el cliente. El estado del bloque ha sido actualizado a <strong style="color:#fca5a5">Cancelado</strong> en el cronograma.</p>
+  </div>
+</div>`;
+
+    await this.mail.sendFromCompany(companyId, [agente.email], `Visita cancelada por cliente — ${fechaFmt}: ${bloque.titulo}`, html);
   }
 
   async respondToVisit(dto: RespondVisitDto) {
@@ -131,29 +170,81 @@ export class CronogramaService {
       throw new BadRequestException('El enlace ha expirado o no es válido.');
     }
 
+    // Obtener bloque con los datos necesarios
     const bloque = await this.prisma.cronogramaBloque.findFirst({
       where: { id: payload.bloqueId, companyId: payload.companyId },
-      select: { id: true, status: true, titulo: true },
+      select: {
+        id: true, status: true, titulo: true, fecha: true, horaInicio: true, horaFin: true,
+        agenteId: true, createdById: true, serviceOrderId: true,
+      },
     });
     if (!bloque) throw new NotFoundException('Bloque no encontrado.');
+    if (!bloque.serviceOrderId) throw new BadRequestException('Este bloque no tiene orden de servicio asociada.');
+
+    // Validar con líder de cliente
+    const so = await this.prisma.serviceOrder.findUnique({
+      where: { id: bloque.serviceOrderId },
+      select: {
+        id: true,
+        clientLeader: {
+          select: { id: true, firstName: true, lastName: true, document: true },
+        },
+      },
+    });
+    if (!so?.clientLeader) {
+      throw new BadRequestException('La orden de servicio no tiene líder de cliente asignado.');
+    }
+    if (so.clientLeader.document.trim() !== dto.documento.trim()) {
+      throw new BadRequestException('El documento ingresado no coincide con el del líder de cliente asignado a esta orden.');
+    }
+
+    const lider = so.clientLeader;
+    const razonBase = `Visita "${bloque.titulo}" del ${dayjs(bloque.fecha).format('DD/MM/YYYY')} ${bloque.horaInicio}–${bloque.horaFin}`;
 
     if (dto.action === 'accept') {
       await this.prisma.cronogramaBloque.update({
         where: { id: bloque.id },
         data: { status: 'programado' },
       });
-      return { ok: true, message: 'Visita confirmada. ¡Hasta pronto!' };
+      await this.prisma.serviceOrderHistory.create({
+        data: {
+          serviceOrderId: so.id,
+          changedById: bloque.createdById,
+          fieldName: 'visita_confirmada',
+          oldValue: bloque.status,
+          newValue: 'programado',
+          reason: `${razonBase} — Confirmada por líder cliente ${lider.firstName} ${lider.lastName}`,
+          noteType: 'nota',
+          noteLevel: 'info',
+        },
+      });
+      return { ok: true, message: '¡Visita confirmada! Nuestro equipo estará presente en la fecha acordada.' };
     }
 
-    // cancel
-    const notas = dto.motivo
-      ? `Cancelado por el agente. Motivo: ${dto.motivo}`
-      : 'Cancelado por el agente.';
+    // Cancelar
+    const motivoTexto = dto.motivo?.trim() || 'Sin motivo especificado';
+    const notas = `Cancelado por líder cliente ${lider.firstName} ${lider.lastName}. Motivo: ${motivoTexto}`;
     await this.prisma.cronogramaBloque.update({
       where: { id: bloque.id },
       data: { status: 'cancelado', notas },
     });
-    return { ok: true, message: 'Visita cancelada y registrada en el sistema.' };
+    await this.prisma.serviceOrderHistory.create({
+      data: {
+        serviceOrderId: so.id,
+        changedById: bloque.createdById,
+        fieldName: 'visita_cancelada',
+        oldValue: bloque.status,
+        newValue: 'cancelado',
+        reason: `${razonBase} — Cancelada por líder cliente ${lider.firstName} ${lider.lastName}. Motivo: ${motivoTexto}`,
+        noteType: 'nota',
+        noteLevel: 'alerta',
+      },
+    });
+
+    // Notificar al agente
+    this.sendCancelNotificationToAgent(payload.companyId, bloque, lider, dto.motivo).catch(() => {});
+
+    return { ok: true, message: 'Visita cancelada. El equipo ha sido notificado y coordinará una nueva fecha.' };
   }
 
   async update(companyId: string, id: string, dto: UpdateBloqueDto) {

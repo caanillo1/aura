@@ -624,8 +624,8 @@ export const cronogramaApi = {
     api.patch(`/cronograma/${id}`, data).then((r) => r.data),
   remove: (id: string) =>
     api.delete(`/cronograma/${id}`).then((r) => r.data),
-  respond: (token: string, action: 'accept' | 'cancel', motivo?: string) =>
-    api.post('/cronograma/respond', { token, action, ...(motivo && { motivo }) }).then((r) => r.data),
+  respond: (token: string, action: 'accept' | 'cancel', motivo?: string, documento?: string) =>
+    api.post('/cronograma/respond', { token, action, documento: documento ?? '', ...(motivo && { motivo }) }).then((r) => r.data),
 };
 
 // ── Comercial ─────────────────────────────────────────────────────────────────

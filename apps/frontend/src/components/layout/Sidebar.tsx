@@ -10,6 +10,7 @@ import {
   ClipboardPlus, ListOrdered, MessageSquarePlus,
   Briefcase, LayoutTemplate, Layers, X,
   CalendarDays, TrendingUp, FileSpreadsheet,
+  MapPin, Activity,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth.store';
@@ -41,10 +42,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Implementación', icon: Briefcase,
     roles: ['admin','coordinator','implementer_clinical','implementer_financial','implementer_support'],
     children: [
-      { href: '/implementacion/ordenes',    label: 'Órdenes de Servicio', icon: ClipboardList,  permission: 'orders.buscar'   },
-      { href: '/implementacion/plantillas', label: 'Plantillas',          icon: LayoutTemplate, permission: 'settings.editar' },
-      { href: '/implementacion/modulos',    label: 'Módulos',             icon: Layers,         permission: 'settings.editar' },
-      { href: '/implementacion/proyectos',  label: 'Proyectos',           icon: FolderKanban,   permission: 'projects.editar' },
+      { href: '/implementacion/ordenes',       label: 'Órdenes de Servicio', icon: ClipboardList,  permission: 'orders.buscar'   },
+      { href: '/implementacion/plantillas',   label: 'Plantillas',          icon: LayoutTemplate, permission: 'settings.editar' },
+      { href: '/implementacion/modulos',      label: 'Módulos',             icon: Layers,         permission: 'settings.editar' },
+      { href: '/implementacion/proyectos',    label: 'Proyectos',           icon: FolderKanban,   permission: 'projects.editar' },
+      { href: '/implementacion/visitas',      label: 'Visitas',             icon: MapPin,         permission: 'orders.buscar'   },
+      { href: '/implementacion/seguimientos', label: 'Seguimientos',        icon: Activity,       permission: 'orders.buscar'   },
     ],
   },
   { label: 'Requerimientos', icon: MessageSquarePlus,

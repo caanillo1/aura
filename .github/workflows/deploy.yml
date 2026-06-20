@@ -87,6 +87,12 @@ jobs:
           git reset --hard origin/main
           Write-Host "✅ Código actualizado"
 
+      - name: Detener backend
+        run: |
+          schtasks /run /TN "AURA-StopBackend"
+          Start-Sleep 6
+          Write-Host "✅ Backend detenido"
+
       - name: Instalar dependencias
         run: |
           cd C:\AURA

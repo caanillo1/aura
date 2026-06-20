@@ -21,6 +21,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { CronogramaModule } from './cronograma/cronograma.module';
 import { ComercialModule } from './comercial/comercial.module';
+import { VisitsModule } from './visits/visits.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './health/health.module';
@@ -47,6 +48,7 @@ import { HealthModule } from './health/health.module';
     WhatsAppModule,
     CronogramaModule,
     ComercialModule,
+    VisitsModule,
     HealthModule,
   ],
   controllers: [AppController],

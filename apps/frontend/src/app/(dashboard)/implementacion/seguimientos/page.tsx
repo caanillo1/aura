@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, User,
 } from 'lucide-react';
 import { projectsApi } from '@/lib/api';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 import type { Project, ProjectActivity, ProjectModule, ProjectPhase, ActivityStatus } from '@/types';
 import {
@@ -120,44 +121,110 @@ function ActivityCard({ act, compact = false }: { act: FlatActivity; compact?: b
   );
 }
 
-// ── Vista: Kanban ─────────────────────────────────────────────────────────────
+// ── Vista: Kanban (con Drag-and-Drop interactivo) ────────────────────────────
 
-function KanbanView({ activities }: { activities: FlatActivity[] }) {
+function KanbanView({ activities, onActivityUpdate }: { activities: FlatActivity[]; onActivityUpdate: (id: string, status: ActivityStatus) => void }) {
   const { theme } = useTheme();
   const isLight = theme === 'light';
-  const columns = (['pendiente', 'en_progreso', 'completado', 'bloqueado'] as ActivityStatus[]);
+  const COLS = ['pendiente', 'en_progreso', 'completado', 'bloqueado'] as ActivityStatus[];
   const border = isLight ? 'rgba(15,23,42,0.07)' : 'rgba(255,255,255,0.06)';
 
-  const grouped = columns.reduce((acc, s) => {
-    acc[s] = activities.filter(a => a.status === s);
-    return acc;
-  }, {} as Record<ActivityStatus, FlatActivity[]>);
+  const [grouped, setGrouped] = useState<Record<ActivityStatus, FlatActivity[]>>(() =>
+    COLS.reduce((acc, s) => ({ ...acc, [s]: activities.filter(a => a.status === s) }), {} as Record<ActivityStatus, FlatActivity[]>)
+  );
+  const [saving, setSaving] = useState<string | null>(null);
+
+  useEffect(() => {
+    setGrouped(COLS.reduce((acc, s) => ({ ...acc, [s]: activities.filter(a => a.status === s) }), {} as Record<ActivityStatus, FlatActivity[]>));
+  }, [activities]);
+
+  async function onDragEnd(result: DropResult) {
+    const { source, destination, draggableId } = result;
+    if (!destination || destination.droppableId === source.droppableId) return;
+
+    const srcCol  = source.droppableId as ActivityStatus;
+    const dstCol  = destination.droppableId as ActivityStatus;
+    const srcItems = Array.from(grouped[srcCol]);
+    const dstItems = Array.from(grouped[dstCol]);
+    const [moved]  = srcItems.splice(source.index, 1);
+    dstItems.splice(destination.index, 0, { ...moved, status: dstCol });
+
+    setGrouped(g => ({ ...g, [srcCol]: srcItems, [dstCol]: dstItems }));
+    setSaving(draggableId);
+
+    try {
+      await projectsApi.updateActivity(draggableId, { status: dstCol });
+      onActivityUpdate(draggableId, dstCol);
+      toast.success(`Actividad movida a "${STATUS_CFG[dstCol].label}"`);
+    } catch {
+      setGrouped(g => {
+        const rollbackSrc = Array.from(g[srcCol]);
+        const rollbackDst = Array.from(g[dstCol]);
+        const [rb] = rollbackDst.splice(destination.index, 1);
+        rollbackSrc.splice(source.index, 0, { ...rb, status: srcCol });
+        return { ...g, [srcCol]: rollbackSrc, [dstCol]: rollbackDst };
+      });
+      toast.error('Error al actualizar el estado');
+    } finally {
+      setSaving(null);
+    }
+  }
 
   return (
-    <div className="flex gap-4 h-full overflow-x-auto pb-4">
-      {columns.map(col => {
-        const cfg = STATUS_CFG[col];
-        const Icon = cfg.icon;
-        const items = grouped[col];
-        return (
-          <div key={col} className="flex-shrink-0 w-72 flex flex-col rounded-2xl overflow-hidden"
-            style={{ background: isLight ? 'rgba(15,23,42,0.03)' : 'rgba(255,255,255,0.02)', border: `1px solid ${border}` }}>
-            <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: `1px solid ${border}` }}>
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: cfg.bg }}>
-                <Icon className="w-3 h-3" style={{ color: cfg.color }} />
+    <DragDropContext onDragEnd={onDragEnd}>
+      <div className="flex gap-4 h-full overflow-x-auto pb-4">
+        {COLS.map(col => {
+          const cfg  = STATUS_CFG[col];
+          const Icon = cfg.icon;
+          const items = grouped[col];
+          return (
+            <div key={col} className="flex-shrink-0 w-72 flex flex-col rounded-2xl overflow-hidden"
+              style={{ background: isLight ? 'rgba(15,23,42,0.03)' : 'rgba(255,255,255,0.02)', border: `1px solid ${border}` }}>
+              <div className="flex items-center gap-2 px-3 py-2.5" style={{ borderBottom: `1px solid ${border}` }}>
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: cfg.bg }}>
+                  <Icon className="w-3 h-3" style={{ color: cfg.color }} />
+                </div>
+                <span className="text-xs font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>{cfg.label}</span>
+                <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{items.length}</span>
               </div>
-              <span className="text-xs font-semibold flex-1" style={{ color: 'var(--text-primary)' }}>{cfg.label}</span>
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{items.length}</span>
+              <Droppable droppableId={col}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px] transition-colors"
+                    style={{ background: snapshot.isDraggingOver ? cfg.bg : 'transparent' }}
+                  >
+                    {items.length === 0 && !snapshot.isDraggingOver && (
+                      <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>Sin actividades</p>
+                    )}
+                    {items.map((a, index) => (
+                      <Draggable key={a.id} draggableId={a.id} index={index}>
+                        {(drag, snap) => (
+                          <div
+                            ref={drag.innerRef}
+                            {...drag.draggableProps}
+                            {...drag.dragHandleProps}
+                            style={{
+                              ...drag.draggableProps.style,
+                              opacity: saving === a.id ? 0.5 : 1,
+                              transform: snap.isDragging ? drag.draggableProps.style?.transform : 'none',
+                            }}
+                          >
+                            <ActivityCard act={a} />
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-2">
-              {items.length === 0 ? (
-                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>Sin actividades</p>
-              ) : items.map(a => <ActivityCard key={a.id} act={a} />)}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </DragDropContext>
   );
 }
 
@@ -775,7 +842,7 @@ export default function SeguimientosPage() {
             ) : (
               <AnimatePresence mode="wait">
                 <motion.div key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full">
-                  {view === 'kanban'     && <KanbanView     activities={activities} />}
+                  {view === 'kanban'     && <KanbanView     activities={activities} onActivityUpdate={(id, status) => setActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a))} />}
                   {view === 'gantt'      && <GanttView      activities={activities} project={project} />}
                   {view === 'lista'      && <ListaView      activities={activities} />}
                   {view === 'calendario' && <CalendarioView activities={activities} />}

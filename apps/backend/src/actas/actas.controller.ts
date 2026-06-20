@@ -19,9 +19,14 @@ export class ActasController {
 
   @Get()
   @Roles(...IMPL_ROLES, 'client')
-  @ApiOperation({ summary: 'Listar actas de un proyecto' })
-  findAll(@GetUser() user: JwtUser, @Query('projectId') projectId: string) {
-    return this.svc.findAll(user.companyId, projectId);
+  @ApiOperation({ summary: 'Listar actas — filtra por projectId, clientId y/o type' })
+  findAll(
+    @GetUser() user: JwtUser,
+    @Query('projectId') projectId?: string,
+    @Query('clientId')  clientId?: string,
+    @Query('type')      type?: string,
+  ) {
+    return this.svc.findAll(user.companyId, { projectId, clientId, type });
   }
 
   @Get(':id')

@@ -503,8 +503,10 @@ export interface CreateActaPayload {
 }
 
 export const actasApi = {
-  list: (projectId: string) =>
-    api.get('/actas', { params: { projectId } }).then((r) => r.data),
+  list: (params: { projectId?: string; clientId?: string; type?: string } | string) => {
+    const p = typeof params === 'string' ? { projectId: params } : params;
+    return api.get('/actas', { params: p }).then((r) => r.data);
+  },
   get: (id: string) =>
     api.get(`/actas/${id}`).then((r) => r.data),
   create: (data: CreateActaPayload) =>
@@ -521,6 +523,34 @@ export const actasApi = {
     api.patch(`/actas/compromisos/${compromisoId}`, { estado }).then((r) => r.data),
   resendEmail: (actaId: string, firmanteId?: string) =>
     api.post(`/actas/${actaId}/resend-email`, { firmanteId }).then((r) => r.data),
+};
+
+export interface CreateVisitPayload {
+  projectId: string;
+  visitType?: string;
+  visitDate: string;
+  startTime?: string;
+  endTime?: string;
+  location?: string;
+  objective?: string;
+  activitiesDone?: string;
+  commitments?: string;
+  observations?: string;
+  status?: string;
+  activityIds?: string[];
+}
+
+export const visitsApi = {
+  list: (params?: { projectId?: string; status?: string; from?: string; to?: string }) =>
+    api.get('/visits', { params }).then((r) => r.data),
+  get: (id: string) =>
+    api.get(`/visits/${id}`).then((r) => r.data),
+  create: (data: CreateVisitPayload) =>
+    api.post('/visits', data).then((r) => r.data),
+  update: (id: string, data: Partial<CreateVisitPayload>) =>
+    api.patch(`/visits/${id}`, data).then((r) => r.data),
+  remove: (id: string) =>
+    api.delete(`/visits/${id}`).then((r) => r.data),
 };
 
 export const requerimientosApi = {

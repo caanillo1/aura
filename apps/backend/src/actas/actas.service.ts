@@ -52,11 +52,34 @@ export class ActasService {
     private wa: WhatsAppService,
   ) {}
 
-  async findAll(companyId: string, projectId: string) {
-    if (!projectId) throw new BadRequestException('projectId es requerido');
-    await this.assertProjectAccess(companyId, projectId);
+  async findAll(
+    companyId: string,
+    filters: { projectId?: string; type?: string; clientId?: string },
+  ) {
+    const { projectId, type, clientId } = filters;
+
+    if (!projectId && !clientId) {
+      throw new BadRequestException('Se requiere projectId o clientId');
+    }
+
+    let projectIds: string[];
+
+    if (projectId) {
+      await this.assertProjectAccess(companyId, projectId);
+      projectIds = [projectId];
+    } else {
+      const projects = await this.prisma.project.findMany({
+        where: { serviceOrder: { companyId, clientId } },
+        select: { id: true },
+      });
+      projectIds = projects.map((p) => p.id);
+    }
+
     return this.prisma.acta.findMany({
-      where: { projectId },
+      where: {
+        projectId: { in: projectIds },
+        ...(type ? { type } : {}),
+      },
       include: INCLUDE,
       orderBy: { createdAt: 'desc' },
     });

@@ -130,7 +130,7 @@ export class CronogramaService {
     await this.mail.sendFromCompany(companyId, [lider.email], `Visita programada — ${fechaFmt}: ${bloque.titulo}`, html);
   }
 
-  private async sendCancelNotificationToAgent(companyId: string, bloque: any, lider: { firstName: string; lastName: string }, motivo?: string) {
+  private async notifyAgent(companyId: string, bloque: any, tipo: 'confirm' | 'cancel', motivo?: string) {
     const agente = await this.prisma.user.findUnique({
       where: { id: bloque.agenteId },
       select: { email: true, firstName: true },
@@ -138,11 +138,37 @@ export class CronogramaService {
     if (!agente?.email) return;
 
     const fechaFmt = dayjs(bloque.fecha).format('DD/MM/YYYY');
+
+    if (tipo === 'confirm') {
+      const html = `
+<div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a1628;color:#e2e8f0;border-radius:16px;overflow:hidden">
+  <div style="background:linear-gradient(135deg,#14532d,#16a34a);padding:32px 28px">
+    <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff">Visita confirmada por el cliente</h1>
+    <p style="margin:8px 0 0;font-size:14px;color:#86efac">El líder de cliente confirmó la visita</p>
+  </div>
+  <div style="padding:28px">
+    <p style="margin:0 0 20px;font-size:15px;color:#cbd5e1">Hola <strong style="color:#e2e8f0">${agente.firstName}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#94a3b8">El cliente ha <strong style="color:#4ade80">confirmado</strong> la siguiente visita:</p>
+    <div style="background:#0f2040;border:1px solid #14532d;border-radius:12px;padding:20px;margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse">
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;width:120px">Actividad</td><td style="padding:6px 0;font-size:14px;font-weight:600;color:#e2e8f0">${bloque.titulo}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Fecha</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${fechaFmt}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Horario</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${bloque.horaInicio} – ${bloque.horaFin}</td></tr>
+      </table>
+    </div>
+    <p style="font-size:13px;color:#64748b">La visita está confirmada. Recuerda estar preparado/a para la fecha acordada.</p>
+  </div>
+</div>`;
+      await this.mail.sendFromCompany(companyId, [agente.email], `Visita confirmada por cliente — ${fechaFmt}: ${bloque.titulo}`, html);
+      return;
+    }
+
+    // cancel
     const html = `
 <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a1628;color:#e2e8f0;border-radius:16px;overflow:hidden">
   <div style="background:linear-gradient(135deg,#7f1d1d,#dc2626);padding:32px 28px">
     <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff">Visita cancelada por el cliente</h1>
-    <p style="margin:8px 0 0;font-size:14px;color:#fca5a5">El líder de cliente ha cancelado la siguiente visita</p>
+    <p style="margin:8px 0 0;font-size:14px;color:#fca5a5">El cliente canceló la siguiente visita</p>
   </div>
   <div style="padding:28px">
     <p style="margin:0 0 20px;font-size:15px;color:#cbd5e1">Hola <strong style="color:#e2e8f0">${agente.firstName}</strong>,</p>
@@ -151,14 +177,12 @@ export class CronogramaService {
         <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;width:140px">Actividad</td><td style="padding:6px 0;font-size:14px;font-weight:600;color:#e2e8f0">${bloque.titulo}</td></tr>
         <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Fecha</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${fechaFmt}</td></tr>
         <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Horario</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${bloque.horaInicio} – ${bloque.horaFin}</td></tr>
-        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Cancelado por</td><td style="padding:6px 0;font-size:14px;color:#fca5a5">${lider.firstName} ${lider.lastName}</td></tr>
-        ${motivo ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;vertical-align:top">Motivo</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${motivo}</td></tr>` : ''}
+        ${motivo ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;vertical-align:top">Motivo</td><td style="padding:6px 0;font-size:14px;color:#fca5a5">${motivo}</td></tr>` : ''}
       </table>
     </div>
-    <p style="font-size:13px;color:#64748b">Por favor coordina una nueva fecha con el cliente. El estado del bloque ha sido actualizado a <strong style="color:#fca5a5">Cancelado</strong> en el cronograma.</p>
+    <p style="font-size:13px;color:#64748b">Coordina con el cliente una nueva fecha. El estado fue actualizado a <strong style="color:#fca5a5">Cancelado</strong> en el cronograma.</p>
   </div>
 </div>`;
-
     await this.mail.sendFromCompany(companyId, [agente.email], `Visita cancelada por cliente — ${fechaFmt}: ${bloque.titulo}`, html);
   }
 
@@ -170,7 +194,6 @@ export class CronogramaService {
       throw new BadRequestException('El enlace ha expirado o no es válido.');
     }
 
-    // Obtener bloque con los datos necesarios
     const bloque = await this.prisma.cronogramaBloque.findFirst({
       where: { id: payload.bloqueId, companyId: payload.companyId },
       select: {
@@ -179,72 +202,61 @@ export class CronogramaService {
       },
     });
     if (!bloque) throw new NotFoundException('Bloque no encontrado.');
-    if (!bloque.serviceOrderId) throw new BadRequestException('Este bloque no tiene orden de servicio asociada.');
 
-    // Validar con líder de cliente
-    const so = await this.prisma.serviceOrder.findUnique({
-      where: { id: bloque.serviceOrderId },
-      select: {
-        id: true,
-        clientLeader: {
-          select: { id: true, firstName: true, lastName: true, document: true },
-        },
-      },
-    });
-    if (!so?.clientLeader) {
-      throw new BadRequestException('La orden de servicio no tiene líder de cliente asignado.');
-    }
-    if (so.clientLeader.document.trim() !== dto.documento.trim()) {
-      throw new BadRequestException('El documento ingresado no coincide con el del líder de cliente asignado a esta orden.');
-    }
-
-    const lider = so.clientLeader;
     const razonBase = `Visita "${bloque.titulo}" del ${dayjs(bloque.fecha).format('DD/MM/YYYY')} ${bloque.horaInicio}–${bloque.horaFin}`;
 
+    // ── Confirmar ────────────────────────────────────────────────────────────
     if (dto.action === 'accept') {
       await this.prisma.cronogramaBloque.update({
         where: { id: bloque.id },
         data: { status: 'programado' },
       });
-      await this.prisma.serviceOrderHistory.create({
-        data: {
-          serviceOrderId: so.id,
-          changedById: bloque.createdById,
-          fieldName: 'visita_confirmada',
-          oldValue: bloque.status,
-          newValue: 'programado',
-          reason: `${razonBase} — Confirmada por líder cliente ${lider.firstName} ${lider.lastName}`,
-          noteType: 'nota',
-          noteLevel: 'info',
-        },
-      });
-      return { ok: true, message: '¡Visita confirmada! Nuestro equipo estará presente en la fecha acordada.' };
+
+      if (bloque.serviceOrderId) {
+        await this.prisma.serviceOrderHistory.create({
+          data: {
+            serviceOrderId: bloque.serviceOrderId,
+            changedById: bloque.createdById,
+            fieldName: 'visita_confirmada',
+            oldValue: bloque.status,
+            newValue: 'programado',
+            reason: `${razonBase} — Confirmada por el cliente`,
+            noteType: 'nota',
+            noteLevel: 'info',
+          },
+        }).catch(() => {});
+      }
+
+      this.notifyAgent(payload.companyId, bloque, 'confirm').catch(() => {});
+      return { ok: true, message: '¡Visita confirmada! Nuestro equipo estará listo para la fecha acordada.' };
     }
 
-    // Cancelar
+    // ── Cancelar ─────────────────────────────────────────────────────────────
     const motivoTexto = dto.motivo?.trim() || 'Sin motivo especificado';
-    const notas = `Cancelado por líder cliente ${lider.firstName} ${lider.lastName}. Motivo: ${motivoTexto}`;
+    const notas = `Cancelado por el cliente. Motivo: ${motivoTexto}`;
+
     await this.prisma.cronogramaBloque.update({
       where: { id: bloque.id },
       data: { status: 'cancelado', notas },
     });
-    await this.prisma.serviceOrderHistory.create({
-      data: {
-        serviceOrderId: so.id,
-        changedById: bloque.createdById,
-        fieldName: 'visita_cancelada',
-        oldValue: bloque.status,
-        newValue: 'cancelado',
-        reason: `${razonBase} — Cancelada por líder cliente ${lider.firstName} ${lider.lastName}. Motivo: ${motivoTexto}`,
-        noteType: 'nota',
-        noteLevel: 'alerta',
-      },
-    });
 
-    // Notificar al agente
-    this.sendCancelNotificationToAgent(payload.companyId, bloque, lider, dto.motivo).catch(() => {});
+    if (bloque.serviceOrderId) {
+      await this.prisma.serviceOrderHistory.create({
+        data: {
+          serviceOrderId: bloque.serviceOrderId,
+          changedById: bloque.createdById,
+          fieldName: 'visita_cancelada',
+          oldValue: bloque.status,
+          newValue: 'cancelado',
+          reason: `${razonBase} — Cancelada por el cliente. Motivo: ${motivoTexto}`,
+          noteType: 'nota',
+          noteLevel: 'alerta',
+        },
+      }).catch(() => {});
+    }
 
-    return { ok: true, message: 'Visita cancelada. El equipo ha sido notificado y coordinará una nueva fecha.' };
+    this.notifyAgent(payload.companyId, bloque, 'cancel', motivoTexto).catch(() => {});
+    return { ok: true, message: 'Visita cancelada y registrada. El equipo será notificado.' };
   }
 
   async update(companyId: string, id: string, dto: UpdateBloqueDto) {

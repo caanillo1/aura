@@ -40,6 +40,5 @@ export class BloqueFilterDto {
 export class RespondVisitDto {
   @IsString() @IsNotEmpty() token: string;
   @IsIn(['accept', 'cancel']) action: 'accept' | 'cancel';
-  @IsString() @IsNotEmpty() documento: string;
   @IsOptional() @IsString() motivo?: string;
 }

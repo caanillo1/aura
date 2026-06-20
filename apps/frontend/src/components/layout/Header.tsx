@@ -15,9 +15,11 @@ const PAGE_TITLES: Record<string, string> = {
   '/requerimientos/nuevo':     'Registrar Requerimiento',
   '/requerimientos/priorizar': 'Priorizar Requerimientos',
   '/documentos':               'Documentos',
-  '/reportes':                 'Reportes',
-  '/configuracion/roles':      'Permisos de Roles',
-  '/configuracion':            'Configuración',
+  '/reportes':                     'Reportes',
+  '/cronograma':                   'Cronograma de Atención',
+  '/comercial/cotizaciones':       'Cotizaciones',
+  '/configuracion/roles':          'Permisos de Roles',
+  '/configuracion':                'Configuración',
 };
 
 interface HeaderProps { onMenuToggle?: () => void }

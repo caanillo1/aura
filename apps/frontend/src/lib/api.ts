@@ -575,6 +575,51 @@ export const reportesApi = {
     api.get('/reportes/requerimientos', { params }).then((r) => r.data),
 };
 
+// ── Cronograma ────────────────────────────────────────────────────────────────
+export const cronogramaApi = {
+  list: (params?: { agenteId?: string; clientId?: string; fechaDesde?: string; fechaHasta?: string }) =>
+    api.get('/cronograma', { params }).then((r) => r.data),
+  get: (id: string) =>
+    api.get(`/cronograma/${id}`).then((r) => r.data),
+  create: (data: {
+    titulo: string; fecha: string; horaInicio: string; horaFin: string;
+    agenteId: string; clientId?: string; serviceOrderId?: string; notas?: string; color?: string;
+  }) =>
+    api.post('/cronograma', data).then((r) => r.data),
+  update: (id: string, data: {
+    titulo?: string; fecha?: string; horaInicio?: string; horaFin?: string;
+    agenteId?: string; clientId?: string; serviceOrderId?: string;
+    notas?: string; color?: string; status?: string; actaId?: string;
+  }) =>
+    api.patch(`/cronograma/${id}`, data).then((r) => r.data),
+  remove: (id: string) =>
+    api.delete(`/cronograma/${id}`).then((r) => r.data),
+};
+
+// ── Comercial ─────────────────────────────────────────────────────────────────
+export const comercialApi = {
+  list: (params?: { page?: number; limit?: number; search?: string; status?: string; clientId?: string }) =>
+    api.get('/comercial/cotizaciones', { params }).then((r) => r.data),
+  get: (id: string) =>
+    api.get(`/comercial/cotizaciones/${id}`).then((r) => r.data),
+  create: (data: {
+    titulo: string; clientId?: string; prospecto?: string; contacto?: string;
+    email?: string; telefono?: string; valor?: number; descripcion?: string;
+    validHasta?: string; notas?: string;
+    items?: { descripcion: string; cantidad: number; valorUnitario: number; descuento?: number }[];
+  }) =>
+    api.post('/comercial/cotizaciones', data).then((r) => r.data),
+  update: (id: string, data: {
+    titulo?: string; clientId?: string; prospecto?: string; contacto?: string;
+    email?: string; telefono?: string; valor?: number; status?: string;
+    descripcion?: string; validHasta?: string; notas?: string;
+    items?: { descripcion: string; cantidad: number; valorUnitario: number; descuento?: number }[];
+  }) =>
+    api.patch(`/comercial/cotizaciones/${id}`, data).then((r) => r.data),
+  remove: (id: string) =>
+    api.delete(`/comercial/cotizaciones/${id}`).then((r) => r.data),
+};
+
 const PUBLIC_API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 export const publicActasApi = {
   searchByDocumento: (documento: string) =>

@@ -9,6 +9,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, LogOut,
   ClipboardPlus, ListOrdered, MessageSquarePlus,
   Briefcase, LayoutTemplate, Layers, X,
+  CalendarDays, TrendingUp, FileSpreadsheet,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth.store';
@@ -51,6 +52,14 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { href: '/requerimientos/nuevo',     label: 'Registrar', icon: ClipboardPlus, permission: 'tickets.nuevo'  },
       { href: '/requerimientos/priorizar', label: 'Priorizar', icon: ListOrdered,   permission: 'tickets.buscar' },
+    ],
+  },
+  { href: '/cronograma', label: 'Cronograma', icon: CalendarDays,
+    roles: ['admin','coordinator','implementer_clinical','implementer_financial','implementer_support'] },
+  { label: 'Comercial', icon: TrendingUp,
+    roles: ['admin','coordinator'],
+    children: [
+      { href: '/comercial/cotizaciones', label: 'Cotizaciones', icon: FileSpreadsheet },
     ],
   },
   { href: '/documentos', label: 'Documentos', icon: FileText,

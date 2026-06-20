@@ -47,20 +47,22 @@ model Company {
   updatedAt        DateTime @updatedAt @db.DateTime2
 
   // Relaciones
-  users            User[]
-  roles            Role[]
-  clients          Client[]
-  serviceOrders    ServiceOrder[]
-  systemConfigs    SystemConfig[]
-  municipios       Municipio[]
-  templateFlows    TemplateFlow[]
-  templateModules  TemplateModule[]
-  templateRisks    TemplateRisk[]
-  emailTemplates   EmailTemplate[]
-  auditLogs        AuditLog[]
-  requerimientos   Requerimiento[]
-  tiposDocumento   TipoDocumento[]
-  archivos         Archivo[]
+  users              User[]
+  roles              Role[]
+  clients            Client[]
+  serviceOrders      ServiceOrder[]
+  systemConfigs      SystemConfig[]
+  municipios         Municipio[]
+  templateFlows      TemplateFlow[]
+  templateModules    TemplateModule[]
+  templateRisks      TemplateRisk[]
+  emailTemplates     EmailTemplate[]
+  auditLogs          AuditLog[]
+  requerimientos     Requerimiento[]
+  tiposDocumento     TipoDocumento[]
+  archivos           Archivo[]
+  cronogramaBloques  CronogramaBloque[]
+  cotizaciones       Cotizacion[]
 
   @@map("Empresas")
 }
@@ -154,10 +156,13 @@ model User {
   soImplementers       ServiceOrderImplementer[]
   activityThreads      ActivityThread[]         @relation("ThreadAuthor")
   actasCreated         Acta[]                   @relation("ActaCreatedBy")
-  requerimientosAgente Requerimiento[]          @relation("ReqAgente")
-  requerimientosCreados Requerimiento[]         @relation("ReqCreatedBy")
-  gestionesReq         RequerimientoGestion[]   @relation("GestionChangedBy")
-  archivosSubidos      Archivo[]                @relation("ArchivoSubidoPor")
+  requerimientosAgente  Requerimiento[]          @relation("ReqAgente")
+  requerimientosCreados Requerimiento[]          @relation("ReqCreatedBy")
+  gestionesReq          RequerimientoGestion[]   @relation("GestionChangedBy")
+  archivosSubidos       Archivo[]                @relation("ArchivoSubidoPor")
+  cronogramaBloques     CronogramaBloque[]       @relation("BloqueAgente")
+  bloquesCreadosPor     CronogramaBloque[]       @relation("BloqueCreatedBy")
+  cotizacionesCreadas   Cotizacion[]             @relation("CotizacionCreatedBy")
 
   @@map("Usuarios")
 }
@@ -204,11 +209,13 @@ model Client {
   company          Company    @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   createdBy        User?      @relation("ClientCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
   municipio        Municipio? @relation(fields: [municipioId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  users            User[]     @relation("UserClient")
-  staff            ClientStaff[]
-  serviceOrders    ServiceOrder[]
-  requerimientos   Requerimiento[]
-  archivos         Archivo[]
+  users              User[]     @relation("UserClient")
+  staff              ClientStaff[]
+  serviceOrders      ServiceOrder[]
+  requerimientos     Requerimiento[]
+  archivos           Archivo[]
+  cronogramaBloques  CronogramaBloque[]
+  cotizaciones       Cotizacion[]
 
   @@unique([companyId, nit])
   @@map("Clientes")
@@ -393,9 +400,10 @@ model ServiceOrder {
   clientLeader      ClientStaff? @relation("SOClientLeader", fields: [clientLeaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   implementers      ServiceOrderImplementer[]
   history           ServiceOrderHistory[]
-  project           Project?
-  requerimientos    Requerimiento[]
-  archivos          Archivo[]
+  project             Project?
+  requerimientos      Requerimiento[]
+  archivos            Archivo[]
+  cronogramaBloques   CronogramaBloque[]
 
   @@unique([companyId, osNumber])
   @@map("OrdenesServicio")
@@ -1199,4 +1207,80 @@ model AuditLog {
   user       User?    @relation("AuditLogUser", fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("RegistroAuditoria")
+}
+
+// =============================================================================
+// SECCIÓN 19: CRONOGRAMA
+// =============================================================================
+
+model CronogramaBloque {
+  id             String    @id @default(uuid()) @db.UniqueIdentifier
+  companyId      String    @db.UniqueIdentifier
+  agenteId       String    @db.UniqueIdentifier
+  clientId       String?   @db.UniqueIdentifier
+  serviceOrderId String?   @db.UniqueIdentifier
+  titulo         String    @db.NVarChar(300)
+  fecha          DateTime  @db.Date
+  horaInicio     String    @db.NVarChar(5)
+  horaFin        String    @db.NVarChar(5)
+  notas          String?   @db.NVarChar(Max)
+  color          String    @default("#2563EB") @db.NVarChar(7)
+  status         String    @default("programado") @db.NVarChar(20)
+  createdById    String    @db.UniqueIdentifier
+  actaId         String?   @db.UniqueIdentifier
+  createdAt      DateTime  @default(now()) @db.DateTime2
+  updatedAt      DateTime  @updatedAt @db.DateTime2
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  agente       User          @relation("BloqueAgente", fields: [agenteId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  client       Client?       @relation(fields: [clientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  serviceOrder ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy    User          @relation("BloqueCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("CronogramaBloques")
+}
+
+// =============================================================================
+// SECCIÓN 20: COMERCIAL — COTIZACIONES
+// =============================================================================
+
+model Cotizacion {
+  id          String    @id @default(uuid()) @db.UniqueIdentifier
+  companyId   String    @db.UniqueIdentifier
+  numero      String    @db.NVarChar(20)
+  titulo      String    @db.NVarChar(300)
+  clientId    String?   @db.UniqueIdentifier
+  prospecto   String?   @db.NVarChar(200)
+  contacto    String?   @db.NVarChar(200)
+  email       String?   @db.NVarChar(200)
+  telefono    String?   @db.NVarChar(50)
+  valor       Decimal?  @db.Decimal(18, 2)
+  status      String    @default("borrador") @db.NVarChar(30)
+  descripcion String?   @db.NVarChar(Max)
+  validHasta  DateTime? @db.Date
+  notas       String?   @db.NVarChar(Max)
+  createdById String    @db.UniqueIdentifier
+  createdAt   DateTime  @default(now()) @db.DateTime2
+  updatedAt   DateTime  @updatedAt @db.DateTime2
+
+  company     Company    @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  client      Client?    @relation(fields: [clientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy   User       @relation("CotizacionCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  items       CotizacionItem[]
+
+  @@unique([companyId, numero])
+  @@map("Cotizaciones")
+}
+
+model CotizacionItem {
+  id            String   @id @default(uuid()) @db.UniqueIdentifier
+  cotizacionId  String   @db.UniqueIdentifier
+  descripcion   String   @db.NVarChar(300)
+  cantidad      Decimal  @default(1) @db.Decimal(10, 2)
+  valorUnitario Decimal  @db.Decimal(18, 2)
+  descuento     Decimal  @default(0) @db.Decimal(5, 2)
+
+  cotizacion    Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+
+  @@map("CotizacionItems")
 }

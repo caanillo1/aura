@@ -19,6 +19,8 @@ import { QueuesModule } from './queues/queues.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WhatsAppModule } from './whatsapp/whatsapp.module';
+import { CronogramaModule } from './cronograma/cronograma.module';
+import { ComercialModule } from './comercial/comercial.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './health/health.module';
@@ -43,6 +45,8 @@ import { HealthModule } from './health/health.module';
     GatewayModule,
     NotificationsModule,
     WhatsAppModule,
+    CronogramaModule,
+    ComercialModule,
     HealthModule,
   ],
   controllers: [AppController],

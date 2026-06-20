@@ -1226,6 +1226,7 @@ model CronogramaBloque {
   notas          String?   @db.NVarChar(Max)
   color          String    @default("#2563EB") @db.NVarChar(7)
   status         String    @default("programado") @db.NVarChar(20)
+  tipoActa       String?   @db.NVarChar(50)
   createdById    String    @db.UniqueIdentifier
   actaId         String?   @db.UniqueIdentifier
   createdAt      DateTime  @default(now()) @db.DateTime2

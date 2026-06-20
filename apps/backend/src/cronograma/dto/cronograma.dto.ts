@@ -10,6 +10,7 @@ export class CreateBloqueDto {
   @IsOptional() @IsUUID() serviceOrderId?: string;
   @IsOptional() @IsString() notas?: string;
   @IsOptional() @IsString() color?: string;
+  @IsOptional() @IsIn(['inicio','visita','cierre','capacitacion','entrega_soporte']) tipoActa?: string;
 }
 
 export class UpdateBloqueDto {
@@ -24,6 +25,7 @@ export class UpdateBloqueDto {
   @IsOptional() @IsString() color?: string;
   @IsOptional() @IsIn(['programado','en_curso','completado','cancelado']) status?: string;
   @IsOptional() @IsUUID() actaId?: string;
+  @IsOptional() @IsIn(['inicio','visita','cierre','capacitacion','entrega_soporte']) tipoActa?: string;
 }
 
 export class BloqueFilterDto {

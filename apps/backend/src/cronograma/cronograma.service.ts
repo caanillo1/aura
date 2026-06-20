@@ -8,10 +8,10 @@ export class CronogramaService {
 
   private bloqueSelect = {
     id: true, titulo: true, fecha: true, horaInicio: true, horaFin: true,
-    color: true, status: true, notas: true, actaId: true, createdAt: true,
+    color: true, status: true, notas: true, actaId: true, tipoActa: true, createdAt: true,
     agente: { select: { id: true, firstName: true, lastName: true } },
     client: { select: { id: true, businessName: true } },
-    serviceOrder: { select: { id: true, osNumber: true, product: true } },
+    serviceOrder: { select: { id: true, osNumber: true, product: true, project: { select: { id: true } } } },
   };
 
   async findAll(companyId: string, filters: BloqueFilterDto) {
@@ -45,7 +45,8 @@ export class CronogramaService {
         titulo: dto.titulo,
         fecha: new Date(dto.fecha), horaInicio: dto.horaInicio, horaFin: dto.horaFin,
         color: dto.color ?? '#2563EB',
-        notas: dto.notas ?? null,
+        notas:    dto.notas    ?? null,
+        tipoActa: dto.tipoActa ?? null,
         company:      { connect: { id: companyId } },
         agente:       { connect: { id: dto.agenteId } },
         createdBy:    { connect: { id: userId } },
@@ -82,6 +83,7 @@ export class CronogramaService {
         ...(dto.color       !== undefined && { color: dto.color }),
         ...(dto.status      !== undefined && { status: dto.status }),
         ...(dto.actaId      !== undefined && { actaId: dto.actaId }),
+        ...(dto.tipoActa    !== undefined && { tipoActa: dto.tipoActa }),
       },
       select: this.bloqueSelect,
     });

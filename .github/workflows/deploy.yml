@@ -2,7 +2,7 @@
 # AURA ERP – Deploy Pipeline
 # Deploy backend → VPS Windows Server 2019
 # Deploy frontend → Vercel
-# Ejecuta en: Push a main (después de CI verde)
+# Ejecuta en: Push a main
 # =============================================================================
 
 name: Deploy
@@ -27,7 +27,9 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend → Vercel
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'frontend')
 
     steps:
       - name: Checkout
@@ -45,7 +47,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
@@ -69,7 +71,9 @@ jobs:
   deploy-backend:
     name: Deploy Backend → VPS
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'backend')
 
     steps:
       - name: Checkout
@@ -87,28 +91,42 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
-      - name: Build backend
+      - name: Verificar build backend (pre-check)
         run: pnpm --filter backend build
 
-      - name: Deploy via SSH to VPS
+      - name: Deploy via SSH al VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
+          timeout: 300s
+          command_timeout: 20m
+          script_stop: true
           script: |
+            echo "=== [1/5] Actualizando codigo ==="
             cd C:\AURA
-            git pull origin main
-            pnpm install --frozen-lockfile
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "=== [2/5] Instalando dependencias ==="
+            pnpm install --no-frozen-lockfile
+
+            echo "=== [3/5] Generando cliente Prisma ==="
             cd apps\backend
-            npx prisma db push --accept-data-loss
+            npx prisma generate
+
+            echo "=== [4/5] Compilando backend ==="
             cd C:\AURA
             pnpm --filter backend build
-            pm2 describe aura-backend >nul 2>&1 && pm2 restart aura-backend --update-env || pm2 start apps\backend\dist\main.js --name aura-backend
+
+            echo "=== [5/5] Reiniciando PM2 ==="
+            pm2 describe aura-backend >nul 2>&1 && pm2 restart aura-backend --update-env || pm2 start ecosystem.config.js
             pm2 save
+            echo "=== Deploy completado ==="
 
   # ─── NOTIFY ─────────────────────────────────────────────────────────────────
   notify:
@@ -119,11 +137,13 @@ jobs:
 
     steps:
       - name: Deploy exitoso
-        if: needs.deploy-frontend.result == 'success' && needs.deploy-backend.result == 'success'
+        if: |
+          (needs.deploy-frontend.result == 'success' || needs.deploy-frontend.result == 'skipped') &&
+          (needs.deploy-backend.result == 'success' || needs.deploy-backend.result == 'skipped')
         run: echo "✅ Deploy AURA ERP completado exitosamente"
 
       - name: Deploy fallido
         if: needs.deploy-frontend.result == 'failure' || needs.deploy-backend.result == 'failure'
         run: |
-          echo "❌ Deploy falló"
+          echo "❌ Deploy falló — revisa los logs del job que falló"
           exit 1

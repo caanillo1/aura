@@ -20,6 +20,8 @@ export class CronogramaService {
         companyId,
         ...(filters.agenteId && { agenteId: filters.agenteId }),
         ...(filters.clientId && { clientId: filters.clientId }),
+        ...(filters.tipoActa && { tipoActa: filters.tipoActa }),
+        ...(filters.status   && { status:   filters.status   }),
         ...(filters.fechaDesde || filters.fechaHasta ? {
           fecha: {
             ...(filters.fechaDesde && { gte: new Date(filters.fechaDesde) }),

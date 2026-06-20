@@ -607,13 +607,13 @@ export const reportesApi = {
 
 // ── Cronograma ────────────────────────────────────────────────────────────────
 export const cronogramaApi = {
-  list: (params?: { agenteId?: string; clientId?: string; fechaDesde?: string; fechaHasta?: string }) =>
+  list: (params?: { agenteId?: string; clientId?: string; fechaDesde?: string; fechaHasta?: string; tipoActa?: string; status?: string }) =>
     api.get('/cronograma', { params }).then((r) => r.data),
   get: (id: string) =>
     api.get(`/cronograma/${id}`).then((r) => r.data),
   create: (data: {
     titulo: string; fecha: string; horaInicio: string; horaFin: string;
-    agenteId: string; clientId?: string; serviceOrderId?: string; notas?: string; color?: string;
+    agenteId: string; clientId?: string; serviceOrderId?: string; notas?: string; color?: string; tipoActa?: string;
   }) =>
     api.post('/cronograma', data).then((r) => r.data),
   update: (id: string, data: {

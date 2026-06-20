@@ -33,4 +33,6 @@ export class BloqueFilterDto {
   @IsOptional() @IsUUID() clientId?: string;
   @IsOptional() @IsDateString() fechaDesde?: string;
   @IsOptional() @IsDateString() fechaHasta?: string;
+  @IsOptional() @IsString() tipoActa?: string;
+  @IsOptional() @IsString() status?: string;
 }

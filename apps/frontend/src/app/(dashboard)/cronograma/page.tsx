@@ -72,7 +72,7 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
     const [hd] = horaDefault.split(':').map(Number);
     setForm({
       titulo:         initial?.titulo             ?? '',
-      fecha:          initial?.fecha              ? dayjs(initial.fecha).format('YYYY-MM-DD') : (initial?.fechaDefault ?? dayjs().format('YYYY-MM-DD')),
+      fecha:          initial?.fecha              ? (initial.fecha as string).substring(0, 10) : (initial?.fechaDefault ?? dayjs().format('YYYY-MM-DD')),
       horaInicio:     initial?.horaInicio         ?? horaDefault,
       horaFin:        initial?.horaFin            ?? `${String(Math.min(hd + 2, 19)).padStart(2,'0')}:00`,
       agenteId:       initial?.agente?.id         ?? '',
@@ -403,7 +403,7 @@ export default function CronogramaPage() {
 
   const bloquesFiltrados = filterAgente ? bloques.filter(b => b.agente.id === filterAgente) : bloques;
   const bloquesEnFecha = (d: Dayjs) =>
-    bloquesFiltrados.filter(b => dayjs(b.fecha).format('YYYY-MM-DD') === d.format('YYYY-MM-DD'));
+    bloquesFiltrados.filter(b => (b.fecha as string).substring(0, 10) === d.format('YYYY-MM-DD'));
 
   // ── Mes ───────────────────────────────────────────────────────────────────
   const renderMonth = () => {
@@ -419,26 +419,32 @@ export default function CronogramaPage() {
         </div>
         <div className="flex-1 grid grid-rows-6 overflow-hidden">
           {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 border-b" style={{ borderColor: 'var(--border-subtle)', minHeight: 100 }}>
+            <div key={wi} className="grid grid-cols-7 border-b" style={{ borderColor: 'var(--border-subtle)', minHeight: 130 }}>
               {week.map((day, di) => {
                 const isToday = day.format('YYYY-MM-DD') === today;
                 const isThisMonth = day.month() === current.month();
                 const bbs = bloquesEnFecha(day);
                 return (
-                  <div key={di} className="p-1.5 border-r overflow-hidden group" style={{ borderColor: 'var(--border-subtle)', opacity: isThisMonth ? 1 : 0.4 }}>
+                  <div key={di} className="p-1.5 border-r overflow-hidden group"
+                    style={{
+                      borderColor: 'var(--border-subtle)',
+                      background: !isThisMonth ? 'rgba(0,0,0,0.025)' : 'transparent',
+                    }}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full"
-                        style={{ background: isToday ? '#2563EB' : 'transparent', color: isToday ? '#fff' : 'var(--text-secondary)' }}>
+                      <span className="text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full"
+                        style={{
+                          background: isToday ? '#2563EB' : 'transparent',
+                          color: isToday ? '#fff' : isThisMonth ? 'var(--text-primary)' : 'var(--text-muted)',
+                        }}>
                         {day.date()}
                       </span>
-                      {/* Clic en + del día → abre modal de nuevo bloque para ese día */}
                       <button onClick={() => openNew(day.format('YYYY-MM-DD'))}
                         className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         style={{ background: 'var(--accent-blue-bg)', color: 'var(--accent-blue)' }}>
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
-                    <div className="space-y-0.5">
+                    <div className="space-y-0.5" style={{ opacity: isThisMonth ? 1 : 0.45 }}>
                       {bbs.slice(0, 3).map(b => {
                         const tc = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
                         return (

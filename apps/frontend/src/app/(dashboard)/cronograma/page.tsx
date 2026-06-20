@@ -341,10 +341,32 @@ function DayModal({ day, bloques, onClose, onEdit, onNew }: {
   onClose: () => void; onEdit: (b: Bloque) => void; onNew: () => void;
 }) {
   if (typeof window === 'undefined') return null;
-  const sorted = [...bloques].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+
+  // Agrupar por agente manteniendo orden cronológico dentro de cada uno
+  type AgentGroup = { agente: Bloque['agente']; color: string; items: Bloque[] };
+  const groupMap = new Map<string, AgentGroup>();
+  [...bloques]
+    .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
+    .forEach((b, _, arr) => {
+      if (!groupMap.has(b.agente.id)) {
+        const idx = [...new Set(arr.map(x => x.agente.id))].indexOf(b.agente.id);
+        groupMap.set(b.agente.id, {
+          agente: b.agente,
+          color: AGENT_COLORS[idx % AGENT_COLORS.length],
+          items: [],
+        });
+      }
+      groupMap.get(b.agente.id)!.items.push(b);
+    });
+  const groups = [...groupMap.values()];
+
   const STATUS_COLOR: Record<string, string> = {
     programado: '#60a5fa', en_curso: '#fb923c', completado: '#34d399', cancelado: '#9ca3af',
   };
+
+  // Ancho del modal según cantidad de agentes
+  const modalMaxW = groups.length <= 1 ? '30rem' : groups.length === 2 ? '52rem' : '76rem';
+
   return createPortal(
     <>
       <motion.div className="fixed inset-0 z-[600]"
@@ -352,8 +374,14 @@ function DayModal({ day, bloques, onClose, onEdit, onNew }: {
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         onClick={onClose} />
       <motion.div
-        className="fixed inset-x-4 top-[8%] bottom-[8%] z-[601] max-w-md mx-auto rounded-2xl flex flex-col overflow-hidden"
-        style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 24px 80px rgba(0,0,0,0.45)', backdropFilter: 'blur(24px)' }}
+        className="fixed inset-x-4 top-[6%] bottom-[6%] z-[601] mx-auto rounded-2xl flex flex-col overflow-hidden"
+        style={{
+          maxWidth: modalMaxW,
+          background: 'var(--card-bg)',
+          border: '1px solid var(--card-border)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(24px)',
+        }}
         initial={{ opacity: 0, y: 20, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 10, scale: 0.96 }} transition={{ duration: 0.22 }}
         onClick={e => e.stopPropagation()}
@@ -363,10 +391,10 @@ function DayModal({ day, bloques, onClose, onEdit, onNew }: {
           style={{ borderBottom: '1px solid var(--card-border)' }}>
           <div>
             <h3 className="font-bold text-base capitalize" style={{ color: 'var(--text-primary)' }}>
-              {day.format('dddd D')}
+              {day.format('dddd D de MMMM YYYY')}
             </h3>
-            <p className="text-xs capitalize mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {day.format('MMMM YYYY')} · {sorted.length} bloque{sorted.length !== 1 ? 's' : ''}
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {bloques.length} actividad{bloques.length !== 1 ? 'es' : ''} · {groups.length} agente{groups.length !== 1 ? 's' : ''}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -381,57 +409,93 @@ function DayModal({ day, bloques, onClose, onEdit, onNew }: {
           </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {sorted.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Sin actividades para este día</p>
-              <button onClick={() => { onNew(); onClose(); }}
-                className="btn-primary px-4 py-2 rounded-xl text-xs font-semibold text-white">
-                Agendar bloque
-              </button>
-            </div>
-          ) : sorted.map(b => {
-            const tc = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
-            const sc = STATUS_COLOR[b.status] ?? '#60a5fa';
-            return (
-              <div key={b.id}
-                onClick={() => { onEdit(b); onClose(); }}
-                className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-white/5"
-                style={{ background: `${b.color}10`, border: `1px solid ${b.color}25`, borderLeft: `3px solid ${b.color}` }}>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono font-bold" style={{ color: b.color }}>
-                      {b.horaInicio} – {b.horaFin}
+        {/* Body: columnas por agente */}
+        {groups.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 py-12">
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Sin actividades para este día</p>
+            <button onClick={() => { onNew(); onClose(); }}
+              className="btn-primary px-4 py-2 rounded-xl text-xs font-semibold text-white">
+              Agendar bloque
+            </button>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto p-4">
+            <div className="flex gap-3 h-full" style={{ minWidth: `${groups.length * 220}px` }}>
+              {groups.map(group => (
+                <div key={group.agente.id} className="flex flex-col gap-2 flex-1" style={{ minWidth: 200 }}>
+                  {/* Cabecera agente */}
+                  <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl shrink-0"
+                    style={{ background: `${group.color}15`, border: `1px solid ${group.color}30` }}>
+                    <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold text-white shrink-0"
+                      style={{ background: group.color }}>
+                      {group.agente.firstName[0]}{group.agente.lastName[0]}
                     </span>
-                    {tc && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                        style={{ background: `${tc.color}20`, color: tc.color }}>
-                        {tc.label.replace('Acta de ','').replace('Entrega a ','')}
-                      </span>
-                    )}
-                    {b.actaId && <CheckCircle2 className="w-3 h-3" style={{ color: '#34d399' }} />}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                        {group.agente.firstName} {group.agente.lastName}
+                      </p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        {group.items.length} bloque{group.items.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm font-semibold mt-0.5 truncate" style={{ color: 'var(--text-primary)' }}>
-                    {b.titulo}
-                  </p>
-                  {b.client && (
-                    <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
-                      {b.client.businessName}
-                    </p>
-                  )}
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {b.agente.firstName} {b.agente.lastName}
-                  </p>
+
+                  {/* Bloques del agente */}
+                  <div className="flex flex-col gap-2 overflow-y-auto flex-1">
+                    {group.items.map(b => {
+                      const tc = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
+                      const sc = STATUS_COLOR[b.status] ?? '#60a5fa';
+                      return (
+                        <div key={b.id}
+                          onClick={() => { onEdit(b); onClose(); }}
+                          className="rounded-xl p-3 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+                          style={{
+                            background: `${b.color}12`,
+                            border: `1px solid ${b.color}20`,
+                            borderLeft: `3px solid ${b.color}`,
+                          }}>
+                          {/* Horario */}
+                          <p className="text-[11px] font-mono font-bold" style={{ color: b.color }}>
+                            {b.horaInicio} – {b.horaFin}
+                          </p>
+                          {/* Título */}
+                          <p className="text-sm font-semibold mt-0.5 leading-snug" style={{ color: 'var(--text-primary)' }}>
+                            {b.titulo}
+                          </p>
+                          {/* Cliente */}
+                          {b.client && (
+                            <p className="text-[10px] mt-1 truncate" style={{ color: 'var(--text-muted)' }}>
+                              {b.client.businessName}
+                            </p>
+                          )}
+                          {/* Tags */}
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold"
+                              style={{ background: `${sc}20`, color: sc }}>
+                              {STATUS_CFG[b.status]?.label ?? b.status}
+                            </span>
+                            {tc && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold"
+                                style={{ background: `${tc.color}20`, color: tc.color }}>
+                                {tc.label.replace('Acta de ','').replace('Entrega a ','')}
+                              </span>
+                            )}
+                            {b.actaId && (
+                              <span className="flex items-center gap-0.5 text-[9px] font-semibold"
+                                style={{ color: '#34d399' }}>
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Acta
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0"
-                  style={{ background: `${sc}20`, color: sc }}>
-                  {STATUS_CFG[b.status]?.label ?? b.status}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              ))}
+            </div>
+          </div>
+        )}
       </motion.div>
     </>,
     document.body
@@ -561,28 +625,25 @@ export default function CronogramaPage() {
                     </div>
 
                     {/* Actividades — se recortan al espacio disponible */}
-                    <div className="flex-1 overflow-hidden flex flex-col gap-px px-1 py-0.5"
+                    <div className="flex-1 overflow-hidden flex flex-col gap-0.5 px-1.5 py-1"
                       style={{ opacity: isThisMonth ? 1 : 0.4 }}>
-                      {bbs.slice(0, 3).map(b => {
-                        const tc = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
-                        return (
-                          <div key={b.id}
-                            onClick={e => { e.stopPropagation(); openEdit(b); }}
-                            className="shrink-0 text-[10px] leading-snug px-1.5 py-px rounded truncate font-medium cursor-pointer hover:opacity-75 transition-opacity"
-                            style={{
-                              background: `${b.color}18`,
-                              color: b.color,
-                              borderLeft: `2px solid ${b.color}`,
-                            }}
-                            title={`${b.horaInicio}–${b.horaFin} · ${b.titulo}${tc ? ` · ${tc.label}` : ''}`}>
-                            <span className="opacity-75 font-mono">{b.horaInicio}</span>{' '}{b.titulo}
-                          </div>
-                        );
-                      })}
+                      {bbs.slice(0, 3).map(b => (
+                        <div key={b.id}
+                          onClick={e => { e.stopPropagation(); openEdit(b); }}
+                          className="shrink-0 text-[10px] leading-snug pl-2 pr-1 py-0.5 rounded-md truncate font-medium cursor-pointer hover:opacity-75 transition-opacity"
+                          style={{
+                            background: `${b.color}18`,
+                            color: b.color,
+                            borderLeft: `2px solid ${b.color}`,
+                          }}
+                          title={`${b.horaInicio}–${b.horaFin} · ${b.titulo}`}>
+                          <span className="opacity-70 font-mono text-[9px]">{b.horaInicio}</span>{' '}{b.titulo}
+                        </div>
+                      ))}
                       {extra > 0 && (
                         <button
                           onClick={e => { e.stopPropagation(); setDayView(day); }}
-                          className="shrink-0 text-[9px] font-semibold text-left px-1.5 hover:underline"
+                          className="shrink-0 text-[9px] font-semibold text-left pl-2 hover:underline mt-px"
                           style={{ color: 'var(--accent-blue)' }}>
                           Ver {extra} más
                         </button>

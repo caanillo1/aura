@@ -595,7 +595,6 @@ export default function CronogramaPage() {
                 const isToday = day.format('YYYY-MM-DD') === today;
                 const isThisMonth = day.month() === current.month();
                 const bbs = bloquesEnFecha(day);
-                const extra = bbs.length - 3;
                 return (
                   <div key={di}
                     className="flex flex-col overflow-hidden cursor-pointer group"
@@ -606,9 +605,8 @@ export default function CronogramaPage() {
                     }}
                     onClick={() => setDayView(day)}>
 
-                    {/* Número del día — área fija */}
-                    <div className="flex items-center justify-between px-1.5 py-1 shrink-0"
-                      style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                    {/* Número del día */}
+                    <div className="flex items-center justify-between px-1.5 py-1 shrink-0">
                       <span className="text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shrink-0"
                         style={{
                           background: isToday ? '#2563EB' : 'transparent',
@@ -624,31 +622,20 @@ export default function CronogramaPage() {
                       </button>
                     </div>
 
-                    {/* Actividades — se recortan al espacio disponible */}
-                    <div className="flex-1 overflow-hidden flex flex-col gap-0.5 px-1.5 py-1"
-                      style={{ opacity: isThisMonth ? 1 : 0.4 }}>
-                      {bbs.slice(0, 3).map(b => (
-                        <div key={b.id}
-                          onClick={e => { e.stopPropagation(); openEdit(b); }}
-                          className="shrink-0 text-[10px] leading-snug pl-2 pr-1 py-0.5 rounded-md truncate font-medium cursor-pointer hover:opacity-75 transition-opacity"
-                          style={{
-                            background: `${b.color}18`,
-                            color: b.color,
-                            borderLeft: `2px solid ${b.color}`,
-                          }}
-                          title={`${b.horaInicio}–${b.horaFin} · ${b.titulo}`}>
-                          <span className="opacity-70 font-mono text-[9px]">{b.horaInicio}</span>{' '}{b.titulo}
-                        </div>
-                      ))}
-                      {extra > 0 && (
-                        <button
-                          onClick={e => { e.stopPropagation(); setDayView(day); }}
-                          className="shrink-0 text-[9px] font-semibold text-left pl-2 hover:underline mt-px"
-                          style={{ color: 'var(--accent-blue)' }}>
-                          Ver {extra} más
-                        </button>
-                      )}
-                    </div>
+                    {/* Puntos de color — uno por actividad, caben dentro del recuadro */}
+                    {bbs.length > 0 && (
+                      <div className="flex-1 overflow-hidden flex flex-wrap gap-1 content-start px-2 pt-0.5 pb-1.5"
+                        style={{ opacity: isThisMonth ? 1 : 0.35 }}>
+                        {bbs.map(b => (
+                          <span
+                            key={b.id}
+                            className="w-2.5 h-2.5 rounded-full shrink-0 transition-transform group-hover:scale-110"
+                            style={{ background: b.color }}
+                            title={`${b.horaInicio}–${b.horaFin} · ${b.titulo} · ${b.agente.firstName} ${b.agente.lastName}`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}

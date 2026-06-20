@@ -42,13 +42,15 @@ export class CronogramaService {
     await this.checkOverlap(companyId, dto.agenteId, dto.fecha, dto.horaInicio, dto.horaFin);
     return this.prisma.cronogramaBloque.create({
       data: {
-        companyId, agenteId: dto.agenteId, titulo: dto.titulo,
+        titulo: dto.titulo,
         fecha: new Date(dto.fecha), horaInicio: dto.horaInicio, horaFin: dto.horaFin,
         color: dto.color ?? '#2563EB',
-        clientId: dto.clientId ?? null,
-        serviceOrderId: dto.serviceOrderId ?? null,
         notas: dto.notas ?? null,
-        createdById: userId,
+        company:      { connect: { id: companyId } },
+        agente:       { connect: { id: dto.agenteId } },
+        createdBy:    { connect: { id: userId } },
+        client:       dto.clientId       ? { connect: { id: dto.clientId } }       : undefined,
+        serviceOrder: dto.serviceOrderId ? { connect: { id: dto.serviceOrderId } } : undefined,
       },
       select: this.bloqueSelect,
     });

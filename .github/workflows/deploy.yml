@@ -1,7 +1,7 @@
 # =============================================================================
 # AURA ERP – Deploy Pipeline
 # Deploy backend → VPS Windows (self-hosted runner)
-# Deploy frontend → Vercel
+# Deploy frontend → Vercel (integración Git nativa, automático en push a main)
 # Ejecuta en: Push a main
 # =============================================================================
 
@@ -15,43 +15,19 @@ on:
       target:
         description: 'Qué desplegar'
         required: true
-        default: 'all'
+        default: 'backend'
         type: choice
         options:
-          - all
           - backend
-          - frontend
 
 jobs:
-  # ─── DEPLOY FRONTEND → VERCEL ───────────────────────────────────────────────
-  deploy-frontend:
-    name: Deploy Frontend → Vercel
-    runs-on: ubuntu-latest
-    if: |
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'frontend')
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Deploy to Vercel
-        run: vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
-        working-directory: apps/frontend
-        env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          NEXT_PUBLIC_WS_URL: ${{ secrets.NEXT_PUBLIC_WS_URL }}
-
   # ─── DEPLOY BACKEND → VPS (self-hosted runner) ───────────────────────────────
   deploy-backend:
     name: Deploy Backend → VPS
     runs-on: [self-hosted, Windows]
     if: |
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'backend')
+      (github.event_name == 'push' || github.event.inputs.target == 'backend')
 
     defaults:
       run:
@@ -101,18 +77,16 @@ jobs:
   notify:
     name: Notificar resultado
     runs-on: ubuntu-latest
-    needs: [deploy-frontend, deploy-backend]
+    needs: [deploy-backend]
     if: always()
 
     steps:
       - name: Deploy exitoso
-        if: |
-          (needs.deploy-frontend.result == 'success' || needs.deploy-frontend.result == 'skipped') &&
-          (needs.deploy-backend.result == 'success' || needs.deploy-backend.result == 'skipped')
-        run: echo "✅ Deploy AURA ERP completado exitosamente"
+        if: needs.deploy-backend.result == 'success'
+        run: echo "✅ Deploy AURA Backend completado exitosamente"
 
       - name: Deploy fallido
-        if: needs.deploy-frontend.result == 'failure' || needs.deploy-backend.result == 'failure'
+        if: needs.deploy-backend.result == 'failure'
         run: |
-          echo "❌ Deploy falló — revisa los logs del job que falló"
+          echo "❌ Deploy backend falló — revisa los logs"
           exit 1

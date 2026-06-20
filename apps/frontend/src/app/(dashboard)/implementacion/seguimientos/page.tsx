@@ -6,9 +6,10 @@ import {
   Activity, Search, X, RefreshCw, Building2,
   Layers, AlignLeft, CalendarDays, GitBranch, TrendingDown, BarChart3,
   CheckCircle2, Clock, AlertCircle,
-  ChevronLeft, ChevronRight, User,
+  ChevronLeft, ChevronRight, User, Users, ChevronDown,
 } from 'lucide-react';
-import { projectsApi } from '@/lib/api';
+import { projectsApi, usersApi } from '@/lib/api';
+import type { User as UserType } from '@/types';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 import type { Project, ProjectActivity, ProjectModule, ProjectPhase, ActivityStatus } from '@/types';
@@ -740,28 +741,114 @@ function ProjectSelector({ value, onChange }: { value: Project | null; onChange:
 
 // ── Página principal ───────────────────────────────────────────────────────────
 
+// ── Selector de agente ────────────────────────────────────────────────────────
+
+function AgentSelector({ value, onChange, border, surface }: {
+  value: UserType | null;
+  onChange: (u: UserType | null) => void;
+  border: string;
+  surface: string;
+}) {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+  const [open, setOpen]     = useState(false);
+  const [agents, setAgents] = useState<UserType[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    usersApi.listAgents({ limit: 50 })
+      .then(r => setAgents(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const dropSurface = isLight ? '#FFFFFF' : 'rgba(10,18,42,0.98)';
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors"
+        style={{ background: value ? 'rgba(99,102,241,0.15)' : surface, border: `1px solid ${border}`, color: value ? '#818cf8' : 'var(--text-muted)' }}>
+        <User className="w-3.5 h-3.5" />
+        {value ? `${value.firstName} ${value.lastName}` : 'Seleccionar agente'}
+        <ChevronDown className="w-3 h-3" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+              className="absolute top-full left-0 mt-1 min-w-[200px] rounded-xl overflow-hidden z-20"
+              style={{ background: dropSurface, border: `1px solid ${border}`, boxShadow: '0 12px 32px rgba(0,0,0,0.25)' }}>
+              {value && (
+                <button onClick={() => { onChange(null); setOpen(false); }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-left text-xs transition-colors hover:bg-white/5"
+                  style={{ color: '#f87171' }}>
+                  <X className="w-3 h-3" /> Quitar filtro
+                </button>
+              )}
+              {loading ? (
+                <div className="flex items-center justify-center py-4">
+                  <RefreshCw className="w-4 h-4 animate-spin" style={{ color: 'var(--text-muted)' }} />
+                </div>
+              ) : agents.map(a => (
+                <button key={a.id} onClick={() => { onChange(a); setOpen(false); }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+                  style={{ background: value?.id === a.id ? 'rgba(99,102,241,0.1)' : undefined }}>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                    style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
+                    {(a.firstName?.[0] ?? '') + (a.lastName?.[0] ?? '')}
+                  </div>
+                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
+                    {a.firstName} {a.lastName}
+                  </span>
+                </button>
+              ))}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Página principal ───────────────────────────────────────────────────────────
+
 export default function SeguimientosPage() {
   const { theme } = useTheme();
   const isLight = theme === 'light';
-  const [project, setProject]     = useState<Project | null>(null);
-  const [activities, setActivities] = useState<FlatActivity[]>([]);
-  const [loading, setLoading]     = useState(false);
-  const [view, setView]           = useState<ViewMode>('kanban');
-  const border = isLight ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.06)';
+  const [project, setProject]       = useState<Project | null>(null);
+  const [allActivities, setAllActivities] = useState<FlatActivity[]>([]);
+  const [loading, setLoading]       = useState(false);
+  const [view, setView]             = useState<ViewMode>('kanban');
+  const [agentMode, setAgentMode]   = useState<'all' | 'agent'>('all');
+  const [selectedAgent, setSelectedAgent] = useState<UserType | null>(null);
+  const border  = isLight ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.06)';
+  const surface = isLight ? 'rgba(15,23,42,0.04)' : 'rgba(255,255,255,0.04)';
 
   const loadProject = useCallback(async (id: string) => {
     setLoading(true);
     try {
       const p = await projectsApi.get(id);
-      setActivities(flattenActivities(p.modules ?? []));
+      setAllActivities(flattenActivities(p.modules ?? []));
     } catch { toast.error('Error al cargar el proyecto'); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
     if (project?.id) loadProject(project.id);
-    else setActivities([]);
+    else setAllActivities([]);
   }, [project, loadProject]);
+
+  const activities = agentMode === 'agent' && selectedAgent
+    ? allActivities.filter(a => (a as any).assignedToId === selectedAgent.id)
+    : allActivities;
+
+  function handleActivityUpdate(id: string, status: ActivityStatus) {
+    setAllActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -778,26 +865,31 @@ export default function SeguimientosPage() {
         </div>
       </div>
 
-      {/* Selector */}
+      {/* Selector de proyecto */}
       <div className="px-6 pb-3 shrink-0">
         <ProjectSelector value={project} onChange={p => { setProject(p); setView('kanban'); }} />
       </div>
 
       {!project ? (
         <div className="flex flex-col items-center justify-center flex-1 gap-3">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.08)', border: `1px solid ${border}` }}>
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(99,102,241,0.08)', border: `1px solid ${border}` }}>
             <Activity className="w-6 h-6" style={{ color: 'var(--text-muted)' }} />
           </div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Selecciona un proyecto para ver sus actividades</p>
         </div>
       ) : (
         <>
-          {/* Info del proyecto */}
+          {/* Info + filtro agente */}
           <div className="px-6 pb-3 shrink-0">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{project.serviceOrder?.client?.businessName}</span>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{activities.length} actividades</span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  {project.serviceOrder?.client?.businessName}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {activities.length}{agentMode === 'agent' ? `/${allActivities.length}` : ''} actividades
+                </span>
                 <div className="flex items-center gap-1.5">
                   <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(148,163,184,0.2)' }}>
                     <div className="h-full rounded-full" style={{ width: `${project.progressPercent}%`, background: 'linear-gradient(90deg,#2563EB,#6366F1)' }} />
@@ -805,15 +897,49 @@ export default function SeguimientosPage() {
                   <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{project.progressPercent}%</span>
                 </div>
               </div>
-              <button onClick={() => project && loadProject(project.id)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{ color: 'var(--text-muted)' }}>
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
+
+              {/* Toggle todos / por agente */}
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1 p-1 rounded-xl" style={{ background: surface, border: `1px solid ${border}` }}>
+                  <button onClick={() => { setAgentMode('all'); setSelectedAgent(null); }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{
+                      background: agentMode === 'all' ? (isLight ? 'rgba(37,99,235,0.1)' : 'rgba(96,165,250,0.12)') : 'transparent',
+                      color: agentMode === 'all' ? (isLight ? '#2563EB' : '#60a5fa') : 'var(--text-muted)',
+                    }}>
+                    <Users className="w-3.5 h-3.5" /> Todos
+                  </button>
+                  <button onClick={() => setAgentMode('agent')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{
+                      background: agentMode === 'agent' ? (isLight ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.15)') : 'transparent',
+                      color: agentMode === 'agent' ? '#818cf8' : 'var(--text-muted)',
+                    }}>
+                    <User className="w-3.5 h-3.5" /> Por agente
+                  </button>
+                </div>
+
+                {agentMode === 'agent' && (
+                  <AgentSelector
+                    value={selectedAgent}
+                    onChange={setSelectedAgent}
+                    border={border}
+                    surface={surface}
+                  />
+                )}
+
+                <button onClick={() => project && loadProject(project.id)}
+                  className="p-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{ color: 'var(--text-muted)' }}>
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
             </div>
           </div>
 
           {/* View selector tabs */}
           <div className="px-6 shrink-0">
-            <div className="flex gap-1 p-1 rounded-xl" style={{ background: isLight ? 'rgba(15,23,42,0.05)' : 'rgba(255,255,255,0.04)', border: `1px solid ${border}` }}>
+            <div className="flex gap-1 p-1 rounded-xl"
+              style={{ background: isLight ? 'rgba(15,23,42,0.05)' : 'rgba(255,255,255,0.04)', border: `1px solid ${border}` }}>
               {VIEWS.map(v => {
                 const Icon = v.icon;
                 const active = view === v.key;
@@ -842,7 +968,7 @@ export default function SeguimientosPage() {
             ) : (
               <AnimatePresence mode="wait">
                 <motion.div key={view} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full">
-                  {view === 'kanban'     && <KanbanView     activities={activities} onActivityUpdate={(id, status) => setActivities(prev => prev.map(a => a.id === id ? { ...a, status } : a))} />}
+                  {view === 'kanban'     && <KanbanView     activities={activities} onActivityUpdate={handleActivityUpdate} />}
                   {view === 'gantt'      && <GanttView      activities={activities} project={project} />}
                   {view === 'lista'      && <ListaView      activities={activities} />}
                   {view === 'calendario' && <CalendarioView activities={activities} />}

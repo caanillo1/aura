@@ -1,11 +1,11 @@
 ﻿import { IsString, IsOptional, IsUUID, IsDateString, IsIn, IsArray, ValidateNested, IsNumber, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateItemDto {
   @IsString() descripcion: string;
-  @IsNumber() @Min(0) cantidad: number;
-  @IsNumber() @Min(0) valorUnitario: number;
-  @IsOptional() @IsNumber() @Min(0) @Max(100) descuento?: number;
+  @Transform(({ value }) => Number(value)) @IsNumber() @Min(0) cantidad: number;
+  @Transform(({ value }) => Number(value)) @IsNumber() @Min(0) valorUnitario: number;
+  @IsOptional() @Transform(({ value }) => value !== undefined && value !== null ? Number(value) : 0) @IsNumber() @Min(0) @Max(100) descuento?: number;
 }
 
 export class CreateCotizacionDto {

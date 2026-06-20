@@ -20,7 +20,7 @@ export class CronogramaController {
 
   @Post()
   create(@Request() req, @Body() dto: CreateBloqueDto) {
-    return this.svc.create(req.user.companyId, req.user.sub, dto);
+    return this.svc.create(req.user.companyId, req.user.id, dto);
   }
 
   @Patch(':id')

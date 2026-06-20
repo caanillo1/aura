@@ -1,5 +1,3 @@
 ﻿{
-  "buildCommand": "pnpm --filter frontend build",
-  "installCommand": "pnpm install",
-  "outputDirectory": "apps/frontend/.next"
+  "installCommand": "cd ../.. && pnpm install"
 }

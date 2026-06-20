@@ -10,6 +10,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/es';
 import { toast } from 'sonner';
 import { cronogramaApi, clientsApi, usersApi, serviceOrdersApi } from '@/lib/api';
+import { ClientCombobox } from '@/components/ui/ClientCombobox';
 import { useAuthStore } from '@/store/auth.store';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
@@ -253,14 +254,14 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
           </div>
 
           {/* Cliente */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Cliente</label>
-            <select className="input-glass rounded-xl px-3 py-2.5 text-sm"
-              value={form.clientId} onChange={e => { set('clientId', e.target.value); set('serviceOrderId', ''); }}>
-              <option value="">— Sin cliente —</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.businessName}</option>)}
-            </select>
-          </div>
+          <ClientCombobox
+            clients={clients}
+            value={form.clientId}
+            onChange={id => { set('clientId', id); set('serviceOrderId', ''); }}
+            label="Cliente"
+            nullLabel="— Sin cliente —"
+            placeholder="Buscar cliente…"
+          />
 
           {/* Orden de servicio */}
           {form.clientId && (

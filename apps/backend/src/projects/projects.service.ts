@@ -22,6 +22,7 @@ export class ProjectsService {
       where.OR = [
         { name: { contains: dto.search } },
         { serviceOrder: { osNumber: { contains: dto.search } } },
+        { serviceOrder: { client: { businessName: { contains: dto.search } } } },
       ];
     }
     const [data, total] = await Promise.all([

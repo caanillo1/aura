@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Building2, Clock, FileText, CheckCircle2, Loader2, ClipboardList, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cronogramaApi, clientsApi } from '@/lib/api';
+import { ClientCombobox } from '@/components/ui/ClientCombobox';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
@@ -167,11 +168,14 @@ export default function VisitasPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <select className="input-glass rounded-xl px-3 py-2 text-xs"
-            value={filterClient} onChange={e => setFilterClient(e.target.value)}>
-            <option value="">Todos los clientes</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.businessName}</option>)}
-          </select>
+          <ClientCombobox
+            clients={clients}
+            value={filterClient}
+            onChange={setFilterClient}
+            nullLabel="Todos los clientes"
+            placeholder="Buscar cliente…"
+            className="min-w-[180px]"
+          />
           <button onClick={load} disabled={loading}
             className="p-2 rounded-xl hover:bg-white/5 transition-colors disabled:opacity-50"
             style={{ color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>

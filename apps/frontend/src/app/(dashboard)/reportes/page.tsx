@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { reportesApi, clientsApi, serviceOrdersApi, companyApi } from '@/lib/api';
 import type { Client, ServiceOrder, Company } from '@/types';
+import { ClientCombobox } from '@/components/ui/ClientCombobox';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -515,9 +516,14 @@ export default function ReportesPage() {
   );
 
   const ClientSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <SelectFilter value={value} onChange={onChange} placeholder="Todos los clientes">
-      {clients.map(c => <option key={c.id} value={c.id}>{c.businessName}</option>)}
-    </SelectFilter>
+    <ClientCombobox
+      clients={clients.map(c => ({ id: c.id, businessName: c.businessName }))}
+      value={value}
+      onChange={onChange}
+      nullLabel="Todos los clientes"
+      placeholder="Buscar cliente…"
+      className="min-w-[180px]"
+    />
   );
 
   const TableWrap = ({ loading, empty, children }: { loading: boolean; empty: boolean; children: React.ReactNode }) => {

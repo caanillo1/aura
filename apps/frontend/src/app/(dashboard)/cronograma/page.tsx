@@ -335,6 +335,109 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
   );
 }
 
+// ── Day View Modal ────────────────────────────────────────────────────────────
+function DayModal({ day, bloques, onClose, onEdit, onNew }: {
+  day: Dayjs; bloques: Bloque[];
+  onClose: () => void; onEdit: (b: Bloque) => void; onNew: () => void;
+}) {
+  if (typeof window === 'undefined') return null;
+  const sorted = [...bloques].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+  const STATUS_COLOR: Record<string, string> = {
+    programado: '#60a5fa', en_curso: '#fb923c', completado: '#34d399', cancelado: '#9ca3af',
+  };
+  return createPortal(
+    <>
+      <motion.div className="fixed inset-0 z-[600]"
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose} />
+      <motion.div
+        className="fixed inset-x-4 top-[8%] bottom-[8%] z-[601] max-w-md mx-auto rounded-2xl flex flex-col overflow-hidden"
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 24px 80px rgba(0,0,0,0.45)', backdropFilter: 'blur(24px)' }}
+        initial={{ opacity: 0, y: 20, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 10, scale: 0.96 }} transition={{ duration: 0.22 }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ borderBottom: '1px solid var(--card-border)' }}>
+          <div>
+            <h3 className="font-bold text-base capitalize" style={{ color: 'var(--text-primary)' }}>
+              {day.format('dddd D')}
+            </h3>
+            <p className="text-xs capitalize mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {day.format('MMMM YYYY')} · {sorted.length} bloque{sorted.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => { onNew(); onClose(); }}
+              className="btn-primary flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white">
+              <Plus className="w-3.5 h-3.5" /> Nuevo bloque
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-white/10 transition-colors"
+              style={{ color: 'var(--text-muted)' }}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {sorted.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 py-12">
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Sin actividades para este día</p>
+              <button onClick={() => { onNew(); onClose(); }}
+                className="btn-primary px-4 py-2 rounded-xl text-xs font-semibold text-white">
+                Agendar bloque
+              </button>
+            </div>
+          ) : sorted.map(b => {
+            const tc = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
+            const sc = STATUS_COLOR[b.status] ?? '#60a5fa';
+            return (
+              <div key={b.id}
+                onClick={() => { onEdit(b); onClose(); }}
+                className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-white/5"
+                style={{ background: `${b.color}10`, border: `1px solid ${b.color}25`, borderLeft: `3px solid ${b.color}` }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono font-bold" style={{ color: b.color }}>
+                      {b.horaInicio} – {b.horaFin}
+                    </span>
+                    {tc && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                        style={{ background: `${tc.color}20`, color: tc.color }}>
+                        {tc.label.replace('Acta de ','').replace('Entrega a ','')}
+                      </span>
+                    )}
+                    {b.actaId && <CheckCircle2 className="w-3 h-3" style={{ color: '#34d399' }} />}
+                  </div>
+                  <p className="text-sm font-semibold mt-0.5 truncate" style={{ color: 'var(--text-primary)' }}>
+                    {b.titulo}
+                  </p>
+                  {b.client && (
+                    <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                      {b.client.businessName}
+                    </p>
+                  )}
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {b.agente.firstName} {b.agente.lastName}
+                  </p>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0"
+                  style={{ background: `${sc}20`, color: sc }}>
+                  {STATUS_CFG[b.status]?.label ?? b.status}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+    </>,
+    document.body
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CronogramaPage() {
   useTheme();
@@ -348,6 +451,7 @@ export default function CronogramaPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalInitial, setModalInitial] = useState<any>(null);
   const [filterAgente, setFilterAgente] = useState('');
+  const [dayView, setDayView] = useState<Dayjs | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -425,12 +529,14 @@ export default function CronogramaPage() {
                 const isThisMonth = day.month() === current.month();
                 const bbs = bloquesEnFecha(day);
                 return (
-                  <div key={di} className="p-1.5 border-r overflow-hidden group"
+                  <div key={di} className="p-1.5 border-r overflow-hidden group cursor-pointer"
                     style={{
                       borderColor: 'var(--border-subtle)',
                       background: !isThisMonth ? 'rgba(0,0,0,0.025)' : 'transparent',
-                    }}>
-                    <div className="flex items-center justify-between mb-1">
+                    }}
+                    onClick={() => setDayView(day)}>
+                    <div className="flex items-center justify-between pb-1 mb-1"
+                      style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                       <span className="text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full"
                         style={{
                           background: isToday ? '#2563EB' : 'transparent',
@@ -438,7 +544,7 @@ export default function CronogramaPage() {
                         }}>
                         {day.date()}
                       </span>
-                      <button onClick={() => openNew(day.format('YYYY-MM-DD'))}
+                      <button onClick={e => { e.stopPropagation(); openNew(day.format('YYYY-MM-DD')); }}
                         className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         style={{ background: 'var(--accent-blue-bg)', color: 'var(--accent-blue)' }}>
                         <Plus className="w-3 h-3" />
@@ -449,7 +555,7 @@ export default function CronogramaPage() {
                         const tc = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
                         return (
                           <div key={b.id}
-                            onClick={() => openEdit(b)}
+                            onClick={e => { e.stopPropagation(); openEdit(b); }}
                             className="text-[10px] leading-tight px-1.5 py-0.5 rounded-md truncate font-medium cursor-pointer hover:opacity-80 transition-opacity"
                             style={{ background: `${b.color}22`, color: b.color, border: `1px solid ${b.color}40` }}
                             title={`${b.horaInicio}–${b.horaFin} · ${b.titulo}${tc ? ` · ${tc.label}` : ''}`}>
@@ -461,7 +567,7 @@ export default function CronogramaPage() {
                       {bbs.length > 3 && (
                         <div className="text-[9px] font-semibold cursor-pointer hover:underline"
                           style={{ color: 'var(--text-muted)' }}
-                          onClick={() => { setCurrent(day); setView('week'); }}>
+                          onClick={e => { e.stopPropagation(); setDayView(day); }}>
                           +{bbs.length - 3} más
                         </div>
                       )}
@@ -620,6 +726,19 @@ export default function CronogramaPage() {
           : view === 'month' ? renderMonth() : renderWeek()
         }
       </div>
+
+      <AnimatePresence>
+        {dayView && (
+          <DayModal
+            key="day-modal"
+            day={dayView}
+            bloques={bloquesEnFecha(dayView)}
+            onClose={() => setDayView(null)}
+            onEdit={b => { setDayView(null); openEdit(b); }}
+            onNew={() => { openNew(dayView.format('YYYY-MM-DD')); setDayView(null); }}
+          />
+        )}
+      </AnimatePresence>
 
       <BloqueModal
         open={modalOpen}

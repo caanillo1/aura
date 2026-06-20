@@ -1,6 +1,6 @@
 # =============================================================================
 # AURA ERP – Deploy Pipeline
-# Deploy backend → VPS Windows Server 2019
+# Deploy backend → VPS Windows (self-hosted runner)
 # Deploy frontend → Vercel
 # Ejecuta en: Push a main
 # =============================================================================
@@ -67,66 +67,54 @@ jobs:
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
         working-directory: apps/frontend
 
-  # ─── DEPLOY BACKEND → VPS WINDOWS ───────────────────────────────────────────
+  # ─── DEPLOY BACKEND → VPS (self-hosted runner) ───────────────────────────────
   deploy-backend:
     name: Deploy Backend → VPS
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows]
     if: |
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'backend')
 
+    defaults:
+      run:
+        shell: powershell
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Actualizar código desde GitHub
+        run: |
+          cd C:\AURA
+          git fetch origin main
+          git reset --hard origin/main
+          Write-Host "✅ Código actualizado"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: '8.15.4'
+      - name: Instalar dependencias
+        run: |
+          cd C:\AURA
+          pnpm install --no-frozen-lockfile
+          Write-Host "✅ Dependencias instaladas"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
+      - name: Generar cliente Prisma
+        run: |
+          cd C:\AURA\apps\backend
+          npx prisma generate
+          Write-Host "✅ Cliente Prisma generado"
 
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+      - name: Compilar backend
+        run: |
+          cd C:\AURA
+          pnpm --filter backend build
+          Write-Host "✅ Backend compilado"
 
-      - name: Verificar build backend (pre-check)
-        run: pnpm --filter backend build
-
-      - name: Deploy via SSH al VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          port: ${{ secrets.VPS_PORT }}
-          timeout: 300s
-          command_timeout: 20m
-          script_stop: true
-          script: |
-            echo "=== [1/5] Actualizando codigo ==="
-            cd C:\AURA
-            git fetch origin main
-            git reset --hard origin/main
-
-            echo "=== [2/5] Instalando dependencias ==="
-            pnpm install --no-frozen-lockfile
-
-            echo "=== [3/5] Generando cliente Prisma ==="
-            cd apps\backend
-            npx prisma generate
-
-            echo "=== [4/5] Compilando backend ==="
-            cd C:\AURA
-            pnpm --filter backend build
-
-            echo "=== [5/5] Reiniciando PM2 ==="
-            pm2 describe aura-backend >nul 2>&1 && pm2 restart aura-backend --update-env || pm2 start ecosystem.config.js
-            pm2 save
-            echo "=== Deploy completado ==="
+      - name: Reiniciar PM2
+        run: |
+          $desc = pm2 describe aura-backend 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            pm2 restart aura-backend --update-env
+          } else {
+            pm2 start C:\AURA\ecosystem.config.js
+          }
+          pm2 save
+          Write-Host "✅ PM2 reiniciado"
 
   # ─── NOTIFY ─────────────────────────────────────────────────────────────────
   notify:

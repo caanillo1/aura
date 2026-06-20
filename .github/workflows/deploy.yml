@@ -107,14 +107,11 @@ jobs:
 
       - name: Reiniciar PM2
         run: |
-          $desc = pm2 describe aura-backend 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            pm2 restart aura-backend --update-env
-          } else {
-            pm2 start C:\AURA\ecosystem.config.js
-          }
-          pm2 save
-          Write-Host "✅ PM2 reiniciado"
+          schtasks /run /TN "AURA-RestartBackend"
+          Start-Sleep 8
+          $result = schtasks /query /TN "AURA-RestartBackend" /FO LIST
+          Write-Host $result
+          Write-Host "✅ PM2 reiniciado via tarea programada"
 
   # ─── NOTIFY ─────────────────────────────────────────────────────────────────
   notify:

@@ -515,61 +515,77 @@ export default function CronogramaPage() {
     const weeks = Array.from({ length: 6 }, (_, w) => Array.from({ length: 7 }, (_, d) => start.add(w * 7 + d, 'day')));
     const today = dayjs().format('YYYY-MM-DD');
     return (
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="grid grid-cols-7 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
+        {/* Cabecera días de la semana */}
+        <div className="grid grid-cols-7 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => (
-            <div key={d} className="py-2 text-center text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>{d}</div>
+            <div key={d} className="py-2 text-center text-xs font-bold uppercase tracking-widest"
+              style={{ color: 'var(--text-muted)' }}>{d}</div>
           ))}
         </div>
-        <div className="flex-1 grid grid-rows-6 overflow-hidden">
+        {/* Cuadrícula de semanas — cada fila ocupa 1/6 del espacio disponible */}
+        <div className="flex-1 grid grid-rows-6 overflow-hidden" style={{ minHeight: 0 }}>
           {weeks.map((week, wi) => (
-            <div key={wi} className="grid grid-cols-7 border-b" style={{ borderColor: 'var(--border-subtle)', minHeight: 130 }}>
+            <div key={wi} className="grid grid-cols-7" style={{ borderBottom: '1px solid var(--border-subtle)', minHeight: 0 }}>
               {week.map((day, di) => {
                 const isToday = day.format('YYYY-MM-DD') === today;
                 const isThisMonth = day.month() === current.month();
                 const bbs = bloquesEnFecha(day);
+                const extra = bbs.length - 3;
                 return (
-                  <div key={di} className="p-1.5 border-r overflow-hidden group cursor-pointer"
+                  <div key={di}
+                    className="flex flex-col overflow-hidden cursor-pointer group"
                     style={{
-                      borderColor: 'var(--border-subtle)',
-                      background: !isThisMonth ? 'rgba(0,0,0,0.025)' : 'transparent',
+                      borderRight: '1px solid var(--border-subtle)',
+                      background: !isThisMonth ? 'rgba(0,0,0,0.03)' : 'transparent',
+                      minHeight: 0,
                     }}
                     onClick={() => setDayView(day)}>
-                    <div className="flex items-center justify-between pb-1 mb-1"
+
+                    {/* Número del día — área fija */}
+                    <div className="flex items-center justify-between px-1.5 py-1 shrink-0"
                       style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                      <span className="text-xs font-bold w-7 h-7 flex items-center justify-center rounded-full"
+                      <span className="text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shrink-0"
                         style={{
                           background: isToday ? '#2563EB' : 'transparent',
                           color: isToday ? '#fff' : isThisMonth ? 'var(--text-primary)' : 'var(--text-muted)',
                         }}>
                         {day.date()}
                       </span>
-                      <button onClick={e => { e.stopPropagation(); openNew(day.format('YYYY-MM-DD')); }}
-                        className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      <button
+                        onClick={e => { e.stopPropagation(); openNew(day.format('YYYY-MM-DD')); }}
+                        className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                         style={{ background: 'var(--accent-blue-bg)', color: 'var(--accent-blue)' }}>
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-2.5 h-2.5" />
                       </button>
                     </div>
-                    <div className="space-y-0.5" style={{ opacity: isThisMonth ? 1 : 0.45 }}>
+
+                    {/* Actividades — se recortan al espacio disponible */}
+                    <div className="flex-1 overflow-hidden flex flex-col gap-px px-1 py-0.5"
+                      style={{ opacity: isThisMonth ? 1 : 0.4 }}>
                       {bbs.slice(0, 3).map(b => {
                         const tc = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
                         return (
                           <div key={b.id}
                             onClick={e => { e.stopPropagation(); openEdit(b); }}
-                            className="text-[10px] leading-tight px-1.5 py-0.5 rounded-md truncate font-medium cursor-pointer hover:opacity-80 transition-opacity"
-                            style={{ background: `${b.color}22`, color: b.color, border: `1px solid ${b.color}40` }}
+                            className="shrink-0 text-[10px] leading-snug px-1.5 py-px rounded truncate font-medium cursor-pointer hover:opacity-75 transition-opacity"
+                            style={{
+                              background: `${b.color}18`,
+                              color: b.color,
+                              borderLeft: `2px solid ${b.color}`,
+                            }}
                             title={`${b.horaInicio}–${b.horaFin} · ${b.titulo}${tc ? ` · ${tc.label}` : ''}`}>
-                            {b.horaInicio} {b.titulo}
-                            {tc && <span className="ml-1 opacity-60">· {tc.label.replace('Acta de ','').replace('Entrega a ','')}</span>}
+                            <span className="opacity-75 font-mono">{b.horaInicio}</span>{' '}{b.titulo}
                           </div>
                         );
                       })}
-                      {bbs.length > 3 && (
-                        <div className="text-[9px] font-semibold cursor-pointer hover:underline"
-                          style={{ color: 'var(--text-muted)' }}
-                          onClick={e => { e.stopPropagation(); setDayView(day); }}>
-                          +{bbs.length - 3} más
-                        </div>
+                      {extra > 0 && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setDayView(day); }}
+                          className="shrink-0 text-[9px] font-semibold text-left px-1.5 hover:underline"
+                          style={{ color: 'var(--accent-blue)' }}>
+                          Ver {extra} más
+                        </button>
                       )}
                     </div>
                   </div>

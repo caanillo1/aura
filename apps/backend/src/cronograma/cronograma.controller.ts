@@ -1,8 +1,20 @@
 ﻿import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CronogramaService } from './cronograma.service';
-import { CreateBloqueDto, UpdateBloqueDto, BloqueFilterDto } from './dto/cronograma.dto';
+import { CreateBloqueDto, UpdateBloqueDto, BloqueFilterDto, RespondVisitDto } from './dto/cronograma.dto';
 
+// ── Endpoint público — sin auth ───────────────────────────────────────────────
+@Controller('cronograma')
+export class CronogramaPublicController {
+  constructor(private svc: CronogramaService) {}
+
+  @Post('respond')
+  respondToVisit(@Body() dto: RespondVisitDto) {
+    return this.svc.respondToVisit(dto);
+  }
+}
+
+// ── Rutas protegidas ──────────────────────────────────────────────────────────
 @UseGuards(JwtAuthGuard)
 @Controller('cronograma')
 export class CronogramaController {

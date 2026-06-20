@@ -1,4 +1,4 @@
-﻿import { IsString, IsOptional, IsDateString, IsUUID, Matches, IsIn } from 'class-validator';
+﻿import { IsString, IsOptional, IsDateString, IsUUID, Matches, IsIn, IsNotEmpty } from 'class-validator';
 
 export class CreateBloqueDto {
   @IsString() titulo: string;
@@ -35,4 +35,10 @@ export class BloqueFilterDto {
   @IsOptional() @IsDateString() fechaHasta?: string;
   @IsOptional() @IsString() tipoActa?: string;
   @IsOptional() @IsString() status?: string;
+}
+
+export class RespondVisitDto {
+  @IsString() @IsNotEmpty() token: string;
+  @IsIn(['accept', 'cancel']) action: 'accept' | 'cancel';
+  @IsOptional() @IsString() motivo?: string;
 }

@@ -10,6 +10,7 @@ import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/es';
 import { toast } from 'sonner';
 import { cronogramaApi, clientsApi, usersApi, serviceOrdersApi } from '@/lib/api';
+import { useAuthStore } from '@/store/auth.store';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 
@@ -45,7 +46,7 @@ function timeToMin(t: string) { const [h, m] = t.split(':').map(Number); return 
 function minToFraction(t: string) { return (timeToMin(t) - 7 * 60) / (12 * 60); }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
-function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete, onCrearActa }: {
+function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete, onCrearActa, currentUserId }: {
   open: boolean; onClose: () => void;
   initial?: any;
   agents: { id: string; firstName: string; lastName: string }[];
@@ -53,6 +54,7 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
   onSave: (data: any) => Promise<Bloque>;
   onDelete?: () => Promise<void>;
   onCrearActa: (b: Bloque) => void;
+  currentUserId?: string;
 }) {
   const [form, setForm] = useState({
     titulo: '', fecha: dayjs().format('YYYY-MM-DD'),
@@ -61,13 +63,14 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
     notas: '', color: '#2563EB', tipoActa: '', status: 'programado',
   });
   const [serviceOrders, setServiceOrders] = useState<any[]>([]);
+  const [soImplementers, setSoImplementers] = useState<{ id: string; firstName: string; lastName: string; role: string }[]>([]);
   const [loadingSO, setLoadingSO] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saved, setSaved] = useState<Bloque | null>(null);
 
   useEffect(() => {
-    if (!open) { setSaved(null); return; }
+    if (!open) { setSaved(null); setSoImplementers([]); return; }
     const horaDefault = initial?.horaDefault ?? '08:00';
     const [hd] = horaDefault.split(':').map(Number);
     setForm({
@@ -75,7 +78,7 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
       fecha:          initial?.fecha              ? (initial.fecha as string).substring(0, 10) : (initial?.fechaDefault ?? dayjs().format('YYYY-MM-DD')),
       horaInicio:     initial?.horaInicio         ?? horaDefault,
       horaFin:        initial?.horaFin            ?? `${String(Math.min(hd + 2, 19)).padStart(2,'0')}:00`,
-      agenteId:       initial?.agente?.id         ?? '',
+      agenteId:       initial?.agente?.id         ?? currentUserId ?? '',
       clientId:       initial?.client?.id         ?? '',
       serviceOrderId: initial?.serviceOrder?.id   ?? '',
       notas:          initial?.notas              ?? '',
@@ -83,16 +86,33 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
       tipoActa:       initial?.tipoActa           ?? '',
       status:         initial?.status             ?? 'programado',
     });
-  }, [open, initial]);
+  }, [open, initial, currentUserId]);
 
   useEffect(() => {
-    if (!form.clientId) { setServiceOrders([]); return; }
+    if (!form.clientId) { setServiceOrders([]); setSoImplementers([]); return; }
     setLoadingSO(true);
     serviceOrdersApi.list({ clientId: form.clientId, limit: 100 } as any)
       .then((r: any) => setServiceOrders(r.data ?? []))
       .catch(() => {})
       .finally(() => setLoadingSO(false));
   }, [form.clientId]);
+
+  useEffect(() => {
+    if (!form.serviceOrderId) { setSoImplementers([]); return; }
+    serviceOrdersApi.get(form.serviceOrderId)
+      .then((so: any) => {
+        const impls: { id: string; firstName: string; lastName: string; role: string }[] = [];
+        if (so.clinicalLeader) impls.push({ ...so.clinicalLeader, role: 'Líder clínico' });
+        if (so.financialLeader && so.financialLeader.id !== so.clinicalLeader?.id)
+          impls.push({ ...so.financialLeader, role: 'Líder financiero' });
+        (so.implementers ?? []).forEach((i: any) => {
+          if (!impls.find(x => x.id === i.user.id))
+            impls.push({ ...i.user, role: i.role === 'lider_clinico' ? 'Líder clínico' : i.role === 'apoyo' ? 'Apoyo' : i.role });
+        });
+        setSoImplementers(impls);
+      })
+      .catch(() => setSoImplementers([]));
+  }, [form.serviceOrderId]);
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -194,12 +214,32 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
           {/* Agente + Estado */}
           <div className={`grid gap-3 ${isEdit ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Agente *</label>
+              <label className="text-xs font-semibold flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
+                Agente *
+                {soImplementers.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
+                    style={{ background: '#2563eb18', color: '#60a5fa' }}>
+                    Implementadores de la OS
+                  </span>
+                )}
+              </label>
               <select className="input-glass rounded-xl px-3 py-2.5 text-sm"
                 value={form.agenteId} onChange={e => set('agenteId', e.target.value)}>
                 <option value="">— Seleccionar —</option>
-                {agents.map(a => <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>)}
+                {soImplementers.length > 0
+                  ? soImplementers.map(a => (
+                    <option key={a.id} value={a.id}>{a.firstName} {a.lastName} ({a.role})</option>
+                  ))
+                  : agents.map(a => <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>)
+                }
               </select>
+              {soImplementers.length > 0 && (
+                <button type="button" onClick={() => setSoImplementers([])}
+                  className="text-[11px] text-left hover:opacity-70 transition-opacity"
+                  style={{ color: '#94a3b8' }}>
+                  Ver todos los agentes →
+                </button>
+              )}
             </div>
             {isEdit && (
               <div className="flex flex-col gap-1.5">
@@ -336,10 +376,11 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
 }
 
 // ── Day View Modal ────────────────────────────────────────────────────────────
-function DayModal({ day, bloques, onClose, onEdit, onNew, selectionMode, selectedIds, onToggle }: {
+function DayModal({ day, bloques, onClose, onEdit, onNew, selectionMode, selectedIds, onToggle, onEnterSelectionMode }: {
   day: Dayjs; bloques: Bloque[];
   onClose: () => void; onEdit: (b: Bloque) => void; onNew: () => void;
   selectionMode?: boolean; selectedIds?: Set<string>; onToggle?: (id: string, e: React.MouseEvent) => void;
+  onEnterSelectionMode?: () => void;
 }) {
   if (typeof window === 'undefined') return null;
 
@@ -399,6 +440,19 @@ function DayModal({ day, bloques, onClose, onEdit, onNew, selectionMode, selecte
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {!selectionMode && onEnterSelectionMode && bloques.length > 0 && (
+              <button onClick={onEnterSelectionMode}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+                <CheckSquare className="w-3.5 h-3.5" /> Seleccionar
+              </button>
+            )}
+            {selectionMode && (
+              <span className="text-xs font-semibold px-2.5 py-1.5 rounded-xl"
+                style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+                Modo selección activo
+              </span>
+            )}
             <button onClick={() => { onNew(); onClose(); }}
               className="btn-primary flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white">
               <Plus className="w-3.5 h-3.5" /> Nuevo bloque
@@ -516,6 +570,7 @@ function DayModal({ day, bloques, onClose, onEdit, onNew, selectionMode, selecte
 export default function CronogramaPage() {
   useTheme();
   const router = useRouter();
+  const { user } = useAuthStore();
   const [view, setView] = useState<'month' | 'week'>('month');
   const [current, setCurrent] = useState<Dayjs>(dayjs());
   const [bloques, setBloques] = useState<Bloque[]>([]);
@@ -909,6 +964,7 @@ export default function CronogramaPage() {
             selectionMode={selectionMode}
             selectedIds={selectedIds}
             onToggle={toggleSelect}
+            onEnterSelectionMode={() => setSelectionMode(true)}
           />
         )}
       </AnimatePresence>
@@ -922,6 +978,7 @@ export default function CronogramaPage() {
         onSave={handleSave}
         onDelete={modalInitial?.id ? handleDelete : undefined}
         onCrearActa={handleCrearActa}
+        currentUserId={user?.id}
       />
 
       {/* Barra flotante de eliminación masiva */}

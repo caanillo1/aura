@@ -1,9 +1,18 @@
 ﻿import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
 import { CronogramaService } from './cronograma.service';
-import { CronogramaController } from './cronograma.controller';
+import { CronogramaController, CronogramaPublicController } from './cronograma.controller';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  controllers: [CronogramaController],
+  imports: [
+    MailModule,
+    JwtModule.register({
+      secret: process.env.JWT_SECRET ?? 'aura_secret',
+      signOptions: { expiresIn: '7d' },
+    }),
+  ],
+  controllers: [CronogramaPublicController, CronogramaController],
   providers: [CronogramaService],
 })
 export class CronogramaModule {}

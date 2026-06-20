@@ -1,10 +1,17 @@
 ﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import dayjs from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateBloqueDto, UpdateBloqueDto, BloqueFilterDto } from './dto/cronograma.dto';
+import { MailService } from '../mail/mail.service';
+import { CreateBloqueDto, UpdateBloqueDto, BloqueFilterDto, RespondVisitDto } from './dto/cronograma.dto';
 
 @Injectable()
 export class CronogramaService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mail: MailService,
+    private jwtService: JwtService,
+  ) {}
 
   private bloqueSelect = {
     id: true, titulo: true, fecha: true, horaInicio: true, horaFin: true,
@@ -42,7 +49,7 @@ export class CronogramaService {
 
   async create(companyId: string, userId: string, dto: CreateBloqueDto) {
     await this.checkOverlap(companyId, dto.agenteId, dto.fecha, dto.horaInicio, dto.horaFin);
-    return this.prisma.cronogramaBloque.create({
+    const bloque = await this.prisma.cronogramaBloque.create({
       data: {
         titulo: dto.titulo,
         fecha: new Date(dto.fecha), horaInicio: dto.horaInicio, horaFin: dto.horaFin,
@@ -57,6 +64,96 @@ export class CronogramaService {
       },
       select: this.bloqueSelect,
     });
+    this.sendVisitEmail(companyId, bloque).catch(() => {}); // no bloquear respuesta
+    return bloque;
+  }
+
+  private async sendVisitEmail(companyId: string, bloque: any) {
+    const agente = await this.prisma.user.findUnique({
+      where: { id: bloque.agente.id },
+      select: { email: true, firstName: true },
+    });
+    if (!agente?.email) return;
+
+    const payload = {
+      bloqueId: bloque.id, companyId,
+      nombre: agente.firstName,
+      titulo: bloque.titulo,
+      fecha: bloque.fecha,
+      horaInicio: bloque.horaInicio,
+      horaFin: bloque.horaFin,
+      clienteNombre: bloque.client?.businessName ?? null,
+    };
+    const token = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+    const frontUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const acceptUrl = `${frontUrl}/cronograma/responder?token=${token}&action=accept`;
+    const cancelUrl = `${frontUrl}/cronograma/responder?token=${token}&action=cancel`;
+
+    const fechaFmt = dayjs(bloque.fecha).format('DD/MM/YYYY');
+    const clienteNombre = bloque.client?.businessName ?? 'Sin cliente';
+    const soInfo = bloque.serviceOrder ? `OS ${bloque.serviceOrder.osNumber} — ${bloque.serviceOrder.product}` : '';
+
+    const html = `
+<div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a1628;color:#e2e8f0;border-radius:16px;overflow:hidden">
+  <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:32px 28px">
+    <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff">Nueva visita programada</h1>
+    <p style="margin:8px 0 0;font-size:14px;color:#93c5fd">Tienes una cita agendada en el cronograma</p>
+  </div>
+  <div style="padding:28px">
+    <p style="margin:0 0 20px;font-size:15px;color:#cbd5e1">Hola <strong style="color:#e2e8f0">${agente.firstName}</strong>,</p>
+    <div style="background:#0f2040;border:1px solid #1e3a5f;border-radius:12px;padding:20px;margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse">
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px;width:120px">Actividad</td><td style="padding:6px 0;font-size:14px;font-weight:600;color:#e2e8f0">${bloque.titulo}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Fecha</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${fechaFmt}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Horario</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${bloque.horaInicio} – ${bloque.horaFin}</td></tr>
+        <tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Cliente</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${clienteNombre}</td></tr>
+        ${soInfo ? `<tr><td style="padding:6px 0;color:#94a3b8;font-size:13px">Orden</td><td style="padding:6px 0;font-size:14px;color:#e2e8f0">${soInfo}</td></tr>` : ''}
+      </table>
+    </div>
+    <p style="margin:0 0 20px;font-size:14px;color:#94a3b8">Por favor confirma tu disponibilidad para esta visita:</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <a href="${acceptUrl}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:700;font-size:14px">✓ Confirmar visita</a>
+      <a href="${cancelUrl}" style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;padding:12px 28px;border-radius:10px;font-weight:700;font-size:14px">✗ Cancelar visita</a>
+    </div>
+    <p style="margin:24px 0 0;font-size:12px;color:#475569">Este enlace expira en 7 días. Si no reconoces esta solicitud, ignora este correo.</p>
+  </div>
+</div>`;
+
+    await this.mail.sendFromCompany(companyId, [agente.email], `Visita agendada: ${bloque.titulo} — ${fechaFmt}`, html);
+  }
+
+  async respondToVisit(dto: RespondVisitDto) {
+    let payload: { bloqueId: string; companyId: string };
+    try {
+      payload = this.jwtService.verify(dto.token) as { bloqueId: string; companyId: string };
+    } catch {
+      throw new BadRequestException('El enlace ha expirado o no es válido.');
+    }
+
+    const bloque = await this.prisma.cronogramaBloque.findFirst({
+      where: { id: payload.bloqueId, companyId: payload.companyId },
+      select: { id: true, status: true, titulo: true },
+    });
+    if (!bloque) throw new NotFoundException('Bloque no encontrado.');
+
+    if (dto.action === 'accept') {
+      await this.prisma.cronogramaBloque.update({
+        where: { id: bloque.id },
+        data: { status: 'programado' },
+      });
+      return { ok: true, message: 'Visita confirmada. ¡Hasta pronto!' };
+    }
+
+    // cancel
+    const notas = dto.motivo
+      ? `Cancelado por el agente. Motivo: ${dto.motivo}`
+      : 'Cancelado por el agente.';
+    await this.prisma.cronogramaBloque.update({
+      where: { id: bloque.id },
+      data: { status: 'cancelado', notas },
+    });
+    return { ok: true, message: 'Visita cancelada y registrada en el sistema.' };
   }
 
   async update(companyId: string, id: string, dto: UpdateBloqueDto) {

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import {
   ChevronLeft, ChevronRight, Plus, X, CheckCircle2, Loader2,
-  Trash2, FileText,
+  Trash2, FileText, Check, Square, CheckSquare,
 } from 'lucide-react';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/es';
@@ -336,9 +336,10 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
 }
 
 // ── Day View Modal ────────────────────────────────────────────────────────────
-function DayModal({ day, bloques, onClose, onEdit, onNew }: {
+function DayModal({ day, bloques, onClose, onEdit, onNew, selectionMode, selectedIds, onToggle }: {
   day: Dayjs; bloques: Bloque[];
   onClose: () => void; onEdit: (b: Bloque) => void; onNew: () => void;
+  selectionMode?: boolean; selectedIds?: Set<string>; onToggle?: (id: string, e: React.MouseEvent) => void;
 }) {
   if (typeof window === 'undefined') return null;
 
@@ -442,18 +443,27 @@ function DayModal({ day, bloques, onClose, onEdit, onNew }: {
 
                   {/* Bloques del agente */}
                   <div className="flex flex-col gap-2 overflow-y-auto flex-1">
-                    {group.items.map(b => {
+                    {group.items.map((b: Bloque) => {
                       const tc = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
                       const sc = STATUS_COLOR[b.status] ?? '#60a5fa';
+                      const isSel = selectedIds?.has(b.id) ?? false;
                       return (
                         <div key={b.id}
-                          onClick={() => { onEdit(b); onClose(); }}
-                          className="rounded-xl p-3 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+                          onClick={e => selectionMode
+                            ? onToggle?.(b.id, e)
+                            : (onEdit(b), onClose())}
+                          className="rounded-xl p-3 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] relative"
                           style={{
-                            background: `${b.color}12`,
-                            border: `1px solid ${b.color}20`,
+                            background: isSel ? `${b.color}28` : `${b.color}12`,
+                            border: isSel ? `2px solid ${b.color}` : `1px solid ${b.color}20`,
                             borderLeft: `3px solid ${b.color}`,
                           }}>
+                          {selectionMode && (
+                            <div className="absolute top-2 right-2 w-4 h-4 rounded border-2 flex items-center justify-center shrink-0"
+                              style={{ background: isSel ? b.color : 'transparent', borderColor: isSel ? b.color : `${b.color}60` }}>
+                              {isSel && <Check className="w-2.5 h-2.5 text-white" />}
+                            </div>
+                          )}
                           {/* Horario */}
                           <p className="text-[11px] font-mono font-bold" style={{ color: b.color }}>
                             {b.horaInicio} – {b.horaFin}
@@ -480,7 +490,7 @@ function DayModal({ day, bloques, onClose, onEdit, onNew }: {
                                 {tc.label.replace('Acta de ','').replace('Entrega a ','')}
                               </span>
                             )}
-                            {b.actaId && (
+                            {!selectionMode && b.actaId && (
                               <span className="flex items-center gap-0.5 text-[9px] font-semibold"
                                 style={{ color: '#34d399' }}>
                                 <CheckCircle2 className="w-2.5 h-2.5" /> Acta
@@ -516,6 +526,8 @@ export default function CronogramaPage() {
   const [modalInitial, setModalInitial] = useState<any>(null);
   const [filterAgente, setFilterAgente] = useState('');
   const [dayView, setDayView] = useState<Dayjs | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     try {
@@ -561,6 +573,41 @@ export default function CronogramaPage() {
     toast.success('Bloque eliminado');
   };
 
+  const toggleSelect = useCallback((id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleDaySelect = (bbs: Bloque[], e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ids = bbs.map(b => b.id);
+    const allSelected = ids.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      allSelected ? ids.forEach(id => next.delete(id)) : ids.forEach(id => next.add(id));
+      return next;
+    });
+  };
+
+  const exitSelection = () => { setSelectionMode(false); setSelectedIds(new Set()); };
+
+  const handleBulkDelete = async () => {
+    const count = selectedIds.size;
+    if (!confirm(`¿Eliminar ${count} bloque${count !== 1 ? 's' : ''} seleccionado${count !== 1 ? 's' : ''}? Esta acción no se puede deshacer.`)) return;
+    try {
+      await Promise.all([...selectedIds].map(id => cronogramaApi.remove(id)));
+      setBloques(p => p.filter(b => !selectedIds.has(b.id)));
+      toast.success(`${count} bloque${count !== 1 ? 's' : ''} eliminado${count !== 1 ? 's' : ''}`);
+      exitSelection();
+    } catch {
+      toast.error('Error al eliminar los bloques');
+    }
+  };
+
   const handleCrearActa = (b: Bloque) => {
     if (b.serviceOrder?.project?.id) {
       router.push(`/implementacion/proyectos/${b.serviceOrder.project.id}/actas?tipo=${b.tipoActa}&bloqueId=${b.id}`);
@@ -595,49 +642,82 @@ export default function CronogramaPage() {
                 const isToday = day.format('YYYY-MM-DD') === today;
                 const isThisMonth = day.month() === current.month();
                 const bbs = bloquesEnFecha(day);
-                return (
-                  <div key={di}
-                    className="flex flex-col overflow-hidden cursor-pointer group"
-                    style={{
-                      borderRight: '1px solid var(--border-subtle)',
-                      background: !isThisMonth ? 'rgba(0,0,0,0.03)' : 'transparent',
-                      minHeight: 0,
-                    }}
-                    onClick={() => setDayView(day)}>
-
-                    {/* Número del día */}
-                    <div className="flex items-center justify-between px-1.5 py-1 shrink-0">
-                      <span className="text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shrink-0"
+                return (() => {
+                    const dayAllSelected = bbs.length > 0 && bbs.every(b => selectedIds.has(b.id));
+                    return (
+                      <div key={di}
+                        className="flex flex-col overflow-hidden cursor-pointer group"
                         style={{
-                          background: isToday ? '#2563EB' : 'transparent',
-                          color: isToday ? '#fff' : isThisMonth ? 'var(--text-primary)' : 'var(--text-muted)',
-                        }}>
-                        {day.date()}
-                      </span>
-                      <button
-                        onClick={e => { e.stopPropagation(); openNew(day.format('YYYY-MM-DD')); }}
-                        className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                        style={{ background: 'var(--accent-blue-bg)', color: 'var(--accent-blue)' }}>
-                        <Plus className="w-2.5 h-2.5" />
-                      </button>
-                    </div>
+                          borderRight: '1px solid var(--border-subtle)',
+                          background: selectionMode && dayAllSelected && bbs.length > 0
+                            ? 'rgba(37,99,235,0.08)'
+                            : !isThisMonth ? 'rgba(0,0,0,0.03)' : 'transparent',
+                          minHeight: 0,
+                          outline: selectionMode && dayAllSelected && bbs.length > 0
+                            ? '2px solid rgba(37,99,235,0.4)' : 'none',
+                          outlineOffset: -1,
+                        }}
+                        onClick={e => selectionMode && bbs.length > 0
+                          ? toggleDaySelect(bbs, e)
+                          : setDayView(day)}>
 
-                    {/* Puntos de color — uno por actividad, caben dentro del recuadro */}
-                    {bbs.length > 0 && (
-                      <div className="flex-1 overflow-hidden flex flex-wrap gap-1 content-start px-2 pt-0.5 pb-1.5"
-                        style={{ opacity: isThisMonth ? 1 : 0.35 }}>
-                        {bbs.map(b => (
-                          <span
-                            key={b.id}
-                            className="w-2.5 h-2.5 rounded-full shrink-0 transition-transform group-hover:scale-110"
-                            style={{ background: b.color }}
-                            title={`${b.horaInicio}–${b.horaFin} · ${b.titulo} · ${b.agente.firstName} ${b.agente.lastName}`}
-                          />
-                        ))}
+                        {/* Número del día */}
+                        <div className="flex items-center justify-between px-1.5 py-1 shrink-0">
+                          <span className="text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shrink-0"
+                            style={{
+                              background: isToday ? '#2563EB' : 'transparent',
+                              color: isToday ? '#fff' : isThisMonth ? 'var(--text-primary)' : 'var(--text-muted)',
+                            }}>
+                            {day.date()}
+                          </span>
+                          {selectionMode
+                            ? (bbs.length > 0 && (
+                              <div className="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors"
+                                style={{
+                                  background: dayAllSelected ? '#2563EB' : 'transparent',
+                                  borderColor: dayAllSelected ? '#2563EB' : 'var(--border-subtle)',
+                                }}>
+                                {dayAllSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                              </div>
+                            ))
+                            : (
+                              <button
+                                onClick={e => { e.stopPropagation(); openNew(day.format('YYYY-MM-DD')); }}
+                                className="w-4 h-4 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                style={{ background: 'var(--accent-blue-bg)', color: 'var(--accent-blue)' }}>
+                                <Plus className="w-2.5 h-2.5" />
+                              </button>
+                            )
+                          }
+                        </div>
+
+                        {/* Puntos de color — uno por actividad */}
+                        {bbs.length > 0 && (
+                          <div className="flex-1 overflow-hidden flex flex-wrap gap-1 content-start px-2 pt-0.5 pb-1.5"
+                            style={{ opacity: isThisMonth ? 1 : 0.35 }}>
+                            {bbs.map(b => {
+                              const isSel = selectedIds.has(b.id);
+                              return (
+                                <span
+                                  key={b.id}
+                                  className="w-2.5 h-2.5 rounded-full shrink-0 transition-all"
+                                  style={{
+                                    background: b.color,
+                                    outline: isSel ? `2px solid #fff` : 'none',
+                                    outlineOffset: 1,
+                                    transform: isSel ? 'scale(1.35)' : undefined,
+                                    boxShadow: isSel ? `0 0 0 3px ${b.color}60` : 'none',
+                                  }}
+                                  onClick={e => selectionMode ? toggleSelect(b.id, e) : undefined}
+                                  title={`${b.horaInicio}–${b.horaFin} · ${b.titulo} · ${b.agente.firstName} ${b.agente.lastName}`}
+                                />
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
+                    );
+                })();
               })}
             </div>
           ))}
@@ -692,18 +772,34 @@ export default function CronogramaPage() {
                     const topPct = minToFraction(b.horaInicio);
                     const htPct  = minToFraction(b.horaFin) - topPct;
                     const tc     = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
+                    const isSel  = selectedIds.has(b.id);
                     return (
                       <motion.div key={b.id}
                         initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
                         className="absolute left-1 right-1 rounded-lg px-2 py-1 overflow-hidden cursor-pointer"
-                        style={{ top: topPct * SLOT_H * HOURS.length, height: Math.max(htPct * SLOT_H * HOURS.length, 28), background: `${b.color}22`, border: `1px solid ${b.color}55`, borderLeft: `3px solid ${b.color}`, zIndex: 10 }}
-                        onClick={() => openEdit(b)}
+                        style={{
+                          top: topPct * SLOT_H * HOURS.length,
+                          height: Math.max(htPct * SLOT_H * HOURS.length, 28),
+                          background: isSel ? `${b.color}40` : `${b.color}22`,
+                          border: isSel ? `2px solid ${b.color}` : `1px solid ${b.color}55`,
+                          borderLeft: `3px solid ${b.color}`,
+                          zIndex: 10,
+                          outline: isSel ? `2px solid ${b.color}60` : 'none',
+                          outlineOffset: 2,
+                        }}
+                        onClick={e => selectionMode ? toggleSelect(b.id, e) : openEdit(b)}
                       >
+                        {selectionMode && (
+                          <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded border-2 flex items-center justify-center"
+                            style={{ background: isSel ? b.color : 'transparent', borderColor: isSel ? b.color : `${b.color}80` }}>
+                            {isSel && <Check className="w-2 h-2 text-white" />}
+                          </div>
+                        )}
                         <p className="text-[10px] font-bold truncate" style={{ color: b.color }}>{b.horaInicio}–{b.horaFin}</p>
                         <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{b.titulo}</p>
                         {b.client && <p className="text-[9px] truncate" style={{ color: 'var(--text-muted)' }}>{b.client.businessName}</p>}
                         {tc && <span className="text-[9px] font-bold px-1 rounded mt-0.5 inline-block" style={{ background: `${tc.color}22`, color: tc.color }}>{tc.label.replace('Acta de ','').replace('Entrega a ','')}</span>}
-                        {b.actaId && <CheckCircle2 className="w-3 h-3 absolute top-1 right-1" style={{ color: '#34d399' }} />}
+                        {!selectionMode && b.actaId && <CheckCircle2 className="w-3 h-3 absolute top-1 right-1" style={{ color: '#34d399' }} />}
                       </motion.div>
                     );
                   })}
@@ -757,6 +853,16 @@ export default function CronogramaPage() {
               </button>
             ))}
           </div>
+          <button
+            onClick={() => selectionMode ? exitSelection() : setSelectionMode(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            style={{
+              background: selectionMode ? 'rgba(239,68,68,0.1)' : 'var(--surface-2)',
+              color: selectionMode ? '#ef4444' : 'var(--text-secondary)',
+              border: `1px solid ${selectionMode ? 'rgba(239,68,68,0.3)' : 'var(--border-subtle)'}`,
+            }}>
+            {selectionMode ? <><X className="w-3.5 h-3.5" /> Cancelar</> : <><CheckSquare className="w-3.5 h-3.5" /> Seleccionar</>}
+          </button>
           <button onClick={() => openNew()}
             className="btn-primary flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white">
             <Plus className="w-3.5 h-3.5" /> Nuevo bloque
@@ -800,6 +906,9 @@ export default function CronogramaPage() {
             onClose={() => setDayView(null)}
             onEdit={b => { setDayView(null); openEdit(b); }}
             onNew={() => { openNew(dayView.format('YYYY-MM-DD')); setDayView(null); }}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onToggle={toggleSelect}
           />
         )}
       </AnimatePresence>
@@ -814,6 +923,43 @@ export default function CronogramaPage() {
         onDelete={modalInitial?.id ? handleDelete : undefined}
         onCrearActa={handleCrearActa}
       />
+
+      {/* Barra flotante de eliminación masiva */}
+      <AnimatePresence>
+        {selectionMode && selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.95 }}
+            transition={{ duration: 0.18 }}
+            className="fixed bottom-6 left-1/2 z-[700] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl"
+            style={{
+              transform: 'translateX(-50%)',
+              background: 'var(--card-bg)',
+              border: '1px solid var(--card-border)',
+              backdropFilter: 'blur(24px)',
+              boxShadow: '0 12px 48px rgba(0,0,0,0.4)',
+            }}>
+            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+            </span>
+            <div className="w-px h-5 shrink-0" style={{ background: 'var(--border-subtle)' }} />
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs font-semibold hover:opacity-70 transition-opacity"
+              style={{ color: 'var(--text-muted)' }}>
+              Deseleccionar todos
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90"
+              style={{ background: '#ef4444' }}>
+              <Trash2 className="w-3.5 h-3.5" />
+              Eliminar
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

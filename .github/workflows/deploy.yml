@@ -105,7 +105,7 @@ jobs:
             pnpm install --frozen-lockfile
             pnpm --filter backend build
             cd apps\backend
-            npx prisma migrate deploy
+            npx prisma db push --accept-data-loss
             cd C:\AURA
             pm2 describe aura-backend >nul 2>&1 && pm2 restart aura-backend --update-env || pm2 start apps\backend\dist\main.js --name aura-backend
             pm2 save

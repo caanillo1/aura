@@ -8,6 +8,8 @@
 name: Deploy
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       target:
@@ -102,8 +104,10 @@ jobs:
             git pull origin main
             pnpm install --frozen-lockfile
             pnpm --filter backend build
+            cd apps\backend
             npx prisma migrate deploy
-            pm2 restart aura-backend --update-env
+            cd C:\AURA
+            pm2 describe aura-backend >nul 2>&1 && pm2 restart aura-backend --update-env || pm2 start apps\backend\dist\main.js --name aura-backend
             pm2 save
 
   # ─── NOTIFY ─────────────────────────────────────────────────────────────────

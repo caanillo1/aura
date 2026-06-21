@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate, buildMeta } from '../common/dto/pagination.dto';
 import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto } from './dto/project.dto';
@@ -8,6 +8,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ProjectsService {
+  private readonly logger = new Logger(ProjectsService.name);
   constructor(
     private prisma: PrismaService,
     private gateway: EventsGateway,
@@ -281,17 +282,27 @@ export class ProjectsService {
     });
     if (!activity) throw new NotFoundException('Actividad no encontrada');
 
-    await Promise.all([
-      this.prisma.subActivity.deleteMany({ where: { activityId } }),
-      this.prisma.activityThread.deleteMany({ where: { activityId } }),
-      this.prisma.activityBlockLog.deleteMany({ where: { activityId } }),
-      this.prisma.visitActivity.deleteMany({ where: { activityId } }),
-      this.prisma.actaActividad.deleteMany({ where: { activityId } }),
-      this.prisma.activityDependency.deleteMany({
-        where: { OR: [{ activityId }, { dependsOnActivityId: activityId }] },
-      }),
-    ]);
-    await this.prisma.activity.delete({ where: { id: activityId } });
+    try {
+      // Nullify nullable activityId references that may have DB-level FKs
+      // not reflected in the Prisma schema (from a previous db push)
+      await this.prisma.$executeRaw`UPDATE Requerimientos SET activityId = NULL WHERE activityId = ${activityId}`;
+      await this.prisma.$executeRaw`UPDATE ActaCompromisos SET activityId = NULL WHERE activityId = ${activityId}`;
+
+      await Promise.all([
+        this.prisma.subActivity.deleteMany({ where: { activityId } }),
+        this.prisma.activityThread.deleteMany({ where: { activityId } }),
+        this.prisma.activityBlockLog.deleteMany({ where: { activityId } }),
+        this.prisma.visitActivity.deleteMany({ where: { activityId } }),
+        this.prisma.actaActividad.deleteMany({ where: { activityId } }),
+        this.prisma.activityDependency.deleteMany({
+          where: { OR: [{ activityId }, { dependsOnActivityId: activityId }] },
+        }),
+      ]);
+      await this.prisma.activity.delete({ where: { id: activityId } });
+    } catch (e: any) {
+      this.logger.error(`deleteActivity(${activityId}) failed: ${e?.message}`, e?.stack);
+      throw new InternalServerErrorException(e?.message ?? 'Error al eliminar la actividad');
+    }
     await this.recalcPhase(activity.phaseId);
     return { message: 'Actividad eliminada' };
   }

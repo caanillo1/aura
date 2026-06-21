@@ -51,11 +51,13 @@ interface Recommendation {
 interface TicketItem {
   id: string; numero: string; titulo: string; prioridad: string;
   estadoActual: string; ticketRubi: string | null; tipo: string;
+  vinculadoAEstaOS?: boolean;
 }
 
 interface TicketsDetail {
   total: number; entregados: number; devueltos: number; negados: number;
-  pendientes: number; altaPrioridad: number; list: TicketItem[];
+  pendientes: number; altaPrioridad: number; vinculadosAOs: number;
+  list: TicketItem[];
 }
 
 type RiskLevel = 'alto' | 'medio' | 'normal';
@@ -909,7 +911,21 @@ export default function AnalisisPage() {
             {/* ── 9. Tickets / Requerimientos ────────────────────────────── */}
             {tickets && tickets.total > 0 && (
               <div>
-                <SectionTitle icon={Ticket} title={`Requerimientos / Tickets (${tickets.total})`} />
+                <SectionTitle icon={Ticket}
+                  title={tickets.vinculadosAOs > 0
+                    ? `Requerimientos / Tickets (${tickets.total})`
+                    : `Requerimientos del cliente (${tickets.total})`} />
+
+                {/* Aviso cuando los tickets vienen del cliente, no de la OS */}
+                {tickets.vinculadosAOs === 0 && (
+                  <div className="flex items-center gap-2 mb-3 px-4 py-2.5 rounded-xl"
+                    style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
+                    <Info className="w-4 h-4 shrink-0" style={{ color: '#60a5fa' }} />
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      Ningún requerimiento está vinculado directamente a esta OS — se muestran los del cliente. Para vincularlos, edítalos desde Requerimientos.
+                    </p>
+                  </div>
+                )}
 
                 {/* KPIs de tickets */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -947,8 +963,8 @@ export default function AnalisisPage() {
                       const prioColor  = TICKET_PRIO_COLOR[t.prioridad]    ?? '#94a3b8';
                       return (
                         <div key={t.id} className="px-4 py-3 flex items-start gap-3">
-                          <div className="shrink-0 pt-0.5">
-                            <div className="w-2 h-2 rounded-full mt-1.5" style={{ background: prioColor }} />
+                          <div className="shrink-0">
+                            <div className="w-2 h-2 rounded-full mt-2" style={{ background: prioColor }} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap mb-0.5">
@@ -960,18 +976,22 @@ export default function AnalisisPage() {
                                   <ExternalLink className="w-3 h-3 inline mr-0.5" />{t.ticketRubi}
                                 </span>
                               )}
-                              <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                                {t.tipo}
-                              </span>
+                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t.tipo}</span>
+                              {t.vinculadoAEstaOS && (
+                                <span className="text-xs px-1.5 py-0.5 rounded font-bold"
+                                  style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
+                                  esta OS
+                                </span>
+                              )}
                             </div>
-                            <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{t.titulo}</p>
+                            <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{t.titulo}</p>
                           </div>
-                          <div className="shrink-0 flex flex-col items-end gap-1">
-                            <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          <div className="shrink-0 flex flex-col items-end gap-1.5 ml-2">
+                            <span className="text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
                               style={{ background: `${estadoColor}18`, color: estadoColor }}>
                               {t.estadoActual}
                             </span>
-                            <span className="text-xs font-medium" style={{ color: prioColor }}>
+                            <span className="text-xs font-semibold" style={{ color: prioColor }}>
                               {t.prioridad}
                             </span>
                           </div>

@@ -724,6 +724,15 @@ export class ServiceOrdersService {
 
     if (!os) throw new Error('OS no encontrada');
 
+    // Si no hay tickets vinculados directamente a la OS, buscar por cliente
+    const reqsRaw = reqs.length > 0 ? reqs
+      : await this.prisma.requerimiento.findMany({
+          where: { clientId: os.client.id },
+          select: { id: true, numero: true, titulo: true, prioridad: true,
+                    estadoActual: true, ticketRubi: true, tipo: true, serviceOrderId: true },
+          orderBy: [{ prioridad: 'asc' }, { estadoActual: 'asc' }],
+        });
+
     type Alert = { level: 'critico' | 'advertencia' | 'info'; tipo: string; titulo: string; detalle: string };
     const alerts: Alert[] = [];
 
@@ -779,7 +788,7 @@ export class ServiceOrdersService {
     }
 
     // ── 6. Tickets devueltos sin resolver ────────────────────────────────────
-    const reqDevueltos = reqs.filter(r => r.estadoActual === 'Devuelto').length;
+    const reqDevueltos = reqsRaw.filter(r => r.estadoActual === 'Devuelto').length;
     if (reqDevueltos > 0) {
       alerts.push({ level: 'advertencia', tipo: 'tickets_devueltos',
         titulo: `${reqDevueltos} requerimiento${reqDevueltos !== 1 ? 's' : ''} devuelto${reqDevueltos !== 1 ? 's' : ''}`,
@@ -808,19 +817,21 @@ export class ServiceOrdersService {
 
     // ── Resumen de tickets (requerimientos) ──────────────────────────────────
     const PRIO_ORDER: Record<string, number> = { Alta: 0, Media: 1, Baja: 2 };
-    const reqsSorted = [...reqs].sort((a, b) =>
+    const reqsSorted = [...reqsRaw].sort((a, b) =>
       (PRIO_ORDER[a.prioridad] ?? 1) - (PRIO_ORDER[b.prioridad] ?? 1));
     const ticketsDetail = {
-      total:      reqs.length,
-      entregados: reqs.filter(r => r.estadoActual === 'Entregado').length,
-      devueltos:  reqs.filter(r => r.estadoActual === 'Devuelto').length,
-      negados:    reqs.filter(r => r.estadoActual === 'Negado').length,
-      pendientes: reqs.filter(r => !['Entregado', 'Negado'].includes(r.estadoActual)).length,
-      altaPrioridad: reqs.filter(r => r.prioridad === 'Alta').length,
+      total:        reqsRaw.length,
+      entregados:   reqsRaw.filter(r => r.estadoActual === 'Entregado').length,
+      devueltos:    reqsRaw.filter(r => r.estadoActual === 'Devuelto').length,
+      negados:      reqsRaw.filter(r => r.estadoActual === 'Negado').length,
+      pendientes:   reqsRaw.filter(r => !['Entregado', 'Negado'].includes(r.estadoActual)).length,
+      altaPrioridad:reqsRaw.filter(r => r.prioridad === 'Alta').length,
+      vinculadosAOs: reqs.length,
       list: reqsSorted.slice(0, 25).map(r => ({
         id: r.id, numero: r.numero, titulo: r.titulo,
         prioridad: r.prioridad, estadoActual: r.estadoActual,
         ticketRubi: r.ticketRubi, tipo: r.tipo,
+        vinculadoAEstaOS: (r as any).serviceOrderId === osId || !!(reqs.find((rr: any) => rr.id === r.id)),
       })),
     };
 

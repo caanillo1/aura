@@ -52,7 +52,7 @@ interface Recommendation {
 interface TicketItem {
   id: string; numero: string; titulo: string; prioridad: string;
   estadoActual: string; ticketRubi: string | null; tipo: string;
-  vinculadoAEstaOS?: boolean;
+  devueltoPor?: string | null; vinculadoAEstaOS?: boolean;
 }
 
 interface TicketsDetail {
@@ -63,6 +63,8 @@ interface TicketsDetail {
 
 interface DelayAttribution {
   clientePct: number; implementadorPct: number;
+  clientDelayDays: number;
+  blockedByBreakdown: { cliente: number; desarrollo: number; implementador: number; sinAtribuir: number };
   signals: { ticketsDevueltos: number; visitasCanceladas: number; actividadesBloqueadas: number; actividadesVencidas: number };
 }
 
@@ -1080,34 +1082,49 @@ export default function AnalisisPage() {
                 <div className="rounded-2xl p-5"
                   style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}>
                   <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-                    Inferido de señales disponibles. No representa una auditoría formal — es una guía para priorizar conversaciones con el equipo.
+                    Basado en señales registradas. No representa una auditoría formal — es una guía para priorizar conversaciones con el equipo.
                   </p>
+
+                  {/* Días reales de retraso por cliente */}
+                  {delayAttrib.clientDelayDays > 0 && (
+                    <div className="flex items-center gap-3 rounded-xl px-4 py-3 mb-4"
+                      style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.25)' }}>
+                      <Timer className="w-4 h-4 shrink-0" style={{ color: '#f97316' }} />
+                      <div>
+                        <p className="text-xs font-bold" style={{ color: '#f97316' }}>
+                          {delayAttrib.clientDelayDays} día{delayAttrib.clientDelayDays !== 1 ? 's' : ''} de retraso real atribuido al cliente
+                        </p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          Tiempo acumulado de bloqueos resueltos donde el cliente fue identificado como responsable
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Barra de atribución */}
-                  <div className="mb-5">
-                    <div className="flex h-4 rounded-full overflow-hidden mb-2">
-                      {delayAttrib.clientePct > 0 && (
-                        <div className="flex items-center justify-center text-xs font-bold text-white transition-all"
-                          style={{ width: `${delayAttrib.clientePct}%`, background: '#f97316',
-                                   minWidth: delayAttrib.clientePct > 10 ? 0 : 0 }}>
-                          {delayAttrib.clientePct >= 15 && `${delayAttrib.clientePct}%`}
-                        </div>
-                      )}
-                      {delayAttrib.implementadorPct > 0 && (
-                        <div className="flex items-center justify-center text-xs font-bold text-white transition-all"
-                          style={{ width: `${delayAttrib.implementadorPct}%`, background: '#6366f1' }}>
-                          {delayAttrib.implementadorPct >= 15 && `${delayAttrib.implementadorPct}%`}
-                        </div>
-                      )}
+                  {(delayAttrib.clientePct > 0 || delayAttrib.implementadorPct > 0) && (
+                    <div className="mb-5">
+                      <div className="flex h-4 rounded-full overflow-hidden mb-2">
+                        {delayAttrib.clientePct > 0 && (
+                          <div className="flex items-center justify-center text-xs font-bold text-white transition-all"
+                            style={{ width: `${delayAttrib.clientePct}%`, background: '#f97316' }}>
+                            {delayAttrib.clientePct >= 15 && `${delayAttrib.clientePct}%`}
+                          </div>
+                        )}
+                        {delayAttrib.implementadorPct > 0 && (
+                          <div className="flex items-center justify-center text-xs font-bold text-white transition-all"
+                            style={{ width: `${delayAttrib.implementadorPct}%`, background: '#6366f1' }}>
+                            {delayAttrib.implementadorPct >= 15 && `${delayAttrib.implementadorPct}%`}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span style={{ color: '#ea580c' }}>Cliente {delayAttrib.clientePct}%</span>
+                        <span style={{ color: '#6366f1' }}>Implementador {delayAttrib.implementadorPct}%</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span style={{ color: '#ea580c' }}>
-                        Cliente {delayAttrib.clientePct}%
-                      </span>
-                      <span style={{ color: '#6366f1' }}>
-                        Implementador {delayAttrib.implementadorPct}%
-                      </span>
-                    </div>
-                  </div>
+                  )}
+
                   {/* Señales detalle */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl p-3"
@@ -1128,6 +1145,14 @@ export default function AnalisisPage() {
                             {delayAttrib.signals.visitasCanceladas}
                           </span>
                         </div>
+                        {delayAttrib.blockedByBreakdown.cliente > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span style={{ color: 'var(--text-muted)' }}>Bloqueadas por cliente</span>
+                            <span className="font-bold" style={{ color: '#ea580c' }}>
+                              {delayAttrib.blockedByBreakdown.cliente}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="rounded-xl p-3"
@@ -1137,17 +1162,35 @@ export default function AnalisisPage() {
                       </p>
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs">
-                          <span style={{ color: 'var(--text-muted)' }}>Actividades bloqueadas</span>
-                          <span className="font-bold" style={{ color: delayAttrib.signals.actividadesBloqueadas > 0 ? '#6366f1' : '#10b981' }}>
-                            {delayAttrib.signals.actividadesBloqueadas}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-xs">
                           <span style={{ color: 'var(--text-muted)' }}>Actividades vencidas</span>
                           <span className="font-bold" style={{ color: delayAttrib.signals.actividadesVencidas > 0 ? '#6366f1' : '#10b981' }}>
                             {delayAttrib.signals.actividadesVencidas}
                           </span>
                         </div>
+                        {delayAttrib.blockedByBreakdown.desarrollo > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span style={{ color: 'var(--text-muted)' }}>Bloqueadas por desarrollo</span>
+                            <span className="font-bold" style={{ color: '#6366f1' }}>
+                              {delayAttrib.blockedByBreakdown.desarrollo}
+                            </span>
+                          </div>
+                        )}
+                        {delayAttrib.blockedByBreakdown.implementador > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span style={{ color: 'var(--text-muted)' }}>Bloqueadas por implementador</span>
+                            <span className="font-bold" style={{ color: '#6366f1' }}>
+                              {delayAttrib.blockedByBreakdown.implementador}
+                            </span>
+                          </div>
+                        )}
+                        {delayAttrib.blockedByBreakdown.sinAtribuir > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span style={{ color: 'var(--text-muted)' }}>Bloqueadas sin atribuir</span>
+                            <span className="font-bold" style={{ color: '#94a3b8' }}>
+                              {delayAttrib.blockedByBreakdown.sinAtribuir}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1244,6 +1287,12 @@ export default function AnalisisPage() {
                               style={{ background: `${estadoColor}18`, color: estadoColor }}>
                               {t.estadoActual}
                             </span>
+                            {t.estadoActual === 'Devuelto' && t.devueltoPor && (
+                              <span className="text-xs px-1.5 py-0.5 rounded font-semibold capitalize whitespace-nowrap"
+                                style={{ background: 'rgba(251,146,60,0.12)', color: '#fb923c' }}>
+                                ← {t.devueltoPor}
+                              </span>
+                            )}
                             <span className="text-xs font-semibold" style={{ color: prioColor }}>
                               {t.prioridad}
                             </span>

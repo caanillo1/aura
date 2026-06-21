@@ -695,6 +695,7 @@ export class ServiceOrdersService {
                     select: {
                       id: true, name: true, code: true, status: true,
                       progressPercent: true, plannedStartDate: true, plannedEndDate: true,
+                      blockedBy: true, clientDelayDays: true,
                       assignedTo: { select: { firstName: true, lastName: true } },
                     },
                   },
@@ -717,7 +718,7 @@ export class ServiceOrdersService {
       this.prisma.requerimiento.findMany({
         where: { serviceOrderId: osId },
         select: { id: true, numero: true, titulo: true, prioridad: true,
-                  estadoActual: true, ticketRubi: true, tipo: true },
+                  estadoActual: true, ticketRubi: true, tipo: true, devueltoPor: true },
         orderBy: [{ prioridad: 'asc' }, { estadoActual: 'asc' }],
       }),
     ]);
@@ -729,7 +730,8 @@ export class ServiceOrdersService {
       : await this.prisma.requerimiento.findMany({
           where: { clientId: os.client.id },
           select: { id: true, numero: true, titulo: true, prioridad: true,
-                    estadoActual: true, ticketRubi: true, tipo: true, serviceOrderId: true },
+                    estadoActual: true, ticketRubi: true, tipo: true,
+                    devueltoPor: true, serviceOrderId: true },
           orderBy: [{ prioridad: 'asc' }, { estadoActual: 'asc' }],
         });
 
@@ -761,6 +763,13 @@ export class ServiceOrdersService {
 
     // ── 3. Actividades bloqueadas ─────────────────────────────────────────────
     const blockedActs = allActivities.filter(a => a.status === 'bloqueado');
+    const blockedByBreakdown = {
+      cliente:       blockedActs.filter(a => (a as any).blockedBy === 'cliente').length,
+      desarrollo:    blockedActs.filter(a => (a as any).blockedBy === 'desarrollo').length,
+      implementador: blockedActs.filter(a => (a as any).blockedBy === 'implementador').length,
+      sinAtribuir:   blockedActs.filter(a => !(a as any).blockedBy).length,
+    };
+    const totalClientDelayDays = allActivities.reduce((s, a) => s + ((a as any).clientDelayDays ?? 0), 0);
     if (blockedActs.length > 0) {
       alerts.push({ level: 'critico', tipo: 'actividades_bloqueadas',
         titulo: `${blockedActs.length} actividad${blockedActs.length !== 1 ? 'es' : ''} bloqueada${blockedActs.length !== 1 ? 's' : ''}`,
@@ -832,6 +841,7 @@ export class ServiceOrdersService {
         id: r.id, numero: r.numero, titulo: r.titulo,
         prioridad: r.prioridad, estadoActual: r.estadoActual,
         ticketRubi: r.ticketRubi, tipo: r.tipo,
+        devueltoPor: (r as any).devueltoPor ?? null,
         vinculadoAEstaOS: (r as any).serviceOrderId === osId || !!(reqs.find((rr: any) => rr.id === r.id)),
       })),
     };
@@ -989,14 +999,17 @@ export class ServiceOrdersService {
     const riskLevel    = criticos >= 1 ? 'alto' : advertencias >= 1 ? 'medio' : 'normal';
 
     // ── Atribución de retraso ────────────────────────────────────────────────
-    // No hay campo "culpable" en la BD — se infiere de señales disponibles
     const visitasCanceladas  = bloques.filter(b => b.status === 'cancelado').length;
-    const clientSignalScore  = reqDevueltos + visitasCanceladas;           // tickets rechazados por cliente + visitas caídas
-    const implSignalScore    = blockedActs.length + overdueActs.length;    // actividades bloqueadas + vencidas
+    // Señales de cliente: tickets devueltos + visitas canceladas + bloqueos por cliente
+    const clientSignalScore  = reqDevueltos + visitasCanceladas + blockedByBreakdown.cliente;
+    // Señales de implementador: bloqueos por desarrollo/implementador + vencidas
+    const implSignalScore    = blockedByBreakdown.desarrollo + blockedByBreakdown.implementador + overdueActs.length;
     const totalSignals       = clientSignalScore + implSignalScore;
-    const delayAttribution   = totalSignals === 0 ? null : {
-      clientePct:      Math.round((clientSignalScore  / totalSignals) * 100),
-      implementadorPct:Math.round((implSignalScore    / totalSignals) * 100),
+    const delayAttribution   = totalSignals === 0 && totalClientDelayDays === 0 ? null : {
+      clientePct:      totalSignals > 0 ? Math.round((clientSignalScore  / totalSignals) * 100) : 0,
+      implementadorPct:totalSignals > 0 ? Math.round((implSignalScore    / totalSignals) * 100) : 0,
+      clientDelayDays: totalClientDelayDays,
+      blockedByBreakdown,
       signals: {
         ticketsDevueltos:    reqDevueltos,
         visitasCanceladas,

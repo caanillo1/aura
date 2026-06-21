@@ -608,6 +608,8 @@ export const requerimientosApi = {
     api.post('/requerimientos/schedule', cfg).then((r) => r.data),
   runScheduleNow: () =>
     api.post('/requerimientos/schedule/run-now').then((r) => r.data),
+  getAnalytics: (params?: { clientId?: string; agenteId?: string; area?: string; tipo?: string; dateFrom?: string; dateTo?: string }) =>
+    api.get('/requerimientos/analytics', { params }).then((r) => r.data),
 };
 
 // ── Reportes ──────────────────────────────────────────────────────────────────

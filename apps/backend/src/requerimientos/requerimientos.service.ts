@@ -538,6 +538,153 @@ export class RequerimientosService {
     return { enviados: reqs.length, destinatarios: dto.destinatarios.length };
   }
 
+  async getAnalytics(companyId: string, filters: { clientId?: string; agenteId?: string; area?: string; tipo?: string; dateFrom?: string; dateTo?: string }) {
+    const where: any = { companyId };
+    if (filters.clientId)  where.clientId  = filters.clientId;
+    if (filters.agenteId)  where.agenteId  = filters.agenteId;
+    if (filters.area)      where.area      = filters.area;
+    if (filters.tipo)      where.tipo      = filters.tipo;
+    if (filters.dateFrom || filters.dateTo) {
+      where.createdAt = {};
+      if (filters.dateFrom) where.createdAt.gte = new Date(filters.dateFrom);
+      if (filters.dateTo)   where.createdAt.lte = new Date(filters.dateTo + 'T23:59:59');
+    }
+
+    const all = await this.prisma.requerimiento.findMany({
+      where,
+      select: {
+        id: true, estadoActual: true, prioridad: true, area: true, tipo: true,
+        createdAt: true, devueltoPor: true, ticketRubi: true,
+        client:         { select: { id: true, businessName: true } },
+        agente:         { select: { id: true, firstName: true, lastName: true } },
+        templateModule: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const total = all.length;
+
+    // Helper group count
+    const groupCount = (arr: any[], key: string) =>
+      arr.reduce((acc: Record<string, number>, item) => {
+        const v = item[key] ?? 'Sin definir';
+        acc[v] = (acc[v] ?? 0) + 1;
+        return acc;
+      }, {});
+
+    const byEstado    = groupCount(all, 'estadoActual');
+    const byPrioridad = groupCount(all, 'prioridad');
+    const byArea      = (Object.entries(groupCount(all, 'area')) as [string, number][]).map(([area, count]) => ({ area, count })).sort((a, b) => b.count - a.count);
+    const byTipo      = (Object.entries(groupCount(all, 'tipo')) as [string, number][]).map(([tipo, count]) => ({ tipo, count })).sort((a, b) => b.count - a.count);
+
+    const byModuloMap: Record<string, number> = {};
+    all.forEach(r => {
+      const name = r.templateModule?.name ?? 'Sin módulo';
+      byModuloMap[name] = (byModuloMap[name] ?? 0) + 1;
+    });
+    const byModulo = Object.entries(byModuloMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 10);
+
+    const byClienteMap: Record<string, { name: string; count: number; entregados: number; devueltos: number }> = {};
+    all.forEach(r => {
+      const name = r.client?.businessName ?? 'Sin cliente';
+      if (!byClienteMap[name]) byClienteMap[name] = { name, count: 0, entregados: 0, devueltos: 0 };
+      byClienteMap[name].count++;
+      if (r.estadoActual === 'Entregado') byClienteMap[name].entregados++;
+      if (r.estadoActual === 'Devuelto')  byClienteMap[name].devueltos++;
+    });
+    const byCliente = Object.values(byClienteMap).sort((a, b) => b.count - a.count).slice(0, 10);
+
+    const byAgenteMap: Record<string, { name: string; count: number; entregados: number; devueltos: number; negados: number }> = {};
+    all.forEach(r => {
+      const name = `${r.agente.firstName} ${r.agente.lastName}`;
+      if (!byAgenteMap[name]) byAgenteMap[name] = { name, count: 0, entregados: 0, devueltos: 0, negados: 0 };
+      byAgenteMap[name].count++;
+      if (r.estadoActual === 'Entregado') byAgenteMap[name].entregados++;
+      if (r.estadoActual === 'Devuelto')  byAgenteMap[name].devueltos++;
+      if (r.estadoActual === 'Negado')    byAgenteMap[name].negados++;
+    });
+    const byAgente = Object.values(byAgenteMap).sort((a, b) => b.count - a.count);
+
+    // Evolución mensual
+    const byMonthMap: Record<string, { month: string; created: number; entregados: number; devueltos: number }> = {};
+    all.forEach(r => {
+      const month = r.createdAt.toISOString().slice(0, 7); // YYYY-MM
+      if (!byMonthMap[month]) byMonthMap[month] = { month, created: 0, entregados: 0, devueltos: 0 };
+      byMonthMap[month].created++;
+      if (r.estadoActual === 'Entregado') byMonthMap[month].entregados++;
+      if (r.estadoActual === 'Devuelto')  byMonthMap[month].devueltos++;
+    });
+    const byMonth = Object.values(byMonthMap).sort((a, b) => a.month.localeCompare(b.month));
+
+    // Atribución devoluciones
+    const devueltoPorBreakdown = {
+      cliente:    all.filter(r => r.devueltoPor === 'cliente').length,
+      desarrollo: all.filter(r => r.devueltoPor === 'desarrollo').length,
+      sinAtribuir: all.filter(r => r.estadoActual === 'Devuelto' && !r.devueltoPor).length,
+    };
+
+    // Tasas
+    const entregados         = byEstado['Entregado'] ?? 0;
+    const totalDevueltos     = byEstado['Devuelto']  ?? 0;
+    const negados            = byEstado['Negado']    ?? 0;
+    const elaborados         = byEstado['Elaborado'] ?? 0;
+    const altaPrioSinEntregar = all.filter(r => r.prioridad === 'Alta' && r.estadoActual !== 'Entregado').length;
+
+    const tasas = {
+      entrega:    total > 0 ? Math.round((entregados / total) * 100) : 0,
+      devolucion: total > 0 ? Math.round((totalDevueltos / total) * 100) : 0,
+      negacion:   total > 0 ? Math.round((negados / total) * 100) : 0,
+      repriorizado: total > 0 ? Math.round(((byEstado['Repriorizado'] ?? 0) / total) * 100) : 0,
+    };
+
+    // Alertas
+    const alerts: { level: 'critico' | 'advertencia' | 'info'; titulo: string; detalle: string }[] = [];
+
+    if (altaPrioSinEntregar > 0) {
+      alerts.push({ level: 'critico', titulo: `${altaPrioSinEntregar} requerimiento${altaPrioSinEntregar !== 1 ? 's' : ''} de alta prioridad sin entregar`,
+        detalle: 'Estos requerimientos requieren atención inmediata para no comprometer la implementación.' });
+    }
+    if (elaborados > 0) {
+      alerts.push({ level: tasas.devolucion > 25 ? 'critico' : 'advertencia',
+        titulo: `${elaborados} requerimiento${elaborados !== 1 ? 's' : ''} en estado Elaborado sin priorizar`,
+        detalle: 'Están registrados pero no han pasado por el proceso de priorización.' });
+    }
+    if (tasas.devolucion > 25) {
+      alerts.push({ level: 'critico', titulo: `Tasa de devolución alta: ${tasas.devolucion}%`,
+        detalle: 'Más de un cuarto de los requerimientos han sido devueltos. Revisar la calidad de las especificaciones.' });
+    } else if (tasas.devolucion > 10) {
+      alerts.push({ level: 'advertencia', titulo: `Tasa de devolución moderada: ${tasas.devolucion}%`,
+        detalle: 'Hay oportunidad de mejorar la calidad de los requerimientos antes de priorizarlos.' });
+    }
+    if (tasas.negacion > 15) {
+      alerts.push({ level: 'advertencia', titulo: `Tasa de negación alta: ${tasas.negacion}%`,
+        detalle: `${negados} requerimientos han sido negados. Validar criterios de aceptación con el cliente.` });
+    }
+    if (devueltoPorBreakdown.sinAtribuir > 0) {
+      alerts.push({ level: 'info', titulo: `${devueltoPorBreakdown.sinAtribuir} devolución${devueltoPorBreakdown.sinAtribuir !== 1 ? 'es' : ''} sin responsable atribuido`,
+        detalle: 'Al registrar devoluciones, indica si fue por el cliente o por desarrollo para mejorar la trazabilidad.' });
+    }
+    if (byArea.length > 0 && byArea[0].count / total > 0.5 && total > 5) {
+      alerts.push({ level: 'info', titulo: `Alta concentración en área "${byArea[0].area}"`,
+        detalle: `El ${Math.round((byArea[0].count / total) * 100)}% de los requerimientos pertenecen a una sola área.` });
+    }
+    if (alerts.length === 0) {
+      alerts.push({ level: 'info', titulo: 'Sin alertas críticas', detalle: 'Los requerimientos están en buen estado operativo.' });
+    }
+
+    // Áreas únicas y tipos únicos (para filtros)
+    const areas  = [...new Set(all.map(r => r.area).filter(Boolean))].sort();
+    const tipos  = [...new Set(all.map(r => r.tipo).filter(Boolean))].sort();
+
+    return {
+      total, byEstado, byPrioridad, byArea, byTipo, byModulo,
+      byCliente, byAgente, byMonth, devueltoPorBreakdown, tasas, alerts,
+      altaPrioSinEntregar, elaboradosSinPriorizar: elaborados,
+      totalDevueltos, negados, entregados,
+      areas, tipos,
+    };
+  }
+
   private async syncActivityForReq(
     reqId: string,
     serviceOrderId: string,

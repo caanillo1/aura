@@ -56,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { href: '/requerimientos/nuevo',     label: 'Registrar', icon: ClipboardPlus, permission: 'tickets.nuevo'  },
       { href: '/requerimientos/priorizar', label: 'Priorizar', icon: ListOrdered,   permission: 'tickets.buscar' },
+      { href: '/requerimientos/analisis',  label: 'Análisis',  icon: BarChart3,     permission: 'tickets.buscar' },
     ],
   },
   { href: '/cronograma', label: 'Cronograma', icon: CalendarDays,

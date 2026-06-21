@@ -32,6 +32,21 @@ export class RequerimientosController {
     return this.svc.findAll(user.companyId, dto);
   }
 
+  @Get('analytics')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Analítica completa de requerimientos' })
+  getAnalytics(
+    @GetUser() user: JwtUser,
+    @Query('clientId')  clientId?: string,
+    @Query('agenteId')  agenteId?: string,
+    @Query('area')      area?: string,
+    @Query('tipo')      tipo?: string,
+    @Query('dateFrom')  dateFrom?: string,
+    @Query('dateTo')    dateTo?: string,
+  ) {
+    return this.svc.getAnalytics(user.companyId, { clientId, agenteId, area, tipo, dateFrom, dateTo });
+  }
+
   @Get(':id')
   @Roles(...ALL_ROLES)
   @ApiOperation({ summary: 'Detalle de requerimiento' })

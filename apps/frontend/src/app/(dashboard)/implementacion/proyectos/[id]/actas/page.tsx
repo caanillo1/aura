@@ -1,13 +1,13 @@
 'use client';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import {
   ArrowLeft, Plus, RefreshCw, FileText, Trash2, Pencil, Printer,
   CheckCircle2, Clock, X, Link2, PenLine, Upload, RotateCcw, Lock, Shield, Settings, Mail,
 } from 'lucide-react';
-import { actasApi, projectsApi, clientsApi, usersApi, companyApi, municipiosApi, type CreateActaPayload, type ActaActividadPayload } from '@/lib/api';
+import { actasApi, projectsApi, clientsApi, usersApi, companyApi, municipiosApi, cronogramaApi, type CreateActaPayload, type ActaActividadPayload } from '@/lib/api';
 import { SignaturePad, type SignaturePadRef } from '@/components/ui/SignaturePad';
 import { ActaDocumento } from '@/components/actas/ActaDocumento';
 import { MunicipioSearch } from '@/components/ui/MunicipioSearch';
@@ -1118,7 +1118,7 @@ interface ActaModalProps {
   currentUser?: { id: string; firstName: string; lastName: string } | null;
   onSetupSignature?: () => void;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (newActaId?: string) => void;
   tc: any;
 }
 
@@ -1338,10 +1338,15 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
         contactos,
         actaActividades: (type === 'visita' || type === 'capacitacion') ? actaActividades : undefined,
       };
-      if (mode === 'create') await actasApi.create(payload);
-      else await actasApi.update(acta.id, payload);
+      let newActaId: string | undefined;
+      if (mode === 'create') {
+        const created: any = await actasApi.create(payload);
+        newActaId = created?.id;
+      } else {
+        await actasApi.update(acta.id, payload);
+      }
       toast.success(mode === 'create' ? 'Acta creada' : 'Acta actualizada');
-      onSaved();
+      onSaved(newActaId);
     } catch (e: any) {
       toast.error(e?.response?.data?.message ?? 'Error al guardar');
     } finally { setSaving(false); }
@@ -2092,6 +2097,8 @@ function PrintView({ acta, project, company, userSignature, onClose, onConfigure
 export default function ActasPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromBloqueId = searchParams.get('bloqueId');
   const { theme } = useTheme();
   const isLight = theme === 'light';
 
@@ -2169,6 +2176,12 @@ export default function ActasPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Auto-abre el selector de tipo cuando se llega desde el cronograma
+  useEffect(() => {
+    if (fromBloqueId) setTypeSelector(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -2435,7 +2448,13 @@ export default function ActasPage() {
           currentUser={currentUser}
           onSetupSignature={() => setShowSetupSig(true)}
           onClose={() => setCreateModal(false)}
-          onSaved={() => { setCreateModal(false); load(); }}
+          onSaved={(newActaId) => {
+            setCreateModal(false);
+            if (fromBloqueId && newActaId) {
+              cronogramaApi.update(fromBloqueId, { actaId: newActaId }).catch(() => {});
+            }
+            load();
+          }}
           tc={tc}
         />
       )}

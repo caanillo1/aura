@@ -299,13 +299,19 @@ export class ProjectsService {
   async bulkUpdateActivities(
     companyId: string,
     userId: string,
-    items: Array<{ activityId: string; status: string; nota?: string }>,
+    items: Array<{ activityId: string; status: string; nota?: string; blockedBy?: string }>,
   ) {
-    if (items.some(i => i.status === 'bloqueado')) {
-      throw new BadRequestException('El bloqueo requiere atribución individual');
+    for (const item of items) {
+      if (item.status === 'bloqueado') {
+        if (!item.blockedBy) throw new BadRequestException(`Actividad ${item.activityId}: debe indicar quién bloquea`);
+        if (!item.nota?.trim()) throw new BadRequestException(`Actividad ${item.activityId}: la nota de bloqueo es obligatoria`);
+      }
     }
-    for (const { activityId, status, nota } of items) {
-      await this.updateActivity(companyId, activityId, { status });
+    for (const { activityId, status, nota, blockedBy } of items) {
+      await this.updateActivity(companyId, activityId, {
+        status,
+        ...(status === 'bloqueado' ? { blockedBy, blockedNote: nota } : {}),
+      });
       await this.prisma.activityThread.create({
         data: {
           activityId,

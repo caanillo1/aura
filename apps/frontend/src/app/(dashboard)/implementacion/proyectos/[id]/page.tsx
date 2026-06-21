@@ -957,7 +957,7 @@ export default function ProjectDetailPage() {
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkApplying, setBulkApplying] = useState(false);
   const [showBulkPanel, setShowBulkPanel] = useState(false);
-  const [bulkEdits, setBulkEdits] = useState<Map<string, { status: string; nota: string }>>(new Map());
+  const [bulkEdits, setBulkEdits] = useState<Map<string, { status: string; nota: string; blockedBy: string }>>(new Map());
   const [now, setNow] = useState(() => new Date());
 
   // Listas para responsables
@@ -1062,30 +1062,44 @@ export default function ProjectDetailPage() {
   }, [project]);
 
   const openBulkPanel = () => {
-    const edits = new Map<string, { status: string; nota: string }>();
+    const edits = new Map<string, { status: string; nota: string; blockedBy: string }>();
     bulkSelected.forEach(id => {
       const act = allActivitiesMap.get(id);
-      edits.set(id, { status: act?.status ?? 'pendiente', nota: '' });
+      edits.set(id, { status: act?.status ?? 'pendiente', nota: '', blockedBy: '' });
     });
     setBulkEdits(edits);
     setShowBulkPanel(true);
   };
 
-  const updateBulkEdit = (actId: string, field: 'status' | 'nota', value: string) => {
+  const updateBulkEdit = (actId: string, field: 'status' | 'nota' | 'blockedBy', value: string) => {
     setBulkEdits(prev => {
       const next = new Map(prev);
-      const curr = next.get(actId) ?? { status: 'pendiente', nota: '' };
-      next.set(actId, { ...curr, [field]: value });
+      const curr = next.get(actId) ?? { status: 'pendiente', nota: '', blockedBy: '' };
+      const updated = { ...curr, [field]: value };
+      if (field === 'status' && value !== 'bloqueado') updated.blockedBy = '';
+      next.set(actId, updated);
       return next;
     });
   };
 
   const handleBulkSave = async () => {
+    for (const actId of Array.from(bulkSelected)) {
+      const edit = bulkEdits.get(actId);
+      if (edit?.status === 'bloqueado') {
+        if (!edit.blockedBy) { toast.error(`Selecciona el responsable del bloqueo en todas las actividades bloqueadas`); return; }
+        if (!edit.nota.trim()) { toast.error(`La nota de bloqueo es obligatoria para cada actividad bloqueada`); return; }
+      }
+    }
     setBulkApplying(true);
     try {
       const items = Array.from(bulkSelected).map(actId => {
-        const edit = bulkEdits.get(actId) ?? { status: 'pendiente', nota: '' };
-        return { activityId: actId, status: edit.status, nota: edit.nota.trim() || undefined };
+        const edit = bulkEdits.get(actId) ?? { status: 'pendiente', nota: '', blockedBy: '' };
+        return {
+          activityId: actId,
+          status:     edit.status,
+          nota:       edit.nota.trim() || undefined,
+          blockedBy:  edit.status === 'bloqueado' ? edit.blockedBy : undefined,
+        };
       });
       await projectsApi.bulkUpdateActivities(items);
       toast.success(`${bulkSelected.size} actividades actualizadas`);
@@ -1658,13 +1672,17 @@ export default function ProjectDetailPage() {
             <div className="overflow-y-auto flex-1 px-4 py-3 flex flex-col gap-2">
               {Array.from(bulkSelected).map(actId => {
                 const act = allActivitiesMap.get(actId);
-                const edit = bulkEdits.get(actId) ?? { status: 'pendiente', nota: '' };
+                const edit = bulkEdits.get(actId) ?? { status: 'pendiente', nota: '', blockedBy: '' };
+                const isBlocking = edit.status === 'bloqueado';
                 const statusColors: Record<string, string> = {
-                  pendiente: '#94a3b8', en_progreso: '#60a5fa', completado: '#34d399',
+                  pendiente: '#94a3b8', en_progreso: '#60a5fa', completado: '#34d399', bloqueado: '#f87171',
                 };
                 return (
                   <div key={actId} className="rounded-xl p-3"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    style={{
+                      background: isBlocking ? 'rgba(248,113,113,0.06)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${isBlocking ? 'rgba(248,113,113,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                    }}>
                     <p className="text-xs font-medium mb-2 truncate" style={{ color: '#cbd5e1' }}>
                       {act?.name ?? actId}
                     </p>
@@ -1682,21 +1700,43 @@ export default function ProjectDetailPage() {
                         <option value="pendiente">Pendiente</option>
                         <option value="en_progreso">En progreso</option>
                         <option value="completado">Completado</option>
+                        <option value="bloqueado">Bloqueado</option>
                       </select>
                       <textarea
                         rows={2}
-                        placeholder="Nota para esta actividad (opcional)"
+                        placeholder={isBlocking ? 'Motivo del bloqueo (obligatorio)' : 'Nota para esta actividad (opcional)'}
                         value={edit.nota}
                         onChange={e => updateBulkEdit(actId, 'nota', e.target.value)}
                         className="text-xs rounded-lg px-3 py-2 resize-none flex-1"
                         style={{
                           background: 'rgba(255,255,255,0.05)',
-                          border: '1px solid rgba(255,255,255,0.10)',
+                          border: `1px solid ${isBlocking && !edit.nota.trim() ? 'rgba(248,113,113,0.50)' : 'rgba(255,255,255,0.10)'}`,
                           color: '#e2e8f0',
                           outline: 'none',
                         }}
                       />
                     </div>
+                    {isBlocking && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs shrink-0" style={{ color: '#f87171' }}>Responsable:</span>
+                        {(['cliente', 'desarrollo', 'implementador'] as const).map(v => (
+                          <button key={v} type="button"
+                            onClick={() => updateBulkEdit(actId, 'blockedBy', edit.blockedBy === v ? '' : v)}
+                            className="text-xs px-2.5 py-1 rounded-full capitalize font-medium transition-all"
+                            style={{
+                              background: edit.blockedBy === v ? 'rgba(248,113,113,0.25)' : 'transparent',
+                              color: edit.blockedBy === v ? '#f87171' : 'rgba(255,255,255,0.45)',
+                              border: `1px solid ${edit.blockedBy === v ? 'rgba(248,113,113,0.55)' : 'rgba(255,255,255,0.15)'}`,
+                            }}>
+                            {v}
+                          </button>
+                        ))}
+                        {!edit.blockedBy && (
+                          <span className="text-xs" style={{ color: '#f87171' }}>← requerido</span>
+                        )}
+                      </div>
+                    )}
+
                   </div>
                 );
               })}

@@ -108,7 +108,7 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Actualizar estado de múltiples actividades con nota individual por actividad' })
   bulkUpdateActivities(
     @GetUser() user: JwtUser,
-    @Body() body: { items: Array<{ activityId: string; status: string; nota?: string }> },
+    @Body() body: { items: Array<{ activityId: string; status: string; nota?: string; blockedBy?: string }> },
   ) {
     return this.svc.bulkUpdateActivities(user.companyId, user.id, body.items);
   }

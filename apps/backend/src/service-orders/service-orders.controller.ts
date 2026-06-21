@@ -64,6 +64,14 @@ export class ServiceOrdersController {
     return this.svc.getFullReport(user.companyId, id);
   }
 
+  @Get(':id/alerts')
+  @Roles(...ALL_ROLES)
+  @Permissions('orders.buscar')
+  @ApiOperation({ summary: 'Análisis de alertas e indicadores predictivos de la OS' })
+  getAlerts(@GetUser() user: JwtUser, @Param('id') id: string) {
+    return this.svc.getAlerts(user.companyId, id);
+  }
+
   @Post(':id/send-report')
   @Roles(...ALL_ROLES)
   @Permissions('orders.buscar')

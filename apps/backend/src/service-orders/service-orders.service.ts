@@ -663,6 +663,194 @@ export class ServiceOrdersService {
     return { ...base, actas: actasCompletas };
   }
 
+  async getAlerts(companyId: string, osId: string) {
+    const today = new Date();
+    const cutoff14 = new Date(today.getTime() - 14 * 86400000);
+
+    const [os, project, recentHistory, bloques] = await Promise.all([
+      this.prisma.serviceOrder.findFirst({
+        where: { id: osId, companyId },
+        select: {
+          id: true, osNumber: true, status: true, product: true,
+          startDate: true, endDate: true, durationDays: true,
+          client: { select: { id: true, businessName: true, nit: true } },
+        },
+      }),
+      this.prisma.project.findUnique({
+        where: { serviceOrderId: osId },
+        select: {
+          id: true, name: true, status: true, progressPercent: true,
+          startDate: true, endDate: true,
+          modules: {
+            where: { isActive: true },
+            orderBy: { order: 'asc' },
+            select: {
+              id: true, name: true, progressPercent: true,
+              phases: {
+                orderBy: { order: 'asc' },
+                select: {
+                  id: true, name: true,
+                  activities: {
+                    orderBy: { order: 'asc' },
+                    select: {
+                      id: true, name: true, code: true, status: true,
+                      progressPercent: true, plannedStartDate: true, plannedEndDate: true,
+                      assignedTo: { select: { firstName: true, lastName: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.serviceOrderHistory.findMany({
+        where: { serviceOrderId: osId, createdAt: { gte: cutoff14 } },
+        select: { id: true, createdAt: true },
+        take: 1,
+      }),
+      this.prisma.cronogramaBloque.findMany({
+        where: { serviceOrderId: osId },
+        select: { id: true, status: true, fecha: true, titulo: true },
+        orderBy: { fecha: 'desc' },
+      }),
+    ]);
+
+    if (!os) throw new Error('OS no encontrada');
+
+    type Alert = { level: 'critico' | 'advertencia' | 'info'; tipo: string; titulo: string; detalle: string };
+    const alerts: Alert[] = [];
+
+    const allActivities = (project?.modules ?? []).flatMap(m =>
+      m.phases.flatMap(p => p.activities.map(a => ({ ...a, moduleName: m.name, phaseName: p.name }))));
+    const doneActs    = allActivities.filter(a => a.status === 'completado').length;
+    const totalActs   = allActivities.length;
+
+    // ── 1. OS vencida ────────────────────────────────────────────────────────
+    if (os.endDate && new Date(os.endDate) < today && !['completada', 'cancelada'].includes(os.status)) {
+      const days = Math.floor((today.getTime() - new Date(os.endDate).getTime()) / 86400000);
+      alerts.push({ level: 'critico', tipo: 'os_vencida',
+        titulo: 'Fecha de cierre vencida',
+        detalle: `La OS venció hace ${days} día${days !== 1 ? 's' : ''} y sigue activa.` });
+    }
+
+    // ── 2. Actividades vencidas ──────────────────────────────────────────────
+    const overdueActs = allActivities.filter(a =>
+      a.plannedEndDate && new Date(a.plannedEndDate) < today && a.status !== 'completado');
+    if (overdueActs.length > 0) {
+      alerts.push({ level: 'critico', tipo: 'actividades_vencidas',
+        titulo: `${overdueActs.length} actividad${overdueActs.length !== 1 ? 'es' : ''} vencida${overdueActs.length !== 1 ? 's' : ''}`,
+        detalle: overdueActs.slice(0, 3).map(a => `${a.code ?? ''} ${a.name} (${a.moduleName})`).join(' · ') +
+                 (overdueActs.length > 3 ? ` y ${overdueActs.length - 3} más` : '') });
+    }
+
+    // ── 3. Actividades bloqueadas ─────────────────────────────────────────────
+    const blockedActs = allActivities.filter(a => a.status === 'bloqueado');
+    if (blockedActs.length > 0) {
+      alerts.push({ level: 'critico', tipo: 'actividades_bloqueadas',
+        titulo: `${blockedActs.length} actividad${blockedActs.length !== 1 ? 'es' : ''} bloqueada${blockedActs.length !== 1 ? 's' : ''}`,
+        detalle: blockedActs.slice(0, 3).map(a => `${a.code ?? ''} ${a.name}`).join(' · ') +
+                 (blockedActs.length > 3 ? ` y ${blockedActs.length - 3} más` : '') });
+    }
+
+    // ── 4. Sin movimiento en 14 días ─────────────────────────────────────────
+    if (project && recentHistory.length === 0 && !['completada', 'cancelada'].includes(os.status)) {
+      alerts.push({ level: 'advertencia', tipo: 'sin_movimiento',
+        titulo: 'Sin movimiento en los últimos 14 días',
+        detalle: 'No se ha registrado ningún cambio en el historial de la OS en 14 días.' });
+    }
+
+    // ── 5. Visitas canceladas ────────────────────────────────────────────────
+    const cancelledVisits = bloques.filter(b => b.status === 'cancelado');
+    if (cancelledVisits.length > 0) {
+      const afterCancel = bloques.filter(b =>
+        b.status !== 'cancelado' && cancelledVisits.some(c => new Date(b.fecha) > new Date(c.fecha)));
+      if (afterCancel.length === 0) {
+        alerts.push({ level: 'advertencia', tipo: 'visita_cancelada_sin_reagendar',
+          titulo: `${cancelledVisits.length} visita${cancelledVisits.length !== 1 ? 's' : ''} cancelada${cancelledVisits.length !== 1 ? 's' : ''} sin reagendar`,
+          detalle: 'Hay visitas canceladas y no se ha programado ninguna nueva visita posterior.' });
+      }
+    }
+
+    // ── 6. Sin proyecto vinculado ────────────────────────────────────────────
+    if (!project && os.status === 'en_curso') {
+      alerts.push({ level: 'advertencia', tipo: 'sin_proyecto',
+        titulo: 'OS en curso sin proyecto vinculado',
+        detalle: 'La orden de servicio está activa pero no tiene un proyecto de implementación creado.' });
+    }
+
+    // ── 7. Progreso muy bajo en tiempo avanzado ──────────────────────────────
+    if (os.startDate && os.endDate && project) {
+      const totalMs   = new Date(os.endDate).getTime() - new Date(os.startDate).getTime();
+      const elapsedMs = today.getTime() - new Date(os.startDate).getTime();
+      const timePct   = totalMs > 0 ? Math.min(100, (elapsedMs / totalMs) * 100) : 0;
+      const progPct   = Number(project.progressPercent ?? 0);
+      if (timePct > 50 && progPct < timePct * 0.5) {
+        alerts.push({ level: 'advertencia', tipo: 'progreso_bajo',
+          titulo: 'Progreso por debajo del ritmo esperado',
+          detalle: `${timePct.toFixed(0)}% del tiempo transcurrido con solo ${progPct.toFixed(0)}% de avance.` });
+      }
+    }
+
+    // ── Predicciones ─────────────────────────────────────────────────────────
+    let predictions: Record<string, any> = {};
+    if (project && totalActs > 0 && os.startDate) {
+      const daysSinceStart = Math.max(1,
+        Math.floor((today.getTime() - new Date(os.startDate).getTime()) / 86400000));
+      const ratePerDay     = doneActs / daysSinceStart;
+      const ratePerWeek    = Math.round(ratePerDay * 7 * 10) / 10;
+      const remaining      = totalActs - doneActs;
+      const daysToComplete = ratePerDay > 0 ? remaining / ratePerDay : null;
+      const estimatedEnd   = daysToComplete != null
+        ? new Date(today.getTime() + daysToComplete * 86400000)
+        : null;
+      const delayDays = estimatedEnd && os.endDate
+        ? Math.floor((estimatedEnd.getTime() - new Date(os.endDate).getTime()) / 86400000)
+        : null;
+
+      let successProbability: number | null = null;
+      if (os.startDate && os.endDate) {
+        const totalMs  = new Date(os.endDate).getTime() - new Date(os.startDate).getTime();
+        const elapsed  = today.getTime() - new Date(os.startDate).getTime();
+        const timePct  = totalMs > 0 ? Math.min(1, elapsed / totalMs) : 0;
+        const progPct  = Number(project.progressPercent ?? 0) / 100;
+        if (timePct > 0) {
+          const ratio = progPct / timePct;
+          successProbability = Math.max(0, Math.min(100, Math.round(ratio * 60 + (delayDays != null && delayDays <= 0 ? 25 : 0))));
+        }
+      }
+
+      predictions = {
+        ritmoActividadesSemana: ratePerWeek,
+        actividadesCompletadas: doneActs,
+        actividadesRestantes:   remaining,
+        totalActividades:       totalActs,
+        fechaEstimadaFin:       estimatedEnd?.toISOString() ?? null,
+        diasDeRetraso:          delayDays,
+        probabilidadExito:      successProbability,
+      };
+    }
+
+    // ── Nivel de riesgo global ───────────────────────────────────────────────
+    const criticos     = alerts.filter(a => a.level === 'critico').length;
+    const advertencias = alerts.filter(a => a.level === 'advertencia').length;
+    const riskLevel    = criticos >= 2 ? 'alto'
+                       : criticos === 1 ? 'alto'
+                       : advertencias >= 2 ? 'medio'
+                       : advertencias === 1 ? 'medio'
+                       : 'normal';
+
+    return {
+      os: { id: os.id, osNumber: os.osNumber, product: os.product, status: os.status,
+            startDate: os.startDate, endDate: os.endDate, client: os.client },
+      project: project ? { name: project.name, status: project.status,
+                           progressPercent: Number(project.progressPercent ?? 0) } : null,
+      riskLevel,
+      alerts,
+      predictions,
+    };
+  }
+
   async delete(companyId: string, id: string) {
     const os = await this.findOne(companyId, id);
 

@@ -779,9 +779,10 @@ export class ServiceOrdersService {
     }
 
     // ── 6. Tickets devueltos sin resolver ────────────────────────────────────
-    if (ticketsDetail.devueltos > 0) {
+    const reqDevueltos = reqs.filter(r => r.estadoActual === 'Devuelto').length;
+    if (reqDevueltos > 0) {
       alerts.push({ level: 'advertencia', tipo: 'tickets_devueltos',
-        titulo: `${ticketsDetail.devueltos} requerimiento${ticketsDetail.devueltos !== 1 ? 's' : ''} devuelto${ticketsDetail.devueltos !== 1 ? 's' : ''}`,
+        titulo: `${reqDevueltos} requerimiento${reqDevueltos !== 1 ? 's' : ''} devuelto${reqDevueltos !== 1 ? 's' : ''}`,
         detalle: 'Hay requerimientos que fueron devueltos y requieren revisión o corrección antes de continuar.' });
     }
 
@@ -940,7 +941,7 @@ export class ServiceOrdersService {
       } else if (alert.tipo === 'tickets_devueltos') {
         recommendations.push({ priority: 'media',
           titulo: 'Revisar requerimientos devueltos',
-          accion: `Analizar los ${ticketsDetail.devueltos} requerimiento${ticketsDetail.devueltos !== 1 ? 's' : ''} devuelto${ticketsDetail.devueltos !== 1 ? 's' : ''} y corregir o clarificar antes de continuar la implementación.` });
+          accion: `Analizar los ${reqDevueltos} requerimiento${reqDevueltos !== 1 ? 's' : ''} devuelto${reqDevueltos !== 1 ? 's' : ''} y corregir o clarificar antes de continuar la implementación.` });
       } else if (alert.tipo === 'sin_movimiento') {
         recommendations.push({ priority: 'media',
           titulo: 'Reactivar el seguimiento de la OS',

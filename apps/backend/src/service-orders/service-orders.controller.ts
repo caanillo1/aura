@@ -72,6 +72,57 @@ export class ServiceOrdersController {
     return this.svc.getAlerts(user.companyId, id);
   }
 
+  @Post(':id/download-analysis-pdf')
+  @Roles(...ALL_ROLES)
+  @Permissions('orders.buscar')
+  @ApiOperation({ summary: 'Descargar PDF del análisis de implementación (estilo ejecutivo)' })
+  async downloadAnalysisPdf(
+    @Res() res: any,
+    @GetUser() user: JwtUser,
+    @Param('id') id: string,
+  ) {
+    const buffer = await this.svc.generateAnalysisPdfBuffer(user.companyId, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Analisis_${id}.pdf"`);
+    res.end(buffer);
+  }
+
+  @Post(':id/send-analysis')
+  @Roles(...ALL_ROLES)
+  @Permissions('orders.buscar')
+  @ApiOperation({ summary: 'Enviar análisis de implementación por correo' })
+  sendAnalysis(
+    @GetUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { destinatarios: string[]; asunto?: string },
+  ) {
+    return this.svc.sendAnalysis(user.companyId, id, body);
+  }
+
+  @Get(':id/analysis-schedule')
+  @Roles(...ALL_ROLES)
+  @Permissions('orders.buscar')
+  @ApiOperation({ summary: 'Obtener config de automatización del análisis' })
+  getAnalysisSchedule(@GetUser() user: JwtUser, @Param('id') id: string) {
+    return this.scheduler.getAnalysisConfig(user.companyId, id);
+  }
+
+  @Post(':id/analysis-schedule')
+  @Roles(...ALL_ROLES)
+  @Permissions('orders.editar')
+  @ApiOperation({ summary: 'Guardar config de automatización del análisis' })
+  saveAnalysisSchedule(@GetUser() user: JwtUser, @Param('id') id: string, @Body() body: any) {
+    return this.scheduler.saveAnalysisConfig(user.companyId, id, body);
+  }
+
+  @Post(':id/analysis-schedule/run-now')
+  @Roles(...ALL_ROLES)
+  @Permissions('orders.buscar')
+  @ApiOperation({ summary: 'Ejecutar envío de análisis ahora' })
+  runAnalysisNow(@GetUser() user: JwtUser, @Param('id') id: string) {
+    return this.scheduler.runAnalysisNow(user.companyId, id);
+  }
+
   @Post(':id/send-report')
   @Roles(...ALL_ROLES)
   @Permissions('orders.buscar')

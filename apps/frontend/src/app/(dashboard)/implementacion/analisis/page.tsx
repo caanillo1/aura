@@ -12,6 +12,7 @@ import {
   Lightbulb, CalendarCheck, CalendarClock, ChevronRight,
   Zap, ShieldAlert, Clock, Flag, ListChecks, Ticket, ArrowLeftRight,
   ExternalLink, TriangleAlert,
+  Download, Mail, Bell, Send, Settings2, Play, Plus, Minus,
 } from 'lucide-react';
 import { serviceOrdersApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -582,6 +583,125 @@ export default function AnalisisPage() {
   const [data, setData]             = useState<AnalysisData | null>(null);
   const [loading, setLoading]       = useState(false);
 
+  // ── Action state ─────────────────────────────────────────────────────────────
+  const [pdfLoading,      setPdfLoading]      = useState(false);
+  const [emailModalOpen,  setEmailModalOpen]  = useState(false);
+  const [autoModalOpen,   setAutoModalOpen]   = useState(false);
+
+  // Email modal state
+  const [emailTo,      setEmailTo]      = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+
+  // Automation modal state
+  const [autoConfig, setAutoConfig] = useState({
+    enabled: false,
+    frecuencia: 'semanal' as 'semanal' | 'quincenal' | 'mensual',
+    diaSemana: 1,
+    hora: 8,
+    minuto: 0,
+    destinatarios: '',
+    asunto: '',
+  });
+  const [autoLoading,  setAutoLoading]  = useState(false);
+  const [autoFetched,  setAutoFetched]  = useState(false);
+  const [autoRunning,  setAutoRunning]  = useState(false);
+
+  const fetchAutoConfig = useCallback(async (osId: string) => {
+    try {
+      const cfg = await serviceOrdersApi.getAnalysisSchedule(osId);
+      if (cfg) {
+        setAutoConfig({
+          enabled:       cfg.enabled ?? false,
+          frecuencia:    cfg.frecuencia ?? 'semanal',
+          diaSemana:     cfg.diaSemana ?? 1,
+          hora:          cfg.hora ?? 8,
+          minuto:        cfg.minuto ?? 0,
+          destinatarios: (cfg.destinatarios ?? []).join(', '),
+          asunto:        cfg.asunto ?? '',
+        });
+      }
+    } catch { /* no config yet */ }
+    setAutoFetched(true);
+  }, []);
+
+  const handleDownloadPdf = useCallback(async () => {
+    if (!selectedOs) return;
+    setPdfLoading(true);
+    try {
+      const blob = await serviceOrdersApi.downloadAnalysisPdf(selectedOs.id);
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `Analisis_${selectedOs.osNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('PDF generado y descargado');
+    } catch {
+      toast.error('Error al generar el PDF');
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [selectedOs]);
+
+  const handleSendEmail = useCallback(async () => {
+    if (!selectedOs) return;
+    const destinatarios = emailTo.split(',').map(s => s.trim()).filter(Boolean);
+    if (!destinatarios.length) { toast.error('Ingresa al menos un destinatario'); return; }
+    setEmailSending(true);
+    try {
+      await serviceOrdersApi.sendAnalysis(selectedOs.id, {
+        destinatarios,
+        asunto: emailSubject.trim() || undefined,
+      });
+      toast.success(`Análisis enviado a ${destinatarios.length} destinatario${destinatarios.length !== 1 ? 's' : ''}`);
+      setEmailModalOpen(false);
+      setEmailTo('');
+      setEmailSubject('');
+    } catch {
+      toast.error('Error al enviar el correo');
+    } finally {
+      setEmailSending(false);
+    }
+  }, [selectedOs, emailTo, emailSubject]);
+
+  const handleSaveAutoConfig = useCallback(async () => {
+    if (!selectedOs) return;
+    const destinatarios = autoConfig.destinatarios.split(',').map(s => s.trim()).filter(Boolean);
+    if (autoConfig.enabled && !destinatarios.length) { toast.error('Ingresa al menos un destinatario'); return; }
+    setAutoLoading(true);
+    try {
+      await serviceOrdersApi.saveAnalysisSchedule(selectedOs.id, {
+        ...autoConfig,
+        destinatarios,
+        asunto: autoConfig.asunto.trim() || undefined,
+      });
+      toast.success(autoConfig.enabled ? 'Automatización activada' : 'Automatización desactivada');
+    } catch {
+      toast.error('Error al guardar la configuración');
+    } finally {
+      setAutoLoading(false);
+    }
+  }, [selectedOs, autoConfig]);
+
+  const handleRunNow = useCallback(async () => {
+    if (!selectedOs) return;
+    const destinatarios = autoConfig.destinatarios.split(',').map(s => s.trim()).filter(Boolean);
+    if (!destinatarios.length) { toast.error('Ingresa destinatarios primero'); return; }
+    setAutoRunning(true);
+    try {
+      await serviceOrdersApi.saveAnalysisSchedule(selectedOs.id, {
+        ...autoConfig, destinatarios, asunto: autoConfig.asunto.trim() || undefined,
+      });
+      await serviceOrdersApi.runAnalysisNow(selectedOs.id);
+      toast.success('Análisis enviado correctamente');
+    } catch {
+      toast.error('Error al enviar');
+    } finally {
+      setAutoRunning(false);
+    }
+  }, [selectedOs, autoConfig]);
+
   const load = useCallback(async (osId: string) => {
     setLoading(true);
     setData(null);
@@ -597,8 +717,14 @@ export default function AnalisisPage() {
 
   useEffect(() => {
     if (selectedOs) load(selectedOs.id);
-    else setData(null);
+    else { setData(null); setAutoFetched(false); }
   }, [selectedOs, load]);
+
+  useEffect(() => {
+    if (autoModalOpen && selectedOs && !autoFetched) {
+      fetchAutoConfig(selectedOs.id);
+    }
+  }, [autoModalOpen, selectedOs, autoFetched, fetchAutoConfig]);
 
   const border = isLight ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.06)';
 
@@ -635,7 +761,7 @@ export default function AnalisisPage() {
       </div>
 
       {/* ── OS Selector ─────────────────────────────────────────────────────── */}
-      <div className="px-6 pb-4 shrink-0 flex items-center gap-3">
+      <div className="px-6 pb-3 shrink-0 flex items-center gap-3">
         <OsSelector value={selectedOs} onChange={setSelectedOs} />
         {selectedOs && (
           <button onClick={() => load(selectedOs.id)} disabled={loading}
@@ -645,6 +771,36 @@ export default function AnalisisPage() {
           </button>
         )}
       </div>
+
+      {/* ── Action Toolbar ───────────────────────────────────────────────────── */}
+      {selectedOs && data && !loading && (
+        <div className="px-6 pb-4 shrink-0 flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleDownloadPdf}
+            disabled={pdfLoading}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+            style={{ background: 'rgba(99,102,241,0.10)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.25)' }}>
+            {pdfLoading
+              ? <RefreshCw className="w-4 h-4 animate-spin" />
+              : <Download className="w-4 h-4" />}
+            {pdfLoading ? 'Generando PDF…' : 'Descargar PDF'}
+          </button>
+          <button
+            onClick={() => setEmailModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: 'rgba(16,185,129,0.10)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
+            <Mail className="w-4 h-4" />
+            Enviar por correo
+          </button>
+          <button
+            onClick={() => setAutoModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: 'rgba(245,158,11,0.10)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+            <Bell className="w-4 h-4" />
+            Automatización
+          </button>
+        </div>
+      )}
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-6 pb-8">
@@ -1026,6 +1182,245 @@ export default function AnalisisPage() {
           </div>
         )}
       </div>
+
+      {/* ── Email Modal ──────────────────────────────────────────────────────── */}
+      {emailModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="rounded-2xl w-full max-w-md"
+            style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 25px 60px rgba(0,0,0,0.4)' }}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-4"
+              style={{ borderBottom: '1px solid var(--card-border)' }}>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(16,185,129,0.12)' }}>
+                  <Mail className="w-4 h-4" style={{ color: '#10b981' }} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Enviar análisis por correo</h3>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Incluye PDF adjunto de calidad ejecutiva</p>
+                </div>
+              </div>
+              <button onClick={() => setEmailModalOpen(false)} style={{ color: 'var(--text-muted)' }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide block mb-1.5"
+                  style={{ color: 'var(--text-muted)' }}>
+                  Destinatarios <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <textarea
+                  value={emailTo}
+                  onChange={e => setEmailTo(e.target.value)}
+                  placeholder="correo@empresa.com, otro@empresa.com"
+                  rows={3}
+                  className="w-full rounded-xl px-3 py-2 text-sm resize-none"
+                  style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))',
+                           border: '1px solid var(--card-border)', color: 'var(--text-primary)',
+                           outline: 'none' }}
+                />
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Separa múltiples correos con comas</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide block mb-1.5"
+                  style={{ color: 'var(--text-muted)' }}>Asunto (opcional)</label>
+                <input
+                  value={emailSubject}
+                  onChange={e => setEmailSubject(e.target.value)}
+                  placeholder={`Análisis de Implementación – OS ${selectedOs?.osNumber ?? ''}`}
+                  className="w-full rounded-xl px-3 py-2 text-sm"
+                  style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))',
+                           border: '1px solid var(--card-border)', color: 'var(--text-primary)',
+                           outline: 'none' }}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end px-5 pb-5">
+              <button onClick={() => setEmailModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold"
+                style={{ border: '1px solid var(--card-border)', color: 'var(--text-muted)' }}>
+                Cancelar
+              </button>
+              <button onClick={handleSendEmail} disabled={emailSending || !emailTo.trim()}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                style={{ background: '#10b981', color: '#fff' }}>
+                {emailSending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {emailSending ? 'Enviando…' : 'Enviar análisis'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Automation Modal ─────────────────────────────────────────────────── */}
+      {autoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="rounded-2xl w-full max-w-lg overflow-y-auto"
+            style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 25px 60px rgba(0,0,0,0.4)', maxHeight: '90vh' }}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-4"
+              style={{ borderBottom: '1px solid var(--card-border)' }}>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: 'rgba(245,158,11,0.12)' }}>
+                  <Bell className="w-4 h-4" style={{ color: '#f59e0b' }} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Automatización de análisis</h3>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Envío periódico del análisis por correo</p>
+                </div>
+              </div>
+              <button onClick={() => setAutoModalOpen(false)} style={{ color: 'var(--text-muted)' }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              {/* Enable toggle */}
+              <div className="flex items-center justify-between rounded-xl px-4 py-3"
+                style={{ background: autoConfig.enabled ? 'rgba(245,158,11,0.08)' : 'var(--border-subtle)',
+                         border: `1px solid ${autoConfig.enabled ? 'rgba(245,158,11,0.25)' : 'var(--card-border)'}` }}>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {autoConfig.enabled ? 'Automatización activa' : 'Automatización inactiva'}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {autoConfig.enabled ? 'El análisis se enviará automáticamente' : 'Activa para programar envíos automáticos'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setAutoConfig(c => ({ ...c, enabled: !c.enabled }))}
+                  className="w-12 h-6 rounded-full transition-all relative shrink-0"
+                  style={{ background: autoConfig.enabled ? '#f59e0b' : 'rgba(100,116,139,0.3)' }}>
+                  <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
+                    style={{ left: autoConfig.enabled ? 'calc(100% - 22px)' : '2px' }} />
+                </button>
+              </div>
+
+              {/* Frequency */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide block mb-2"
+                  style={{ color: 'var(--text-muted)' }}>Frecuencia</label>
+                <div className="flex gap-2">
+                  {(['semanal', 'quincenal', 'mensual'] as const).map(f => (
+                    <button key={f} onClick={() => setAutoConfig(c => ({ ...c, frecuencia: f }))}
+                      className="flex-1 py-2 rounded-xl text-xs font-semibold capitalize transition-all"
+                      style={{
+                        background: autoConfig.frecuencia === f ? 'rgba(245,158,11,0.15)' : 'var(--border-subtle)',
+                        color: autoConfig.frecuencia === f ? '#f59e0b' : 'var(--text-muted)',
+                        border: `1px solid ${autoConfig.frecuencia === f ? 'rgba(245,158,11,0.30)' : 'var(--card-border)'}`,
+                      }}>
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Day of week */}
+              {autoConfig.frecuencia === 'semanal' && (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide block mb-2"
+                    style={{ color: 'var(--text-muted)' }}>Día de envío</label>
+                  <div className="flex gap-1">
+                    {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((d, i) => (
+                      <button key={i} onClick={() => setAutoConfig(c => ({ ...c, diaSemana: i }))}
+                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                        style={{
+                          background: autoConfig.diaSemana === i ? 'rgba(99,102,241,0.15)' : 'var(--border-subtle)',
+                          color: autoConfig.diaSemana === i ? '#6366f1' : 'var(--text-muted)',
+                          border: `1px solid ${autoConfig.diaSemana === i ? 'rgba(99,102,241,0.30)' : 'var(--card-border)'}`,
+                        }}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Time */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide block mb-2"
+                  style={{ color: 'var(--text-muted)' }}>Hora de envío</label>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setAutoConfig(c => ({ ...c, hora: Math.max(0, c.hora - 1) }))}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center"
+                      style={{ border: '1px solid var(--card-border)', color: 'var(--text-muted)' }}>
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="text-sm font-bold w-12 text-center" style={{ color: 'var(--text-primary)' }}>
+                      {String(autoConfig.hora).padStart(2, '0')}:00
+                    </span>
+                    <button onClick={() => setAutoConfig(c => ({ ...c, hora: Math.min(23, c.hora + 1) }))}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center"
+                      style={{ border: '1px solid var(--card-border)', color: 'var(--text-muted)' }}>
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>hora del servidor</span>
+                </div>
+              </div>
+
+              {/* Recipients */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide block mb-1.5"
+                  style={{ color: 'var(--text-muted)' }}>
+                  Destinatarios <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <textarea
+                  value={autoConfig.destinatarios}
+                  onChange={e => setAutoConfig(c => ({ ...c, destinatarios: e.target.value }))}
+                  placeholder="correo@empresa.com, otro@empresa.com"
+                  rows={2}
+                  className="w-full rounded-xl px-3 py-2 text-sm resize-none"
+                  style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))',
+                           border: '1px solid var(--card-border)', color: 'var(--text-primary)',
+                           outline: 'none' }}
+                />
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Separa múltiples correos con comas</p>
+              </div>
+
+              {/* Subject */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide block mb-1.5"
+                  style={{ color: 'var(--text-muted)' }}>Asunto (opcional)</label>
+                <input
+                  value={autoConfig.asunto}
+                  onChange={e => setAutoConfig(c => ({ ...c, asunto: e.target.value }))}
+                  placeholder={`Análisis de Implementación – OS ${selectedOs?.osNumber ?? ''}`}
+                  className="w-full rounded-xl px-3 py-2 text-sm"
+                  style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))',
+                           border: '1px solid var(--card-border)', color: 'var(--text-primary)',
+                           outline: 'none' }}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-between px-5 pb-5">
+              <button onClick={handleRunNow} disabled={autoRunning || !autoConfig.destinatarios.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold disabled:opacity-40"
+                style={{ border: '1px solid var(--card-border)', color: 'var(--text-muted)' }}>
+                {autoRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                Enviar ahora
+              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setAutoModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold"
+                  style={{ border: '1px solid var(--card-border)', color: 'var(--text-muted)' }}>
+                  Cancelar
+                </button>
+                <button onClick={handleSaveAutoConfig} disabled={autoLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50"
+                  style={{ background: '#f59e0b', color: '#fff' }}>
+                  {autoLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Settings2 className="w-4 h-4" />}
+                  {autoLoading ? 'Guardando…' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -317,6 +317,16 @@ export const serviceOrdersApi = {
     api.post(`/service-orders/${id}/informe-schedule/bimensual`, body).then((r) => r.data),
   runBimensualNow: (id: string, period: 'quincenal' | 'mensual'): Promise<any> =>
     api.post(`/service-orders/${id}/informe-schedule/bimensual/run-now`, { period }).then((r) => r.data),
+  downloadAnalysisPdf: (id: string): Promise<Blob> =>
+    api.post(`/service-orders/${id}/download-analysis-pdf`, {}, { responseType: 'blob', timeout: 120000 }).then((r) => r.data),
+  sendAnalysis: (id: string, body: { destinatarios: string[]; asunto?: string }): Promise<any> =>
+    api.post(`/service-orders/${id}/send-analysis`, body).then((r) => r.data),
+  getAnalysisSchedule: (id: string): Promise<any> =>
+    api.get(`/service-orders/${id}/analysis-schedule`).then((r) => r.data),
+  saveAnalysisSchedule: (id: string, body: any): Promise<any> =>
+    api.post(`/service-orders/${id}/analysis-schedule`, body).then((r) => r.data),
+  runAnalysisNow: (id: string): Promise<any> =>
+    api.post(`/service-orders/${id}/analysis-schedule/run-now`).then((r) => r.data),
 };
 
 // ── Templates ─────────────────────────────────────────────────────────────────

@@ -24,8 +24,20 @@ export interface BimensualConfig {
   lastSentAt?: string;
 }
 
+export interface AnalysisConfig {
+  enabled: boolean;
+  frecuencia: 'semanal' | 'quincenal' | 'mensual';
+  diaSemana: number;    // 0=Dom … 6=Sáb (used when frecuencia='semanal')
+  hora: number;
+  minuto: number;
+  destinatarios: string[];
+  asunto?: string;
+  lastSentAt?: string;
+}
+
 const WEEKLY_PREFIX    = 'informe_weekly_';
 const BIMENSUAL_PREFIX = 'informe_bimensual_';
+const ANALYSIS_PREFIX  = 'analysis_auto_';
 
 @Injectable()
 export class InformeSchedulerService implements OnModuleInit {
@@ -48,6 +60,7 @@ export class InformeSchedulerService implements OnModuleInit {
         OR: [
           { configKey: { startsWith: WEEKLY_PREFIX } },
           { configKey: { startsWith: BIMENSUAL_PREFIX } },
+          { configKey: { startsWith: ANALYSIS_PREFIX } },
         ],
       },
       select: { companyId: true, configKey: true, configValue: true },
@@ -57,11 +70,14 @@ export class InformeSchedulerService implements OnModuleInit {
       try {
         const osId = row.configKey.startsWith(WEEKLY_PREFIX)
           ? row.configKey.replace(WEEKLY_PREFIX, '')
-          : row.configKey.replace(BIMENSUAL_PREFIX, '');
+          : row.configKey.startsWith(BIMENSUAL_PREFIX)
+          ? row.configKey.replace(BIMENSUAL_PREFIX, '')
+          : row.configKey.replace(ANALYSIS_PREFIX, '');
         const cfg = JSON.parse(row.configValue);
         if (!cfg.enabled) continue;
         if (row.configKey.startsWith(WEEKLY_PREFIX))    this.registerWeeklyCron(row.companyId, osId, cfg);
         if (row.configKey.startsWith(BIMENSUAL_PREFIX)) this.registerBimensualCrons(row.companyId, osId, cfg);
+        if (row.configKey.startsWith(ANALYSIS_PREFIX))  this.registerAnalysisCron(row.companyId, osId, cfg);
       } catch { /* config inválida */ }
     }
   }
@@ -115,6 +131,60 @@ export class InformeSchedulerService implements OnModuleInit {
     if (!cfg?.destinatarios?.length) throw new Error('No hay configuración bimensual guardada');
     await this.executeBimensualSend(companyId, osId, cfg, period);
     return { message: 'Informe PDF enviado correctamente' };
+  }
+
+  // ── Analysis auto-send ───────────────────────────────────────────────────────
+
+  async getAnalysisConfig(companyId: string, osId: string): Promise<AnalysisConfig | null> {
+    return this.readConfig<AnalysisConfig>(companyId, `${ANALYSIS_PREFIX}${osId}`);
+  }
+
+  async saveAnalysisConfig(companyId: string, osId: string, cfg: AnalysisConfig): Promise<{ message: string }> {
+    const key = `${ANALYSIS_PREFIX}${osId}`;
+    await this.prisma.systemConfig.upsert({
+      where:  { companyId_configKey: { companyId, configKey: key } },
+      create: { companyId, configKey: key, configValue: JSON.stringify(cfg), description: `Auto análisis OS ${osId}` },
+      update: { configValue: JSON.stringify(cfg) },
+    });
+    this.removeCron(`analysis_${osId}`);
+    if (cfg.enabled && cfg.destinatarios.length > 0) this.registerAnalysisCron(companyId, osId, cfg);
+    return { message: cfg.enabled ? 'Automatización de análisis activada' : 'Automatización de análisis desactivada' };
+  }
+
+  async runAnalysisNow(companyId: string, osId: string): Promise<{ message: string }> {
+    const cfg = await this.getAnalysisConfig(companyId, osId);
+    if (!cfg?.destinatarios?.length) throw new Error('No hay configuración de análisis guardada');
+    await this.executeAnalysisSend(companyId, osId, cfg);
+    return { message: 'Análisis enviado correctamente' };
+  }
+
+  private registerAnalysisCron(companyId: string, osId: string, cfg: AnalysisConfig) {
+    let expr: string;
+    if (cfg.frecuencia === 'semanal') {
+      expr = `0 ${cfg.minuto} ${cfg.hora} * * ${cfg.diaSemana}`;
+    } else if (cfg.frecuencia === 'quincenal') {
+      expr = `0 ${cfg.minuto} ${cfg.hora} 1,15 * *`;
+    } else {
+      expr = `0 ${cfg.minuto} ${cfg.hora} 1 * *`;
+    }
+    const jobName = `analysis_${osId}`;
+    this.logger.log(`Cron análisis [${jobName}]: ${expr}`);
+    const job = new CronJob(expr, () => {
+      this.executeAnalysisSend(companyId, osId, cfg).catch(err =>
+        this.logger.error(`Error cron análisis osId=${osId}: ${err?.message}`),
+      );
+    });
+    this.schedulerRegistry.addCronJob(jobName, job);
+    job.start();
+  }
+
+  private async executeAnalysisSend(companyId: string, osId: string, cfg: AnalysisConfig) {
+    this.logger.log(`Envío automático análisis osId=${osId}`);
+    await this.svc.sendAnalysis(companyId, osId, {
+      destinatarios: cfg.destinatarios,
+      asunto: cfg.asunto,
+    });
+    await this.updateLastSent(companyId, `${ANALYSIS_PREFIX}${osId}`, cfg);
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────────

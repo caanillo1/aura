@@ -2318,6 +2318,94 @@ table { border-collapse: collapse; width: 100%; }
     return this.generatePdfPuppeteer(data, isCompleto);
   }
 
+  async generateAnalysisPdfBuffer(companyId: string, osId: string): Promise<Buffer> {
+    const [data, company] = await Promise.all([
+      this.getAlerts(companyId, osId),
+      this.prisma.company.findUnique({
+        where: { id: companyId },
+        select: {
+          name: true, commercialName: true, primaryColor: true,
+          nit: true, city: true, email: true, logoData: true,
+        },
+      }),
+    ]);
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    const res = await fetch(`${frontendUrl}/api/generate-analysis-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data, company }),
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => res.statusText);
+      throw new Error(`[generate-analysis-pdf] HTTP ${res.status}: ${msg}`);
+    }
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  }
+
+  async sendAnalysis(
+    companyId: string,
+    osId: string,
+    dto: { destinatarios: string[]; asunto?: string },
+  ): Promise<{ message: string; destinatarios: number }> {
+    const [alertData, company] = await Promise.all([
+      this.getAlerts(companyId, osId),
+      this.prisma.company.findUnique({
+        where: { id: companyId },
+        select: { name: true, commercialName: true, primaryColor: true },
+      }),
+    ]);
+    const { os, riskLevel, activitySummary, predictions } = alertData as any;
+    const nom = company?.commercialName ?? company?.name ?? '';
+    const pc  = company?.primaryColor ?? '#1E3A5F';
+
+    const pdf      = await this.generateAnalysisPdfBuffer(companyId, osId);
+    const asunto   = dto.asunto ?? `Análisis de Implementación – OS ${os.osNumber} – ${os.client?.businessName ?? ''}`;
+    const filename = `Analisis_${os.osNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+
+    const riskLabel: Record<string, string> = { alto: 'RIESGO ALTO', medio: 'RIESGO MEDIO', normal: 'EN CONTROL' };
+    const riskColor: Record<string, string> = { alto: '#dc2626', medio: '#d97706', normal: '#059669' };
+    const rl = riskLabel[riskLevel ?? 'normal'] ?? 'EN CONTROL';
+    const rc = riskColor[riskLevel ?? 'normal'] ?? '#059669';
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f3f4f6;">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 0;"><tr><td align="center">
+<table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e5e7eb;">
+<tr><td style="background:${pc};padding:20px 28px;color:#fff;border-radius:8px 8px 0 0;">
+  <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;opacity:0.8;">Análisis de Implementación</div>
+  <div style="font-size:17px;font-weight:800;margin-top:6px;">${os.client?.businessName ?? ''}</div>
+  <div style="font-size:12px;opacity:0.85;margin-top:3px;">OS: ${os.osNumber}  ·  ${os.product ?? ''}</div>
+</td></tr>
+<tr><td style="height:4px;background:linear-gradient(90deg,${pc},${rc});"></td></tr>
+<tr><td style="padding:24px 28px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:18px;">
+  <tr>
+    <td width="50%" style="padding:12px 14px;background:${riskLevel === 'alto' ? '#fef2f2' : riskLevel === 'medio' ? '#fffbeb' : '#f0fdf4'};border-radius:6px;border:1px solid ${rc}40;">
+      <div style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${rc};">Nivel de Riesgo</div>
+      <div style="font-size:18px;font-weight:800;color:${rc};margin-top:4px;">${rl}</div>
+    </td>
+    <td width="4%"></td>
+    <td width="46%" style="padding:12px 14px;background:#f0f9ff;border-radius:6px;border:1px solid ${pc}40;">
+      <div style="font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${pc};">Avance del Proyecto</div>
+      <div style="font-size:18px;font-weight:800;color:${pc};margin-top:4px;">${Math.round(Number((alertData as any).project?.progressPercent ?? 0))}%</div>
+      <div style="font-size:10px;color:#6b7280;margin-top:2px;">${activitySummary?.done ?? 0} / ${activitySummary?.total ?? 0} actividades</div>
+    </td>
+  </tr></table>
+  <p style="font-size:13px;color:#374151;margin:0 0 6px;">Adjunto encontrará el <b>Análisis de Implementación</b> en formato PDF con detalle de módulos, predicciones, recomendaciones y alertas.</p>
+  ${predictions?.diasDeRetraso != null ? `<p style="font-size:12px;color:#6b7280;margin:0;">Fin estimado: <b>${predictions.fechaEstimadaFin ? new Date(predictions.fechaEstimadaFin).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}</b>${predictions.diasDeRetraso > 0 ? ` &nbsp;·&nbsp; <span style="color:#dc2626;">${predictions.diasDeRetraso} días de retraso</span>` : ' &nbsp;·&nbsp; <span style="color:#059669;">A tiempo</span>'}</p>` : ''}
+</td></tr>
+<tr><td style="padding:14px 28px;background:#f9fafb;border-top:1px solid #e5e7eb;text-align:center;font-size:10px;color:#9ca3af;border-radius:0 0 8px 8px;">
+  ${nom} · Análisis generado automáticamente
+</td></tr>
+</table></td></tr></table></body></html>`;
+
+    await this.mail.sendFromCompany(companyId, dto.destinatarios, asunto, html, [
+      { filename, content: pdf, contentType: 'application/pdf' },
+    ]);
+    return { message: 'Análisis enviado correctamente', destinatarios: dto.destinatarios.length };
+  }
+
   private buildReportHtml(data: any): string {
     const { company, os, project, actas, requerimientos,
             personalCapacitado, personalEnProceso, personalPendiente } = data;

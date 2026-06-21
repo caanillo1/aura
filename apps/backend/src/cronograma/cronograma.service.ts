@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import dayjs from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { EventsGateway } from '../gateway/events.gateway';
 import { CreateBloqueDto, UpdateBloqueDto, BloqueFilterDto, RespondVisitDto } from './dto/cronograma.dto';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class CronogramaService {
     private prisma: PrismaService,
     private mail: MailService,
     private jwtService: JwtService,
+    private gateway: EventsGateway,
   ) {}
 
   private bloqueSelect = {
@@ -228,6 +230,11 @@ export class CronogramaService {
       }
 
       this.notifyAgent(payload.companyId, bloque, 'confirm').catch(() => {});
+      this.pushVisitNotification(bloque.agenteId, 'visita_confirmada',
+        'Visita confirmada por el cliente',
+        `El cliente confirmó la visita "${bloque.titulo}" del ${dayjs(bloque.fecha).format('DD/MM/YYYY')} ${bloque.horaInicio}–${bloque.horaFin}`,
+        bloque.id,
+      );
       return { ok: true, message: '¡Visita confirmada! Nuestro equipo estará listo para la fecha acordada.' };
     }
 
@@ -256,7 +263,22 @@ export class CronogramaService {
     }
 
     this.notifyAgent(payload.companyId, bloque, 'cancel', motivoTexto).catch(() => {});
+    this.pushVisitNotification(bloque.agenteId, 'visita_cancelada',
+      'Visita cancelada por el cliente',
+      `El cliente canceló la visita "${bloque.titulo}" del ${dayjs(bloque.fecha).format('DD/MM/YYYY')}. Motivo: ${motivoTexto}`,
+      bloque.id,
+    );
     return { ok: true, message: 'Visita cancelada y registrada. El equipo será notificado.' };
+  }
+
+  private pushVisitNotification(
+    userId: string, type: string, title: string, message: string, bloqueId: string,
+  ): void {
+    this.prisma.notification.create({
+      data: { userId, type, title, message, entityType: 'bloque', entityId: bloqueId },
+    }).then(notif => {
+      this.gateway.emitToUser(userId, 'notification:new', notif);
+    }).catch(() => {});
   }
 
   async update(companyId: string, id: string, dto: UpdateBloqueDto) {

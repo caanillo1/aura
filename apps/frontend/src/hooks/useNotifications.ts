@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { toast } from 'sonner';
 import { notificationsApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -50,6 +51,20 @@ export function useNotifications() {
       // 1. Actualización optimista instantánea — no espera a la API
       setUnread(prev => prev + 1);
       const n = raw as Partial<AppNotification>;
+
+      // Toast en tiempo real para respuestas de visita del cliente
+      if (n?.type === 'visita_confirmada') {
+        toast.success(n.title ?? 'Visita confirmada', {
+          description: n.message ?? undefined,
+          duration: 8000,
+        });
+      } else if (n?.type === 'visita_cancelada') {
+        toast.error(n.title ?? 'Visita cancelada', {
+          description: n.message ?? undefined,
+          duration: 8000,
+        });
+      }
+
       if (n?.id && n?.type && n?.title) {
         setNotifications(prev => [{
           id:         n.id!,

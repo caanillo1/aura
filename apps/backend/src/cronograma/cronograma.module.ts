@@ -3,10 +3,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { CronogramaService } from './cronograma.service';
 import { CronogramaController, CronogramaPublicController } from './cronograma.controller';
 import { MailModule } from '../mail/mail.module';
+import { GatewayModule } from '../gateway/gateway.module';
 
 @Module({
   imports: [
     MailModule,
+    GatewayModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET ?? 'aura_secret',
       signOptions: { expiresIn: '7d' },

@@ -282,16 +282,24 @@ export class ProjectsService {
     });
     if (!activity) throw new NotFoundException('Actividad no encontrada');
 
+    // Helper: run a deleteMany and silently skip if the table doesn't exist yet in this environment
+    const safeDelete = async (fn: () => Promise<unknown>) => {
+      try { await fn(); } catch (e: any) {
+        if (e?.message?.includes('does not exist')) return;
+        throw e;
+      }
+    };
+
     try {
       // Nullify nullable activityId references that may have DB-level FKs
       // not reflected in the Prisma schema (from a previous db push)
-      await this.prisma.$executeRaw`UPDATE Requerimientos SET activityId = NULL WHERE activityId = ${activityId}`;
-      await this.prisma.$executeRaw`UPDATE ActaCompromisos SET activityId = NULL WHERE activityId = ${activityId}`;
+      await safeDelete(() => this.prisma.$executeRaw`UPDATE Requerimientos SET activityId = NULL WHERE activityId = ${activityId}`);
+      await safeDelete(() => this.prisma.$executeRaw`UPDATE ActaCompromisos SET activityId = NULL WHERE activityId = ${activityId}`);
 
       await Promise.all([
-        this.prisma.subActivity.deleteMany({ where: { activityId } }),
-        this.prisma.activityThread.deleteMany({ where: { activityId } }),
-        this.prisma.activityBlockLog.deleteMany({ where: { activityId } }),
+        safeDelete(() => this.prisma.subActivity.deleteMany({ where: { activityId } })),
+        safeDelete(() => this.prisma.activityThread.deleteMany({ where: { activityId } })),
+        safeDelete(() => this.prisma.activityBlockLog.deleteMany({ where: { activityId } })),
         this.prisma.visitActivity.deleteMany({ where: { activityId } }),
         this.prisma.actaActividad.deleteMany({ where: { activityId } }),
         this.prisma.activityDependency.deleteMany({

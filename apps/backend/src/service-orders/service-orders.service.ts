@@ -820,13 +820,14 @@ export class ServiceOrdersService {
     const reqsSorted = [...reqsRaw].sort((a, b) =>
       (PRIO_ORDER[a.prioridad] ?? 1) - (PRIO_ORDER[b.prioridad] ?? 1));
     const ticketsDetail = {
-      total:        reqsRaw.length,
-      entregados:   reqsRaw.filter(r => r.estadoActual === 'Entregado').length,
-      devueltos:    reqsRaw.filter(r => r.estadoActual === 'Devuelto').length,
-      negados:      reqsRaw.filter(r => r.estadoActual === 'Negado').length,
-      pendientes:   reqsRaw.filter(r => !['Entregado', 'Negado'].includes(r.estadoActual)).length,
-      altaPrioridad:reqsRaw.filter(r => r.prioridad === 'Alta').length,
-      vinculadosAOs: reqs.length,
+      total:          reqsRaw.length,
+      entregados:     reqsRaw.filter(r => r.estadoActual === 'Entregado').length,
+      devueltos:      reqsRaw.filter(r => r.estadoActual === 'Devuelto').length,
+      negados:        reqsRaw.filter(r => r.estadoActual === 'Negado').length,
+      repriorizados:  reqsRaw.filter(r => r.estadoActual === 'Repriorizado').length,
+      pendientes:     reqsRaw.filter(r => r.estadoActual === 'Pendiente').length,
+      altaPrioridad:  reqsRaw.filter(r => r.prioridad === 'Alta').length,
+      vinculadosAOs:  reqs.length,
       list: reqsSorted.slice(0, 25).map(r => ({
         id: r.id, numero: r.numero, titulo: r.titulo,
         prioridad: r.prioridad, estadoActual: r.estadoActual,
@@ -987,6 +988,23 @@ export class ServiceOrdersService {
     const advertencias = alerts.filter(a => a.level === 'advertencia').length;
     const riskLevel    = criticos >= 1 ? 'alto' : advertencias >= 1 ? 'medio' : 'normal';
 
+    // ── Atribución de retraso ────────────────────────────────────────────────
+    // No hay campo "culpable" en la BD — se infiere de señales disponibles
+    const visitasCanceladas  = bloques.filter(b => b.status === 'cancelado').length;
+    const clientSignalScore  = reqDevueltos + visitasCanceladas;           // tickets rechazados por cliente + visitas caídas
+    const implSignalScore    = blockedActs.length + overdueActs.length;    // actividades bloqueadas + vencidas
+    const totalSignals       = clientSignalScore + implSignalScore;
+    const delayAttribution   = totalSignals === 0 ? null : {
+      clientePct:      Math.round((clientSignalScore  / totalSignals) * 100),
+      implementadorPct:Math.round((implSignalScore    / totalSignals) * 100),
+      signals: {
+        ticketsDevueltos:    reqDevueltos,
+        visitasCanceladas,
+        actividadesBloqueadas: blockedActs.length,
+        actividadesVencidas:   overdueActs.length,
+      },
+    };
+
     return {
       os: {
         id: os.id, osNumber: os.osNumber, product: os.product, status: os.status,
@@ -1000,12 +1018,13 @@ export class ServiceOrdersService {
       riskLevel,
       alerts,
       predictions,
-      modules:         modulesDetail,
-      visits:          visitsDetail,
-      timeline:        timelineDetail,
+      modules:          modulesDetail,
+      visits:           visitsDetail,
+      timeline:         timelineDetail,
       activitySummary,
       recommendations,
-      tickets:         ticketsDetail,
+      tickets:          ticketsDetail,
+      delayAttribution,
     };
   }
 

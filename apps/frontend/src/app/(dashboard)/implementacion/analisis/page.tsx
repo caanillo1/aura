@@ -57,8 +57,13 @@ interface TicketItem {
 
 interface TicketsDetail {
   total: number; entregados: number; devueltos: number; negados: number;
-  pendientes: number; altaPrioridad: number; vinculadosAOs: number;
+  repriorizados: number; pendientes: number; altaPrioridad: number; vinculadosAOs: number;
   list: TicketItem[];
+}
+
+interface DelayAttribution {
+  clientePct: number; implementadorPct: number;
+  signals: { ticketsDevueltos: number; visitasCanceladas: number; actividadesBloqueadas: number; actividadesVencidas: number };
 }
 
 type RiskLevel = 'alto' | 'medio' | 'normal';
@@ -80,7 +85,7 @@ interface AnalysisData {
   riskLevel: RiskLevel; alerts: Alert[]; predictions: Predictions;
   modules?: ModuleDetail[]; visits?: VisitsDetail; timeline?: TimelineDetail | null;
   activitySummary?: ActivitySummary; recommendations?: Recommendation[];
-  tickets?: TicketsDetail;
+  tickets?: TicketsDetail; delayAttribution?: DelayAttribution | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -728,16 +733,17 @@ export default function AnalisisPage() {
 
   const border = isLight ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.06)';
 
-  const risk       = data ? RISK_CFG[data.riskLevel] : null;
-  const acts       = data?.activitySummary;
-  const visits     = data?.visits;
-  const timeline   = data?.timeline;
-  const modules    = data?.modules ?? [];
-  const recs       = data?.recommendations ?? [];
-  const preds      = data?.predictions;
-  const tickets    = data?.tickets;
-  const critAlerts = data?.alerts.filter(a => a.level === 'critico').length ?? 0;
-  const warnAlerts = data?.alerts.filter(a => a.level === 'advertencia').length ?? 0;
+  const risk            = data ? RISK_CFG[data.riskLevel] : null;
+  const acts            = data?.activitySummary;
+  const visits          = data?.visits;
+  const timeline        = data?.timeline;
+  const modules         = data?.modules ?? [];
+  const recs            = data?.recommendations ?? [];
+  const preds           = data?.predictions;
+  const tickets         = data?.tickets;
+  const delayAttrib     = data?.delayAttribution;
+  const critAlerts      = data?.alerts.filter(a => a.level === 'critico').length ?? 0;
+  const warnAlerts      = data?.alerts.filter(a => a.level === 'advertencia').length ?? 0;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -924,6 +930,9 @@ export default function AnalisisPage() {
                     sub="completadas del total" color="#6366f1" icon={ListChecks} />
                   <KpiCard label="En progreso" value={acts.inProgress}
                     sub="actividades activas" color="#60a5fa" icon={Activity} />
+                  <KpiCard label="Pendientes" value={acts.pending}
+                    sub="sin iniciar" color={acts.pending > 0 ? '#94a3b8' : '#10b981'}
+                    icon={Clock} />
                   <KpiCard label="Vencidas" value={acts.overdue}
                     sub="fuera de plazo" color={acts.overdue > 0 ? '#f59e0b' : '#10b981'}
                     icon={AlertTriangle} accent={acts.overdue > 0} />
@@ -1064,7 +1073,89 @@ export default function AnalisisPage() {
               )}
             </div>
 
-            {/* ── 9. Tickets / Requerimientos ────────────────────────────── */}
+            {/* ── 9. Atribución del retraso ─────────────────────────────── */}
+            {delayAttrib && (
+              <div>
+                <SectionTitle icon={ArrowLeftRight} title="Atribución del retraso" />
+                <div className="rounded-2xl p-5"
+                  style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}>
+                  <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+                    Inferido de señales disponibles. No representa una auditoría formal — es una guía para priorizar conversaciones con el equipo.
+                  </p>
+                  {/* Barra de atribución */}
+                  <div className="mb-5">
+                    <div className="flex h-4 rounded-full overflow-hidden mb-2">
+                      {delayAttrib.clientePct > 0 && (
+                        <div className="flex items-center justify-center text-xs font-bold text-white transition-all"
+                          style={{ width: `${delayAttrib.clientePct}%`, background: '#f97316',
+                                   minWidth: delayAttrib.clientePct > 10 ? 0 : 0 }}>
+                          {delayAttrib.clientePct >= 15 && `${delayAttrib.clientePct}%`}
+                        </div>
+                      )}
+                      {delayAttrib.implementadorPct > 0 && (
+                        <div className="flex items-center justify-center text-xs font-bold text-white transition-all"
+                          style={{ width: `${delayAttrib.implementadorPct}%`, background: '#6366f1' }}>
+                          {delayAttrib.implementadorPct >= 15 && `${delayAttrib.implementadorPct}%`}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span style={{ color: '#ea580c' }}>
+                        Cliente {delayAttrib.clientePct}%
+                      </span>
+                      <span style={{ color: '#6366f1' }}>
+                        Implementador {delayAttrib.implementadorPct}%
+                      </span>
+                    </div>
+                  </div>
+                  {/* Señales detalle */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl p-3"
+                      style={{ background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.18)' }}>
+                      <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: '#ea580c' }}>
+                        Señales del cliente
+                      </p>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span style={{ color: 'var(--text-muted)' }}>Tickets devueltos</span>
+                          <span className="font-bold" style={{ color: delayAttrib.signals.ticketsDevueltos > 0 ? '#ea580c' : '#10b981' }}>
+                            {delayAttrib.signals.ticketsDevueltos}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span style={{ color: 'var(--text-muted)' }}>Visitas canceladas</span>
+                          <span className="font-bold" style={{ color: delayAttrib.signals.visitasCanceladas > 0 ? '#ea580c' : '#10b981' }}>
+                            {delayAttrib.signals.visitasCanceladas}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="rounded-xl p-3"
+                      style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                      <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: '#6366f1' }}>
+                        Señales del implementador
+                      </p>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span style={{ color: 'var(--text-muted)' }}>Actividades bloqueadas</span>
+                          <span className="font-bold" style={{ color: delayAttrib.signals.actividadesBloqueadas > 0 ? '#6366f1' : '#10b981' }}>
+                            {delayAttrib.signals.actividadesBloqueadas}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span style={{ color: 'var(--text-muted)' }}>Actividades vencidas</span>
+                          <span className="font-bold" style={{ color: delayAttrib.signals.actividadesVencidas > 0 ? '#6366f1' : '#10b981' }}>
+                            {delayAttrib.signals.actividadesVencidas}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── 10. Tickets / Requerimientos ───────────────────────────── */}
             {tickets && tickets.total > 0 && (
               <div>
                 <SectionTitle icon={Ticket}
@@ -1085,14 +1176,20 @@ export default function AnalisisPage() {
 
                 {/* KPIs de tickets */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                  <KpiCard label="Total tickets"  value={tickets.total}
+                  <KpiCard label="Total tickets"    value={tickets.total}
                     sub="asociados a la OS" color="#8b5cf6" icon={Ticket} />
-                  <KpiCard label="Pendientes"     value={tickets.pendientes}
-                    sub="sin entrega" color={tickets.pendientes > 0 ? '#f59e0b' : '#10b981'}
-                    icon={Clock} accent={tickets.pendientes > 0} />
-                  <KpiCard label="Entregados"     value={tickets.entregados}
+                  <KpiCard label="Entregados"       value={tickets.entregados}
                     sub="resueltos" color="#10b981" icon={CheckCheck} />
-                  <KpiCard label="Alta prioridad" value={tickets.altaPrioridad}
+                  <KpiCard label="Pendientes"       value={tickets.pendientes}
+                    sub="estado pendiente" color={tickets.pendientes > 0 ? '#f59e0b' : '#10b981'}
+                    icon={Clock} accent={tickets.pendientes > 0} />
+                  <KpiCard label="Repriorizados"    value={tickets.repriorizados ?? 0}
+                    sub="en re-evaluación" color={(tickets.repriorizados ?? 0) > 0 ? '#fbbf24' : '#10b981'}
+                    icon={ArrowLeftRight} accent={(tickets.repriorizados ?? 0) > 0} />
+                  <KpiCard label="Devueltos"        value={tickets.devueltos}
+                    sub="retornados al implementador" color={tickets.devueltos > 0 ? '#f97316' : '#10b981'}
+                    icon={ArrowLeftRight} accent={tickets.devueltos > 0} />
+                  <KpiCard label="Alta prioridad"   value={tickets.altaPrioridad}
                     sub="requieren atención" color={tickets.altaPrioridad > 0 ? '#ef4444' : '#10b981'}
                     icon={TriangleAlert} accent={tickets.altaPrioridad > 0} />
                 </div>
@@ -1159,7 +1256,7 @@ export default function AnalisisPage() {
               </div>
             )}
 
-            {/* ── 10. Module Detail Cards ─────────────────────────────────── */}
+            {/* ── 11. Module Detail Cards ─────────────────────────────────── */}
             {modules.length > 0 && (
               <div>
                 <SectionTitle icon={Layers} title={`Detalle por módulo (${modules.length})`} />

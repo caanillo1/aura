@@ -128,6 +128,27 @@ function PageFooter({ pc, nom, page }: { pc: string; nom: string; page: number }
 
 // ── Main document ─────────────────────────────────────────────────────────────
 
+function AttributionBar({ clientePct, implPct }: { clientePct: number; implPct: number }) {
+  return (
+    <View style={{ gap: 6 }}>
+      <View style={{ flexDirection: 'row', height: 10, borderRadius: 6, overflow: 'hidden' }}>
+        <View style={{ flex: clientePct, backgroundColor: '#f97316' }} />
+        <View style={{ flex: implPct,  backgroundColor: '#6366f1' }} />
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#f97316' }} />
+          <Text style={{ fontSize: FS.label, color: '#c2410c', fontFamily: F.bold }}>Cliente {clientePct}%</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#6366f1' }} />
+          <Text style={{ fontSize: FS.label, color: '#4338ca', fontFamily: F.bold }}>Implementador {implPct}%</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 interface Props {
   data: any;
   company: any;
@@ -136,7 +157,7 @@ interface Props {
 export function AnalisisPdfDocument({ data, company }: Props) {
   const { os, project, riskLevel, alerts = [], predictions = {},
           modules = [], visits, timeline, activitySummary = {},
-          recommendations = [], tickets } = data ?? {};
+          recommendations = [], tickets, delayAttribution } = data ?? {};
 
   const nom = company?.commercialName ?? company?.name ?? '';
   const pc  = company?.primaryColor ?? '#1E3A5F';
@@ -256,8 +277,9 @@ export function AnalisisPdfDocument({ data, company }: Props) {
             {([
               { label: 'Completadas',  value: activitySummary.done ?? 0,       color: '#065f46', bg: '#d1fae5' },
               { label: 'En Progreso',  value: activitySummary.inProgress ?? 0, color: '#1e40af', bg: '#dbeafe' },
+              { label: 'Pendientes',   value: activitySummary.pending ?? 0,    color: '#92400e', bg: '#fef3c7' },
               { label: 'Bloqueadas',   value: activitySummary.blocked ?? 0,    color: '#991b1b', bg: '#fee2e2' },
-              { label: 'Vencidas',     value: activitySummary.overdue ?? 0,    color: '#92400e', bg: '#fef3c7' },
+              { label: 'Vencidas',     value: activitySummary.overdue ?? 0,    color: '#b45309', bg: '#fff7ed' },
             ] as { label: string; value: number; color: string; bg: string }[]).map(({ label, value, color, bg }) => (
               <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between',
                 alignItems: 'center', padding: '5 10', backgroundColor: bg,
@@ -438,6 +460,43 @@ export function AnalisisPdfDocument({ data, company }: Props) {
         </View>
       )}
 
+      {/* Delay Attribution */}
+      {delayAttribution && (
+        <View style={{ marginBottom: 16, padding: '10 14', backgroundColor: N.gray50,
+          borderRadius: 8, borderWidth: 0.5, borderColor: N.gray200 }}>
+          <SectionHead title="Atribución del Retraso" pc={pc} />
+          <Text style={{ fontSize: FS.small, color: N.gray500, marginBottom: 8, lineHeight: LH.normal }}>
+            Basado en señales disponibles: tickets devueltos + visitas canceladas (cliente) vs
+            actividades bloqueadas + vencidas (implementador). No reemplaza un análisis formal.
+          </Text>
+          <AttributionBar clientePct={delayAttribution.clientePct} implPct={delayAttribution.implementadorPct} />
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+            <View style={{ flex: 1, padding: '7 10', backgroundColor: '#fff7ed',
+              borderRadius: 6, borderWidth: 0.5, borderColor: '#fed7aa' }}>
+              <Text style={{ fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
+                letterSpacing: 0.8, color: '#9a3412', marginBottom: 4 }}>Señales del cliente</Text>
+              <Text style={{ fontSize: FS.small, color: '#7c2d12' }}>
+                Tickets devueltos: {delayAttribution.signals.ticketsDevueltos}
+              </Text>
+              <Text style={{ fontSize: FS.small, color: '#7c2d12' }}>
+                Visitas canceladas: {delayAttribution.signals.visitasCanceladas}
+              </Text>
+            </View>
+            <View style={{ flex: 1, padding: '7 10', backgroundColor: '#eef2ff',
+              borderRadius: 6, borderWidth: 0.5, borderColor: '#c7d2fe' }}>
+              <Text style={{ fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
+                letterSpacing: 0.8, color: '#3730a3', marginBottom: 4 }}>Señales del implementador</Text>
+              <Text style={{ fontSize: FS.small, color: '#312e81' }}>
+                Actividades bloqueadas: {delayAttribution.signals.actividadesBloqueadas}
+              </Text>
+              <Text style={{ fontSize: FS.small, color: '#312e81' }}>
+                Actividades vencidas: {delayAttribution.signals.actividadesVencidas}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Recommendations */}
       {recommendations.length > 0 && (
         <View style={{ marginBottom: 16 }}>
@@ -535,12 +594,12 @@ export function AnalisisPdfDocument({ data, company }: Props) {
 
       {/* Ticket KPI row */}
       <View style={{ flexDirection: 'row', gap: 7, marginBottom: 14 }}>
-        <KpiCard label="Total" value={String(tickets.total)} color={pc} />
-        <KpiCard label="Entregados" value={String(tickets.entregados)} color="#10b981" />
-        <KpiCard label="Devueltos" value={String(tickets.devueltos)} color="#f97316" />
-        <KpiCard label="Negados" value={String(tickets.negados)} color="#ef4444" />
-        <KpiCard label="Pendientes" value={String(tickets.pendientes)} color="#f59e0b" />
-        <KpiCard label="Alta prioridad" value={String(tickets.altaPrioridad)} color="#8b5cf6" />
+        <KpiCard label="Total"        value={String(tickets.total)}         color={pc} />
+        <KpiCard label="Entregados"   value={String(tickets.entregados)}    color="#10b981" />
+        <KpiCard label="Pendientes"   value={String(tickets.pendientes)}    color="#f59e0b" />
+        <KpiCard label="Reprioriz."   value={String(tickets.repriorizados ?? 0)} color="#fbbf24" />
+        <KpiCard label="Devueltos"    value={String(tickets.devueltos)}     color="#f97316" />
+        <KpiCard label="Alta prior."  value={String(tickets.altaPrioridad)} color="#8b5cf6" />
       </View>
 
       {/* Ticket list table */}
@@ -553,15 +612,15 @@ export function AnalisisPdfDocument({ data, company }: Props) {
           {/* Header */}
           <View style={{ flexDirection: 'row', backgroundColor: N.gray100,
             borderRadius: 4, padding: '5 8', marginBottom: 4 }}>
-            <Text style={{ flex: 0.6, fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
+            <Text style={{ width: 28, fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
               letterSpacing: 0.5, color: N.gray500 }}>N°</Text>
             <Text style={{ flex: 3, fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
-              letterSpacing: 0.5, color: N.gray500 }}>Título</Text>
-            <Text style={{ flex: 1, fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
+              letterSpacing: 0.5, color: N.gray500, paddingRight: 4 }}>Título</Text>
+            <Text style={{ width: 55, fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
               letterSpacing: 0.5, color: N.gray500 }}>Tipo</Text>
-            <Text style={{ flex: 1, fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
-              letterSpacing: 0.5, color: N.gray500 }}>Prioridad</Text>
-            <Text style={{ flex: 1.2, fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
+            <Text style={{ width: 44, fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
+              letterSpacing: 0.5, color: N.gray500 }}>Prior.</Text>
+            <Text style={{ width: 60, fontSize: FS.label, fontFamily: F.bold, textTransform: 'uppercase',
               letterSpacing: 0.5, color: N.gray500 }}>Estado</Text>
           </View>
           {tickets.list.slice(0, 20).map((t: any, i: number) => {
@@ -571,20 +630,20 @@ export function AnalisisPdfDocument({ data, company }: Props) {
               <View key={t.id} style={{ flexDirection: 'row', padding: '5 8',
                 backgroundColor: i % 2 === 0 ? N.white : N.gray50,
                 borderBottomWidth: 0.5, borderBottomColor: N.gray100 }}>
-                <Text style={{ flex: 0.6, fontSize: FS.table, color: N.gray500 }}>
+                <Text style={{ width: 28, fontSize: FS.table, color: N.gray500 }}>
                   {t.numero ?? (i + 1)}
                 </Text>
-                <Text style={{ flex: 3, fontSize: FS.table, color: N.gray800,
+                <Text style={{ flex: 3, fontSize: FS.table, color: N.gray800, paddingRight: 4,
                   fontFamily: t.vinculadoAEstaOS ? F.bold : F.regular }}>
-                  {String(t.titulo ?? '').slice(0, 80)}
+                  {String(t.titulo ?? '').slice(0, 70)}
                 </Text>
-                <Text style={{ flex: 1, fontSize: FS.table, color: N.gray600 }}>
-                  {t.tipo ?? '—'}
+                <Text style={{ width: 55, fontSize: FS.table, color: N.gray600 }}>
+                  {(t.tipo ?? '—').slice(0, 10)}
                 </Text>
-                <Text style={{ flex: 1, fontSize: FS.table, fontFamily: F.bold, color: pColor }}>
+                <Text style={{ width: 44, fontSize: FS.table, fontFamily: F.bold, color: pColor }}>
                   {t.prioridad ?? '—'}
                 </Text>
-                <Text style={{ flex: 1.2, fontSize: FS.table, fontFamily: F.bold, color: eColor }}>
+                <Text style={{ width: 60, fontSize: FS.table, fontFamily: F.bold, color: eColor }}>
                   {t.estadoActual ?? '—'}
                 </Text>
               </View>

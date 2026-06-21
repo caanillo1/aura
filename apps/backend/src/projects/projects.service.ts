@@ -282,6 +282,9 @@ export class ProjectsService {
     if (!activity) throw new NotFoundException('Actividad no encontrada');
 
     await Promise.all([
+      this.prisma.subActivity.deleteMany({ where: { activityId } }),
+      this.prisma.activityThread.deleteMany({ where: { activityId } }),
+      this.prisma.activityBlockLog.deleteMany({ where: { activityId } }),
       this.prisma.visitActivity.deleteMany({ where: { activityId } }),
       this.prisma.actaActividad.deleteMany({ where: { activityId } }),
       this.prisma.activityDependency.deleteMany({

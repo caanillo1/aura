@@ -29,6 +29,8 @@ export class AddGestionDto {
   @ApiProperty() @IsString() @IsNotEmpty() fecha: string;
   @ApiProperty() @IsIn(ESTADOS) estado: string;
   @ApiProperty() @IsString() @IsNotEmpty() observacion: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['cliente','desarrollo']) devueltoPor?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() devueltoNota?: string;
 }
 
 export class CreateBulkRequerimientosDto {

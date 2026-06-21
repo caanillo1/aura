@@ -36,6 +36,8 @@ export class ActaCompromisoDto {
   @ApiPropertyOptional() @IsOptional() @IsUUID() moduleId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() phaseId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() activityId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() fechaLimite?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['agente','cliente']) responsablePrincipal?: string;
 }
 
 export class ActaParticipanteDto {

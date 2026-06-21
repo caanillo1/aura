@@ -172,7 +172,7 @@ export default function PriorizarPage() {
 
   // Modal gestión
   const [modalReq,      setModalReq]      = useState<Req | null>(null);
-  const [gestion,       setGestion]       = useState({ estado: 'Priorizado' as Estado, observacion: '', fecha: new Date().toISOString().split('T')[0] });
+  const [gestion,       setGestion]       = useState({ estado: 'Priorizado' as Estado, observacion: '', fecha: new Date().toISOString().split('T')[0], devueltoPor: '' as '' | 'cliente' | 'desarrollo', devueltoNota: '' });
   const [savingGestion, setSavingGestion] = useState(false);
 
   // Modal exportar Excel
@@ -336,10 +336,16 @@ export default function PriorizarPage() {
   // ── Gestión ───────────────────────────────────────────────────────────────
   const handleAddGestion = async () => {
     if (!gestion.observacion.trim()) { toast.error('La observación es obligatoria'); return; }
+    if (gestion.estado === 'Devuelto' && !gestion.devueltoPor) { toast.error('Selecciona quién devuelve el ticket'); return; }
     if (!modalReq) return;
     setSavingGestion(true);
     try {
-      await requerimientosApi.addGestion(modalReq.id, gestion);
+      await requerimientosApi.addGestion(modalReq.id, {
+        fecha: gestion.fecha,
+        estado: gestion.estado,
+        observacion: gestion.observacion,
+        ...(gestion.estado === 'Devuelto' ? { devueltoPor: gestion.devueltoPor, devueltoNota: gestion.devueltoNota || undefined } : {}),
+      });
       const nuevoEstado = gestion.estado as Estado;
       const newEntry: Gestion = {
         id: `tmp-${Date.now()}`, fecha: new Date(gestion.fecha).toISOString(),
@@ -352,7 +358,7 @@ export default function PriorizarPage() {
       ));
       toast.success('Gestión registrada');
       setModalReq(null);
-      setGestion({ estado: 'Priorizado', observacion: '', fecha: new Date().toISOString().split('T')[0] });
+      setGestion({ estado: 'Priorizado', observacion: '', fecha: new Date().toISOString().split('T')[0], devueltoPor: '', devueltoNota: '' });
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? 'Error al registrar gestión');
     } finally {
@@ -1284,7 +1290,7 @@ export default function PriorizarPage() {
                                 </button>
                                 {can('tickets.gestionar') && (
                                   <button
-                                    onClick={() => { setModalReq(req); setGestion({ estado: 'Priorizado', observacion: '', fecha: new Date().toISOString().split('T')[0] }); }}
+                                    onClick={() => { setModalReq(req); setGestion({ estado: 'Priorizado', observacion: '', fecha: new Date().toISOString().split('T')[0], devueltoPor: '', devueltoNota: '' }); }}
                                     className="p-1.5 rounded-lg transition-all hover:bg-violet-500/10"
                                     style={{ color: '#a78bfa' }} title="Registrar gestión">
                                     <Send className="w-3.5 h-3.5" />
@@ -1452,6 +1458,24 @@ export default function PriorizarPage() {
               </span>
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>— nuevo estado</span>
             </div>
+
+            {/* Devolución: quién devuelve (solo cuando estado = Devuelto) */}
+            {gestion.estado === 'Devuelto' && (
+              <div className="rounded-xl p-3 space-y-2.5" style={{ background: 'rgba(251,146,60,0.06)', border: '1px solid rgba(251,146,60,0.25)' }}>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#fb923c' }}>¿Quién devuelve el ticket?</p>
+                <div className="flex gap-2">
+                  {[{ v: 'cliente' as const, l: 'Cliente' }, { v: 'desarrollo' as const, l: 'Área de Desarrollo' }].map(({ v, l }) => (
+                    <button key={v} type="button" onClick={() => setGestion(p => ({ ...p, devueltoPor: v }))}
+                      className="flex-1 text-sm py-2 rounded-xl font-semibold border transition-all"
+                      style={{
+                        background: gestion.devueltoPor === v ? 'rgba(251,146,60,0.18)' : 'transparent',
+                        color: gestion.devueltoPor === v ? '#fb923c' : 'var(--text-muted)',
+                        borderColor: gestion.devueltoPor === v ? 'rgba(251,146,60,0.50)' : 'var(--border-subtle)',
+                      }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Observación */}
             <div>
@@ -1977,7 +2001,7 @@ export default function PriorizarPage() {
                   Cerrar
                 </button>
                 <button
-                  onClick={() => { setViewTarget(null); setEditMode(false); setModalReq(viewTarget); setGestion({ estado: 'Priorizado', observacion: '', fecha: new Date().toISOString().split('T')[0] }); }}
+                  onClick={() => { setViewTarget(null); setEditMode(false); setModalReq(viewTarget); setGestion({ estado: 'Priorizado', observacion: '', fecha: new Date().toISOString().split('T')[0], devueltoPor: '', devueltoNota: '' }); }}
                   className="flex-1 btn-primary py-2.5 rounded-xl text-sm text-white font-semibold flex items-center justify-center gap-2">
                   <Send className="w-4 h-4" /> Registrar gestión
                 </button>

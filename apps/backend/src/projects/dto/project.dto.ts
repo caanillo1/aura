@@ -70,6 +70,9 @@ export class UpdateActivityDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() executionDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() assignedToId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() clientStaffId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['cliente','desarrollo','implementador']) blockedBy?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() blockedNote?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() unlockNote?: string;
 }
 
 export class CreateProjectActivityDto {

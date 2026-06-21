@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes';
 import {
   ArrowLeft, RefreshCw, CheckCircle2, Circle, Clock, AlertCircle,
   ChevronDown, Layers, Calendar, ClipboardList, Pencil, Check,
-  MessageSquare, Send, Trash2, Upload, Plus, User, FileText,
+  MessageSquare, Send, Trash2, Upload, Plus, User, FileText, CheckSquare,
 } from 'lucide-react';
 import Link from 'next/link';
 import { projectsApi, templatesApi, usersApi, clientsApi, actasApi } from '@/lib/api';
@@ -239,6 +239,9 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
     clientStaffId:    activity?.clientStaffId ?? '',
   });
   const [saving, setSaving] = useState(false);
+  const [blockBy,   setBlockBy]   = useState('');
+  const [blockNote, setBlockNote] = useState('');
+  const [unlockNote, setUnlockNote] = useState('');
 
   const [threads, setThreads]                 = useState<ActivityThread[]>([]);
   const [loadingThreads, setLoadingThreads]   = useState(false);
@@ -262,6 +265,9 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
         assignedToId:     activity.assignedToId ?? '',
         clientStaffId:    activity.clientStaffId ?? '',
       });
+      setBlockBy('');
+      setBlockNote('');
+      setUnlockNote('');
       setNewThread('');
     }
   }, [activity]);
@@ -282,6 +288,10 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
 
   const handleSave = async () => {
     if (!activity) return;
+    if (form.status === 'bloqueado') {
+      if (!blockBy) { toast.error('Selecciona quién bloquea la actividad'); return; }
+      if (!blockNote.trim()) { toast.error('La nota de bloqueo es obligatoria'); return; }
+    }
     setSaving(true);
     try {
       await projectsApi.updateActivity(activity.id, {
@@ -296,6 +306,8 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
         executionDate:    form.executionDate    || null,
         assignedToId:     form.assignedToId     || null,
         clientStaffId:    form.clientStaffId    || null,
+        ...(form.status === 'bloqueado' ? { blockedBy: blockBy, blockedNote: blockNote } : {}),
+        ...(activity.status === 'bloqueado' && form.status !== 'bloqueado' && unlockNote ? { unlockNote } : {}),
       });
       toast.success('Actividad actualizada');
       onSaved();
@@ -404,6 +416,51 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
                 })}
               </div>
             </div>
+
+            {/* Bloqueo: campos obligatorios cuando se selecciona "bloqueado" */}
+            {form.status === 'bloqueado' && (
+              <div className="rounded-xl p-3 space-y-2.5" style={{ background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#f87171' }}>Información de bloqueo</p>
+                <div>
+                  <label className="block text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>¿Quién bloquea? <span className="text-red-400">*</span></label>
+                  <div className="flex gap-2">
+                    {[{ v: 'cliente', l: 'Cliente' }, { v: 'desarrollo', l: 'Desarrollo' }, { v: 'implementador', l: 'Implementador' }].map(({ v, l }) => (
+                      <button key={v} type="button" onClick={() => setBlockBy(v)}
+                        className="flex-1 text-xs py-1.5 rounded-lg font-semibold border transition-all"
+                        style={{
+                          background: blockBy === v ? 'rgba(248,113,113,0.20)' : 'transparent',
+                          color: blockBy === v ? '#f87171' : 'var(--text-muted)',
+                          borderColor: blockBy === v ? 'rgba(248,113,113,0.50)' : 'var(--border-subtle)',
+                        }}>{l}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Motivo del bloqueo <span className="text-red-400">*</span></label>
+                  <textarea rows={3} placeholder="Describe por qué está bloqueada la actividad..."
+                    value={blockNote} onChange={e => setBlockNote(e.target.value)}
+                    className="input-glass w-full rounded-xl px-3 py-2 text-sm resize-none" />
+                </div>
+              </div>
+            )}
+
+            {/* Desbloqueo: nota opcional al reanudar desde estado bloqueado */}
+            {activity?.status === 'bloqueado' && form.status !== 'bloqueado' && (
+              <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.25)' }}>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#34d399' }}>Reanudando actividad bloqueada</p>
+                {activity.clientDelayDays ? (
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Días acumulados por cliente: <span className="font-semibold" style={{ color: '#f87171' }}>{activity.clientDelayDays}d</span>
+                  </p>
+                ) : null}
+                <div>
+                  <label className="block text-[10px] mb-1 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Nota de reanudación (opcional)</label>
+                  <textarea rows={2} placeholder="Motivo por el que se retoma la actividad..."
+                    value={unlockNote} onChange={e => setUnlockNote(e.target.value)}
+                    className="input-glass w-full rounded-xl px-3 py-2 text-sm resize-none" />
+                </div>
+              </div>
+            )}
 
             {/* Progreso */}
             <div>
@@ -611,9 +668,47 @@ function ActivityModal({ activity, users, clientStaff, onClose, onSaved, tc }: A
 }
 
 
+// ── Botón de borrado de actividad (con confirmación inline) ────────────────
+
+function ActivityDeleteButton({ activityId, onDeleted }: { activityId: string; onDeleted: () => void }) {
+  const [confirm, setConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  if (confirm) {
+    return (
+      <div className="flex items-center gap-1 shrink-0">
+        <button onClick={async () => {
+          setDeleting(true);
+          try { await projectsApi.deleteActivity(activityId); onDeleted(); }
+          catch { toast.error('Error al eliminar actividad'); setDeleting(false); setConfirm(false); }
+        }} disabled={deleting}
+          className="text-[10px] px-2 py-1 rounded-lg font-semibold"
+          style={{ background: 'rgba(248,113,113,0.20)', color: '#f87171', border: '1px solid rgba(248,113,113,0.40)' }}>
+          {deleting ? '...' : 'Confirmar'}
+        </button>
+        <button onClick={() => setConfirm(false)}
+          className="text-[10px] px-1.5 py-1 rounded-lg"
+          style={{ color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+      onClick={() => setConfirm(true)}
+      className="shrink-0 p-1.5 rounded-lg transition-colors"
+      style={{ color: '#f87171', border: '1px solid rgba(248,113,113,0.15)' }}
+      title="Eliminar actividad">
+      <Trash2 className="w-3 h-3" />
+    </motion.button>
+  );
+}
+
 // ── Componente de fase ─────────────────────────────────────────────────────
 
-function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdate, onActivityAdded }: {
+function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdate, onActivityAdded, bulkMode, bulkSelected, onBulkToggle }: {
   phase: ProjectPhase;
   tc: any;
   users: UserType[];
@@ -621,6 +716,9 @@ function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdat
   filterStatus: ActivityStatus | null;
   onActivityUpdate: () => void;
   onActivityAdded: () => void;
+  bulkMode: boolean;
+  bulkSelected: Set<string>;
+  onBulkToggle: (activityId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<ProjectActivity | null>(null);
@@ -706,9 +804,15 @@ function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdat
                       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
-                      {/* Fila 1: status, code, name, priority, progress, edit */}
+                      {/* Fila 1: status, code, name, priority, progress, edit, delete */}
                       <div className="flex items-center gap-3">
-                        <AIcon className="w-4 h-4 shrink-0" style={{ color: aCfg.color }} />
+                        {bulkMode ? (
+                          <input type="checkbox" checked={bulkSelected.has(act.id)}
+                            onChange={() => onBulkToggle(act.id)}
+                            className="w-4 h-4 rounded shrink-0 cursor-pointer accent-blue-400" />
+                        ) : (
+                          <AIcon className="w-4 h-4 shrink-0" style={{ color: aCfg.color }} />
+                        )}
                         <span className="font-mono text-[11px] px-1.5 py-0.5 rounded shrink-0"
                           style={{ background: 'rgba(96,165,250,0.08)', color: '#60a5fa' }}>
                           {act.code}
@@ -722,13 +826,16 @@ function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdat
                           <span className="text-[10px] block text-right mb-0.5" style={{ color: tc.m }}>{actPct.toFixed(0)}%</span>
                           <ProgressBar pct={actPct} color={aCfg.color} height={3} />
                         </div>
-                        {can('activities.manage') && (
+                        {can('activities.manage') && !bulkMode && (
                           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                             onClick={() => setSelected(act)}
                             className="shrink-0 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium flex items-center gap-1"
                             style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)' }}>
                             <Pencil className="w-3 h-3" /> <span className="hidden sm:inline">Editar</span>
                           </motion.button>
+                        )}
+                        {can('activities.manage') && !bulkMode && (
+                          <ActivityDeleteButton activityId={act.id} onDeleted={onActivityUpdate} />
                         )}
                       </div>
 
@@ -846,6 +953,10 @@ export default function ProjectDetailPage() {
   const [loading, setLoading]   = useState(true);
   const [activeModIdx, setActiveModIdx] = useState(0);
   const [filterStatus, setFilterStatus] = useState<ActivityStatus | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkNote, setBulkNote] = useState('');
   const [now, setNow] = useState(() => new Date());
 
   // Listas para responsables
@@ -1406,6 +1517,25 @@ export default function ProjectDetailPage() {
                   );
                 })()}
 
+                {/* Botón selección múltiple */}
+                {can('activities.manage') && (
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setBulkMode(m => !m); setBulkSelected(new Set()); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                      style={{
+                        background: bulkMode ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.05)',
+                        color: bulkMode ? '#34d399' : tc.m,
+                        border: `1px solid ${bulkMode ? 'rgba(52,211,153,0.40)' : 'rgba(255,255,255,0.08)'}`,
+                      }}>
+                      <CheckSquare className="w-3.5 h-3.5" />
+                      {bulkMode ? `Seleccionando (${bulkSelected.size})` : 'Selección múltiple'}
+                    </button>
+                    {bulkMode && bulkSelected.size > 0 && (
+                      <span className="text-xs" style={{ color: tc.m }}>{bulkSelected.size} actividad{bulkSelected.size !== 1 ? 'es' : ''} seleccionada{bulkSelected.size !== 1 ? 's' : ''}</span>
+                    )}
+                  </div>
+                )}
+
                 {activeMod.phases.length === 0 ? (
                   <div style={{ ...cardStyle, textAlign: 'center' }}>
                     <p style={{ color: tc.m }}>Sin fases definidas</p>
@@ -1421,12 +1551,68 @@ export default function ProjectDetailPage() {
                       filterStatus={filterStatus}
                       onActivityUpdate={load}
                       onActivityAdded={load}
+                      bulkMode={bulkMode}
+                      bulkSelected={bulkSelected}
+                      onBulkToggle={(id) => setBulkSelected(prev => {
+                        const n = new Set(prev);
+                        n.has(id) ? n.delete(id) : n.add(id);
+                        return n;
+                      })}
                     />
                   ))
                 )}
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Floating bulk action bar */}
+      {bulkMode && bulkSelected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 px-4 py-3 rounded-2xl shadow-2xl"
+          style={{ background: '#0f172a', border: '1px solid rgba(96,165,250,0.35)', backdropFilter: 'blur(12px)', minWidth: 420 }}>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold shrink-0" style={{ color: '#60a5fa' }}>
+              {bulkSelected.size} seleccionada{bulkSelected.size !== 1 ? 's' : ''}
+            </span>
+            <span className="text-xs shrink-0" style={{ color: 'rgba(255,255,255,0.30)' }}>→ Cambiar a:</span>
+            {([
+              { s: 'pendiente',   label: 'Pendiente',   color: '#94a3b8' },
+              { s: 'en_progreso', label: 'En progreso', color: '#60a5fa' },
+              { s: 'completado',  label: 'Completado',  color: '#34d399' },
+            ] as const).map(({ s, label, color }) => (
+              <button key={s} disabled={bulkApplying}
+                onClick={async () => {
+                  setBulkApplying(true);
+                  try {
+                    await projectsApi.bulkUpdateStatus(Array.from(bulkSelected), s, bulkNote.trim() || undefined);
+                    toast.success(`${bulkSelected.size} actividades → ${label}`);
+                    setBulkSelected(new Set());
+                    setBulkMode(false);
+                    setBulkNote('');
+                    load();
+                  } catch { toast.error('Error al actualizar actividades'); }
+                  finally { setBulkApplying(false); }
+                }}
+                className="text-xs px-3 py-1.5 rounded-full font-semibold transition-all disabled:opacity-50"
+                style={{ background: color + '20', color, border: `1px solid ${color}50` }}>
+                {bulkApplying ? '...' : label}
+              </button>
+            ))}
+            <button onClick={() => { setBulkSelected(new Set()); setBulkMode(false); setBulkNote(''); }}
+              className="ml-auto text-xs px-2 py-1.5 rounded-full"
+              style={{ color: 'rgba(255,255,255,0.40)', border: '1px solid rgba(255,255,255,0.10)' }}>
+              ✕ Cancelar
+            </button>
+          </div>
+          <textarea
+            rows={2}
+            placeholder="Nota del cambio (opcional) — se registra individualmente en cada actividad"
+            value={bulkNote}
+            onChange={e => setBulkNote(e.target.value)}
+            className="text-xs rounded-lg px-3 py-2 resize-none w-full"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#e2e8f0', outline: 'none' }}
+          />
         </div>
       )}
 

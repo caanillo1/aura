@@ -538,6 +538,10 @@ model Activity {
   progressPercent  Decimal   @default(0) @db.Decimal(5, 2)
   observations     String?   @db.NVarChar(Max)
   order            Int       @default(0)
+  blockedBy        String?   @db.NVarChar(20)
+  blockedNote      String?   @db.NVarChar(Max)
+  blockedSince     DateTime? @db.DateTime2
+  clientDelayDays  Int       @default(0)
   createdAt        DateTime  @default(now()) @db.DateTime2
   updatedAt        DateTime  @updatedAt @db.DateTime2
 
@@ -548,10 +552,27 @@ model Activity {
   visitActivities  VisitActivity[]
   actaActividades  ActaActividad[] @relation("ActaActividadActivity")
   threads          ActivityThread[]
+  blockLogs        ActivityBlockLog[]
   dependencies     ActivityDependency[] @relation("ADActivity")
   dependsOn        ActivityDependency[] @relation("ADDependsOn")
 
   @@map("Actividades")
+}
+
+model ActivityBlockLog {
+  id            String    @id @default(uuid()) @db.UniqueIdentifier
+  activityId    String    @db.UniqueIdentifier
+  blockedBy     String    @db.NVarChar(20)
+  blockedNote   String    @db.NVarChar(Max)
+  blockedSince  DateTime  @db.DateTime2
+  unlockedAt    DateTime  @db.DateTime2
+  diasBloqueado Int       @default(0)
+  unlockNote    String?   @db.NVarChar(Max)
+  createdAt     DateTime  @default(now()) @db.DateTime2
+
+  activity      Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@map("ActivityBlockLogs")
 }
 
 model ActivityThread {
@@ -999,7 +1020,9 @@ model ActaCompromiso {
   clientStaffId String? @db.UniqueIdentifier
   moduleId      String? @db.UniqueIdentifier
   phaseId       String? @db.UniqueIdentifier
-  activityId    String? @db.UniqueIdentifier
+  activityId           String?   @db.UniqueIdentifier
+  fechaLimite          DateTime? @db.Date
+  responsablePrincipal String?   @db.NVarChar(20)
 
   acta        Acta          @relation(fields: [actaId], references: [id], onDelete: Cascade)
   assignedTo  User?         @relation("ActaCompromisoAgent", fields: [assignedToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -1091,6 +1114,8 @@ model Requerimiento {
   agenteId            String   @db.UniqueIdentifier
   createdById         String   @db.UniqueIdentifier
   activityId          String?  @db.UniqueIdentifier
+  devueltoPor         String?  @db.NVarChar(20)
+  devueltoNota        String?  @db.NVarChar(Max)
   createdAt           DateTime @default(now()) @db.DateTime2
   updatedAt           DateTime @updatedAt @db.DateTime2
 

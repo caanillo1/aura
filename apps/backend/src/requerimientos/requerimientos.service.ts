@@ -166,7 +166,12 @@ export class RequerimientosService {
       }),
       this.prisma.requerimiento.update({
         where: { id: req.id },
-        data:  { estadoActual: dto.estado },
+        data: {
+          estadoActual: dto.estado,
+          ...(dto.estado === 'Devuelto' && dto.devueltoPor
+            ? { devueltoPor: dto.devueltoPor, devueltoNota: dto.devueltoNota ?? null }
+            : {}),
+        },
       }),
     ]);
 

@@ -433,6 +433,7 @@ export const projectsApi = {
     actualStartDate?: string | null; actualEndDate?: string | null;
     executionDate?: string | null;
     assignedToId?: string | null; clientStaffId?: string | null;
+    blockedBy?: string; blockedNote?: string; unlockNote?: string;
   }) =>
     api.patch(`/projects/activities/${activityId}`, data).then((r) => r.data),
   addActivity: (phaseId: string, data: {
@@ -442,6 +443,10 @@ export const projectsApi = {
     assignedToId?: string; clientStaffId?: string;
   }) =>
     api.post(`/projects/phases/${phaseId}/activities`, data).then((r) => r.data),
+  deleteActivity: (activityId: string) =>
+    api.delete(`/projects/activities/${activityId}`).then((r) => r.data),
+  bulkUpdateStatus: (activityIds: string[], status: string, nota?: string) =>
+    api.post(`/projects/activities/bulk-status`, { activityIds, status, nota }).then((r) => r.data),
   loadTemplate: (id: string, data: {
     templateFlowId: string;
     phaseDates?: { templatePhaseId: string; startDate?: string; endDate?: string }[];
@@ -582,7 +587,7 @@ export const requerimientosApi = {
     serviceOrderId?: string | null; templateModuleId?: string | null; templatePhaseId?: string | null;
   }) =>
     api.patch(`/requerimientos/${id}`, data).then((r) => r.data),
-  addGestion: (id: string, data: { fecha: string; estado: string; observacion: string }) =>
+  addGestion: (id: string, data: { fecha: string; estado: string; observacion: string; devueltoPor?: string; devueltoNota?: string }) =>
     api.post(`/requerimientos/${id}/gestiones`, data).then((r) => r.data),
   delete: (id: string) =>
     api.delete(`/requerimientos/${id}`).then((r) => r.data),

@@ -165,6 +165,7 @@ export class ProjectsService {
       where: { id: activityId, phase: { projectModule: { project: { serviceOrder: { companyId } } } } },
       select: {
         phaseId: true, progressPercent: true, status: true, actualStartDate: true, actualEndDate: true,
+        blockedBy: true, blockedNote: true, blockedSince: true, clientDelayDays: true,
         phase: {
           select: {
             projectModuleId: true,
@@ -187,11 +188,42 @@ export class ProjectsService {
     const projectId = activity.phase.projectModule.projectId;
 
     const data: any = {};
+    let blockLogData: { activityId: string; blockedBy: string; blockedNote: string; blockedSince: Date; unlockedAt: Date; diasBloqueado: number; unlockNote: string | null } | null = null;
+
     if (dto.status !== undefined) {
       data.status = dto.status;
       if (dto.status === 'completado' && dto.progressPercent === undefined) data.progressPercent = 100;
       if (dto.status === 'en_progreso' && Number(activity.progressPercent) === 0) data.progressPercent = 10;
       if (dto.status === 'pendiente') data.progressPercent = 0;
+
+      if (dto.status === 'bloqueado') {
+        if (!dto.blockedBy) throw new BadRequestException('Debe indicar quién bloquea la actividad (blockedBy)');
+        if (!dto.blockedNote?.trim()) throw new BadRequestException('La nota de bloqueo es obligatoria');
+        data.blockedBy = dto.blockedBy;
+        data.blockedNote = dto.blockedNote;
+        data.blockedSince = new Date();
+      }
+
+      if ((activity as any).status === 'bloqueado' && dto.status !== 'bloqueado') {
+        const now = new Date();
+        const since: Date = (activity as any).blockedSince ?? now;
+        const dias = Math.max(0, Math.round((now.getTime() - since.getTime()) / 86400000));
+        if ((activity as any).blockedBy === 'cliente') {
+          data.clientDelayDays = ((activity as any).clientDelayDays ?? 0) + dias;
+        }
+        data.blockedBy = null;
+        data.blockedNote = null;
+        data.blockedSince = null;
+        blockLogData = {
+          activityId,
+          blockedBy: (activity as any).blockedBy!,
+          blockedNote: (activity as any).blockedNote!,
+          blockedSince: since,
+          unlockedAt: now,
+          diasBloqueado: dias,
+          unlockNote: dto.unlockNote ?? null,
+        };
+      }
     }
     if (dto.progressPercent !== undefined) data.progressPercent = dto.progressPercent;
     if (dto.actualHours !== undefined) data.actualHours = dto.actualHours;
@@ -229,15 +261,54 @@ export class ProjectsService {
       ? activity.phase.projectModule.project.modules.reduce((s, m) => s + (m.id === moduleId ? moduleAvg : Number(m.progressPercent)), 0) / activity.phase.projectModule.project.modules.length
       : 0;
 
-    // Single transaction — all 4 writes in one DB round trip
-    const [updated] = await this.prisma.$transaction([
+    // Single transaction — all 4 writes + optional block log in one DB round trip
+    const txOps: any[] = [
       this.prisma.activity.update({ where: { id: activityId }, data }),
       this.prisma.phase.update({ where: { id: phaseId }, data: { progressPercent: phaseAvg, status: phaseStatus } }),
       this.prisma.projectModule.update({ where: { id: moduleId }, data: { progressPercent: moduleAvg } }),
       this.prisma.project.update({ where: { id: projectId }, data: { progressPercent: projectAvg } }),
-    ]);
+    ];
+    if (blockLogData) txOps.push(this.prisma.activityBlockLog.create({ data: blockLogData }));
+    const [updated] = await this.prisma.$transaction(txOps);
 
     return updated;
+  }
+
+  async deleteActivity(companyId: string, activityId: string) {
+    const activity = await this.prisma.activity.findFirst({
+      where: { id: activityId, phase: { projectModule: { project: { serviceOrder: { companyId } } } } },
+      select: { id: true, phaseId: true },
+    });
+    if (!activity) throw new NotFoundException('Actividad no encontrada');
+
+    await Promise.all([
+      this.prisma.visitActivity.deleteMany({ where: { activityId } }),
+      this.prisma.actaActividad.deleteMany({ where: { activityId } }),
+      this.prisma.activityDependency.deleteMany({
+        where: { OR: [{ activityId }, { dependsOnActivityId: activityId }] },
+      }),
+    ]);
+    await this.prisma.activity.delete({ where: { id: activityId } });
+    await this.recalcPhase(activity.phaseId);
+    return { message: 'Actividad eliminada' };
+  }
+
+  async bulkUpdateStatus(companyId: string, userId: string, activityIds: string[], status: string, nota?: string) {
+    if (status === 'bloqueado') throw new BadRequestException('El bloqueo requiere atribución individual');
+    for (const activityId of activityIds) {
+      await this.updateActivity(companyId, activityId, { status });
+    }
+    const threadContent = nota?.trim() || `Estado cambiado a "${status}" (actualización masiva)`;
+    await this.prisma.activityThread.createMany({
+      data: activityIds.map(activityId => ({
+        activityId,
+        authorId:   userId,
+        authorType: 'agent',
+        content:    threadContent,
+        newStatus:  status,
+      })),
+    });
+    return { updated: activityIds.length };
   }
 
   async addPhaseActivity(companyId: string, phaseId: string, dto: CreateProjectActivityDto) {

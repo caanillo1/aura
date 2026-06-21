@@ -318,6 +318,10 @@ export interface ProjectActivity {
   assignedTo?: { id: string; firstName: string; lastName: string } | null;
   clientStaff?: { id: string; firstName: string; lastName: string } | null;
   threads?: ActivityThread[];
+  blockedBy?: string | null;
+  blockedNote?: string | null;
+  blockedSince?: string | null;
+  clientDelayDays?: number;
 }
 
 export interface ProjectPhase {

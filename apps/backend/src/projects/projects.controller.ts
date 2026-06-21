@@ -95,6 +95,20 @@ export class ProjectsController {
   addActivity(@GetUser() user: JwtUser, @Param('phaseId') phaseId: string, @Body() dto: CreateProjectActivityDto) {
     return this.svc.addPhaseActivity(user.companyId, phaseId, dto);
   }
+
+  @Delete('activities/:activityId')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Eliminar actividad del plan de trabajo' })
+  deleteActivity(@GetUser() user: JwtUser, @Param('activityId') activityId: string) {
+    return this.svc.deleteActivity(user.companyId, activityId);
+  }
+
+  @Post('activities/bulk-status')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Cambiar estado de múltiples actividades' })
+  bulkUpdateStatus(@GetUser() user: JwtUser, @Body() body: { activityIds: string[]; status: string; nota?: string }) {
+    return this.svc.bulkUpdateStatus(user.companyId, user.id, body.activityIds, body.status, body.nota);
+  }
 }
 
 // Endpoint anidado en service-orders para generar proyecto

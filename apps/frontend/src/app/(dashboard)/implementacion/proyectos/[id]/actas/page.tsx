@@ -20,7 +20,7 @@ type ActaType = 'inicio' | 'visita' | 'cierre' | 'capacitacion' | 'entrega_sopor
 
 interface Firmante  { id?: string; nombre: string; cargo: string; empresa: string; email?: string; telefono?: string; documento?: string; fecha: string; orden: number; signatureData?: string; signedAt?: string; signerType?: string; }
 interface FechaV    { fecha: string; horaInicio: string; horaFin: string; }
-interface Compromiso{ numero: number; compromiso: string; responsable: string; estado: string; assignedToId?: string; clientStaffId?: string; moduleId?: string; phaseId?: string; activityId?: string; }
+interface Compromiso{ numero: number; compromiso: string; responsable: string; estado: string; assignedToId?: string; clientStaffId?: string; moduleId?: string; phaseId?: string; activityId?: string; fechaLimite?: string; diasVigencia?: number; responsablePrincipal?: string; }
 interface Participante { numero: number; nombre: string; cargo?: string; documento?: string; }
 interface Accion    { accion: string; responsable: string; fechaLimite: string; }
 interface Contacto  { nombre: string; telefono: string; area: string; }
@@ -767,13 +767,14 @@ function ChecklistTable({ title, items, setItems, showMedio, tc }: {
 
 // ── Compromisos editor (visita) ────────────────────────────────────────────
 
-function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff, tc }: {
+function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff, tc, actaFecha }: {
   rows: Compromiso[];
   setRows: (r: Compromiso[]) => void;
   projectModules: any[];
   agents: { id: string; firstName: string; lastName: string }[];
   clientStaff: { id: string; firstName: string; lastName: string; jobTitle?: string | null }[];
   tc: any;
+  actaFecha: string;
 }) {
   const inputSty = { background: '#1a2235', border: '1px solid rgba(255,255,255,0.12)', color: tc.s, colorScheme: 'dark' as const };
 
@@ -781,6 +782,13 @@ function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff,
   const del = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
   const upd = (i: number, patch: Partial<Compromiso>) =>
     setRows(rows.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+
+  const handleDias = (i: number, dias: number) => {
+    if (!dias || dias < 1) { upd(i, { diasVigencia: undefined, fechaLimite: undefined }); return; }
+    const base = actaFecha ? new Date(actaFecha + 'T00:00:00') : new Date();
+    base.setDate(base.getDate() + dias);
+    upd(i, { diasVigencia: dias, fechaLimite: base.toISOString().slice(0, 10) });
+  };
 
   return (
     <div>
@@ -852,6 +860,32 @@ function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff,
                   disabled={!r.moduleId}>
                   <option value="">— {r.moduleId ? 'Seleccionar fase' : 'Primero un módulo'} —</option>
                   {phasesForModule.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+            </div>
+            {/* Fila 4: días vigencia → fecha límite + responsable principal */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[10px] mb-0.5" style={{ color: tc.m }}>Días para cumplir</p>
+                <div className="flex items-center gap-1.5">
+                  <input type="number" min={1} max={365} placeholder="ej: 10"
+                    value={r.diasVigencia ?? ''}
+                    onChange={e => handleDias(i, parseInt(e.target.value) || 0)}
+                    className="w-20 text-xs px-2 py-1 rounded-lg outline-none" style={inputSty} />
+                  {r.fechaLimite && (
+                    <span className="text-[10px]" style={{ color: '#34d399' }}>
+                      → {new Date(r.fechaLimite + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] mb-0.5" style={{ color: tc.m }}>Responsable principal</p>
+                <select value={r.responsablePrincipal ?? ''} onChange={e => upd(i, { responsablePrincipal: e.target.value || undefined })}
+                  className="w-full text-xs px-2 py-1 rounded-lg outline-none" style={inputSty}>
+                  <option value="">— Sin definir —</option>
+                  <option value="agente">Agente (implementador)</option>
+                  <option value="cliente">Cliente</option>
                 </select>
               </div>
             </div>
@@ -1169,6 +1203,8 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
       moduleId: c.moduleId ?? undefined,
       phaseId: c.phaseId ?? undefined,
       activityId: c.activityId ?? undefined,
+      fechaLimite: c.fechaLimite ? c.fechaLimite.slice(0, 10) : undefined,
+      responsablePrincipal: c.responsablePrincipal ?? undefined,
     })) ?? []
   );
   const [actaActividades, setActaActividades] = useState<ActaActividadRow[]>(
@@ -1291,6 +1327,8 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
           moduleId: c.moduleId,
           phaseId: c.phaseId,
           activityId: c.activityId,
+          fechaLimite: c.fechaLimite || undefined,
+          responsablePrincipal: c.responsablePrincipal || undefined,
         })),
         participantes: participantes.map((p, i) => ({
           numero: i + 1, nombre: p.nombre, cargo: p.cargo || undefined,
@@ -1503,6 +1541,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
               agents={agents}
               clientStaff={clientStaff ?? []}
               tc={tc}
+              actaFecha={fecha}
             />
           </>)}
 

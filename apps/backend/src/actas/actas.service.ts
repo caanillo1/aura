@@ -14,6 +14,7 @@ const INCLUDE = {
       id: true, numero: true, compromiso: true, responsable: true,
       estado: true, assignedToId: true, clientStaffId: true,
       moduleId: true, phaseId: true, activityId: true,
+      fechaLimite: true, responsablePrincipal: true,
       assignedTo:  { select: { id: true, firstName: true, lastName: true } },
       clientStaff: { select: { id: true, firstName: true, lastName: true, jobTitle: true } },
       module:      { select: { id: true, name: true } },
@@ -354,6 +355,9 @@ export class ActasService {
 
     // ── Compromisos: pre-fetch paralelo → updates paralelo → creates secuencial → bulk insert ──
     if (dto.compromisos !== undefined) {
+      const actaRecord = await tx.acta.findUnique({ where: { id: actaId }, select: { fecha: true } });
+      const actaFecha: Date | null = actaRecord?.fecha ?? null;
+
       await tx.actaCompromiso.deleteMany({ where: { actaId } });
 
       if (dto.compromisos.length > 0) {
@@ -401,13 +405,13 @@ export class ActasService {
 
           const actStatus = this.compromisoEstadoToActivityStatus(c.estado ?? 'pendiente');
           const code = `${(phaseInfo.slug ?? 'COMP').toUpperCase()}-${String(phaseInfo.nextOrder).padStart(2, '0')}`;
-          const newAct = await tx.activity.create({ data: { phaseId: c.phaseId, code, name: c.compromiso, status: actStatus, progressPercent: this.statusToProgress(actStatus), assignedToId: c.assignedToId ?? null, clientStaffId: c.clientStaffId ?? null, order: phaseInfo.nextOrder, observations: `Generado desde compromiso del Acta de Visita` } });
+          const newAct = await tx.activity.create({ data: { phaseId: c.phaseId, code, name: c.compromiso, status: actStatus, progressPercent: this.statusToProgress(actStatus), assignedToId: c.assignedToId ?? null, clientStaffId: c.clientStaffId ?? null, order: phaseInfo.nextOrder, observations: `Generado desde compromiso del Acta de Visita`, plannedStartDate: actaFecha ?? undefined, plannedEndDate: c.fechaLimite ? new Date(c.fechaLimite) : null } });
           phaseInfo.nextOrder++;
           finalActivityIds.push(newAct.id);
         }
 
         // Bulk insert all compromisos in one query
-        await tx.actaCompromiso.createMany({ data: dto.compromisos.map((c, i) => ({ actaId, numero: c.numero ?? i + 1, compromiso: c.compromiso, responsable: c.responsable ?? null, estado: c.estado ?? 'pendiente', assignedToId: c.assignedToId ?? null, clientStaffId: c.clientStaffId ?? null, moduleId: c.moduleId ?? null, phaseId: c.phaseId ?? null, activityId: finalActivityIds[i] ?? null })) });
+        await tx.actaCompromiso.createMany({ data: dto.compromisos.map((c, i) => ({ actaId, numero: c.numero ?? i + 1, compromiso: c.compromiso, responsable: c.responsable ?? null, estado: c.estado ?? 'pendiente', assignedToId: c.assignedToId ?? null, clientStaffId: c.clientStaffId ?? null, moduleId: c.moduleId ?? null, phaseId: c.phaseId ?? null, activityId: finalActivityIds[i] ?? null, fechaLimite: c.fechaLimite ? new Date(c.fechaLimite) : null, responsablePrincipal: c.responsablePrincipal ?? null })) });
       }
     }
   }

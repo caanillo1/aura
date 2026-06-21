@@ -392,7 +392,7 @@ function DayModal({ day, bloques, onClose, onEdit, onNew, selectionMode, selecte
     .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
     .forEach((b, _, arr) => {
       if (!groupMap.has(b.agente.id)) {
-        const idx = [...new Set(arr.map(x => x.agente.id))].indexOf(b.agente.id);
+        const idx = Array.from(new Set(arr.map(x => x.agente.id))).indexOf(b.agente.id);
         groupMap.set(b.agente.id, {
           agente: b.agente,
           color: AGENT_COLORS[idx % AGENT_COLORS.length],
@@ -401,7 +401,7 @@ function DayModal({ day, bloques, onClose, onEdit, onNew, selectionMode, selecte
       }
       groupMap.get(b.agente.id)!.items.push(b);
     });
-  const groups = [...groupMap.values()];
+  const groups = Array.from(groupMap.values());
 
   const STATUS_COLOR: Record<string, string> = {
     programado: '#60a5fa', en_curso: '#fb923c', completado: '#34d399', cancelado: '#9ca3af',
@@ -655,7 +655,7 @@ export default function CronogramaPage() {
     const count = selectedIds.size;
     if (!confirm(`¿Eliminar ${count} bloque${count !== 1 ? 's' : ''} seleccionado${count !== 1 ? 's' : ''}? Esta acción no se puede deshacer.`)) return;
     try {
-      await Promise.all([...selectedIds].map(id => cronogramaApi.remove(id)));
+      await Promise.all(Array.from(selectedIds).map(id => cronogramaApi.remove(id)));
       setBloques(p => p.filter(b => !selectedIds.has(b.id)));
       toast.success(`${count} bloque${count !== 1 ? 's' : ''} eliminado${count !== 1 ? 's' : ''}`);
       exitSelection();

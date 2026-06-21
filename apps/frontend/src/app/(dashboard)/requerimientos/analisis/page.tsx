@@ -61,6 +61,9 @@ const ALERT_CFG = {
 
 const CHART_PALETTE = ['#6366f1','#60a5fa','#34d399','#f59e0b','#f87171','#a78bfa','#fb923c','#10b981'];
 
+const normalize = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const pct = (n: number, total: number) => total > 0 ? Math.round((n / total) * 100) : 0;
@@ -148,9 +151,10 @@ export default function RequerimientosAnalisisPage() {
   });
   const [appliedFilters, setAppliedFilters] = useState<FilterState>({ ...filters });
 
-  // Options for filter selects (populated from data)
   const [agents,  setAgents]  = useState<{ id: string; firstName: string; lastName: string }[]>([]);
   const [clients, setClients] = useState<{ id: string; businessName: string }[]>([]);
+  const [clientSearch,      setClientSearch]      = useState('');
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
 
   const load = useCallback(async (f: FilterState) => {
     setLoading(true);
@@ -178,7 +182,7 @@ export default function RequerimientosAnalisisPage() {
   const applyFilters = () => { setAppliedFilters({ ...filters }); setShowFilters(false); };
   const clearFilters = () => {
     const empty: FilterState = { clientId: '', agenteId: '', area: '', tipo: '', dateFrom: '', dateTo: '' };
-    setFilters(empty); setAppliedFilters(empty);
+    setFilters(empty); setAppliedFilters(empty); setClientSearch('');
   };
   const activeFilterCount = Object.values(appliedFilters).filter(Boolean).length;
 
@@ -231,54 +235,111 @@ export default function RequerimientosAnalisisPage() {
       {showFilters && (
         <div className="rounded-2xl p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3"
           style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}>
-          <div>
+
+          {/* Cliente — combobox con búsqueda sin distinción de tildes */}
+          <div className="relative">
             <label className="text-xs font-semibold uppercase tracking-wide block mb-1" style={{ color: 'var(--text-muted)' }}>Cliente</label>
-            <select value={filters.clientId} onChange={e => setFilters(f => ({ ...f, clientId: e.target.value }))}
-              className="text-xs rounded-xl px-2 py-1.5 w-full"
-              style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none' }}>
-              <option value="">Todos</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.businessName}</option>)}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Buscar cliente…"
+                value={clientSearch}
+                onChange={e => {
+                  setClientSearch(e.target.value);
+                  setFilters(f => ({ ...f, clientId: '' }));
+                  setShowClientDropdown(true);
+                }}
+                onFocus={() => setShowClientDropdown(true)}
+                onBlur={() => setTimeout(() => setShowClientDropdown(false), 150)}
+                className="text-xs rounded-xl px-2 py-1.5 w-full pr-6"
+                style={{ background: isLight ? '#f1f5f9' : '#1e293b', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none' }}
+              />
+              {clientSearch && (
+                <button
+                  onMouseDown={() => { setClientSearch(''); setFilters(f => ({ ...f, clientId: '' })); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  style={{ color: 'var(--text-muted)' }}>
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+            {showClientDropdown && (
+              <div className="absolute z-50 mt-1 w-full rounded-xl shadow-lg max-h-44 overflow-y-auto"
+                style={{ background: isLight ? '#fff' : '#1e293b', border: '1px solid var(--card-border)' }}>
+                {clients
+                  .filter(c => !clientSearch || normalize(c.businessName).includes(normalize(clientSearch)))
+                  .slice(0, 8)
+                  .map(c => (
+                    <button key={c.id}
+                      onMouseDown={() => {
+                        setFilters(f => ({ ...f, clientId: c.id }));
+                        setClientSearch(c.businessName);
+                        setShowClientDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs transition-colors"
+                      style={{
+                        color: 'var(--text-primary)',
+                        background: filters.clientId === c.id ? 'rgba(99,102,241,0.12)' : 'transparent',
+                      }}>
+                      {c.businessName}
+                    </button>
+                  ))}
+                {clients.filter(c => !clientSearch || normalize(c.businessName).includes(normalize(clientSearch))).length === 0 && (
+                  <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)' }}>Sin resultados</p>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* Agente */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide block mb-1" style={{ color: 'var(--text-muted)' }}>Agente</label>
             <select value={filters.agenteId} onChange={e => setFilters(f => ({ ...f, agenteId: e.target.value }))}
               className="text-xs rounded-xl px-2 py-1.5 w-full"
-              style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none' }}>
+              style={{ background: isLight ? '#f1f5f9' : '#1e293b', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none', colorScheme: isLight ? 'light' : 'dark' }}>
               <option value="">Todos</option>
               {agents.map(a => <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>)}
             </select>
           </div>
+
+          {/* Área */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide block mb-1" style={{ color: 'var(--text-muted)' }}>Área</label>
             <select value={filters.area} onChange={e => setFilters(f => ({ ...f, area: e.target.value }))}
               className="text-xs rounded-xl px-2 py-1.5 w-full"
-              style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none' }}>
+              style={{ background: isLight ? '#f1f5f9' : '#1e293b', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none', colorScheme: isLight ? 'light' : 'dark' }}>
               <option value="">Todas</option>
               {data.areas.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
+
+          {/* Tipo */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide block mb-1" style={{ color: 'var(--text-muted)' }}>Tipo</label>
             <select value={filters.tipo} onChange={e => setFilters(f => ({ ...f, tipo: e.target.value }))}
               className="text-xs rounded-xl px-2 py-1.5 w-full"
-              style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none' }}>
+              style={{ background: isLight ? '#f1f5f9' : '#1e293b', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none', colorScheme: isLight ? 'light' : 'dark' }}>
               <option value="">Todos</option>
               {data.tipos.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
+
+          {/* Desde */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide block mb-1" style={{ color: 'var(--text-muted)' }}>Desde</label>
             <input type="date" value={filters.dateFrom} onChange={e => setFilters(f => ({ ...f, dateFrom: e.target.value }))}
               className="text-xs rounded-xl px-2 py-1.5 w-full"
-              style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none' }} />
+              style={{ background: isLight ? '#f1f5f9' : '#1e293b', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none', colorScheme: isLight ? 'light' : 'dark' }} />
           </div>
+
+          {/* Hasta */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide block mb-1" style={{ color: 'var(--text-muted)' }}>Hasta</label>
             <input type="date" value={filters.dateTo} onChange={e => setFilters(f => ({ ...f, dateTo: e.target.value }))}
               className="text-xs rounded-xl px-2 py-1.5 w-full"
-              style={{ background: 'var(--input-bg, rgba(255,255,255,0.04))', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none' }} />
+              style={{ background: isLight ? '#f1f5f9' : '#1e293b', border: '1px solid var(--card-border)', color: 'var(--text-primary)', outline: 'none', colorScheme: isLight ? 'light' : 'dark' }} />
           </div>
+
           <div className="col-span-full flex justify-end">
             <button onClick={applyFilters}
               className="text-xs px-5 py-2 rounded-xl font-semibold"

@@ -74,7 +74,7 @@ export default function OrdenDetailPage() {
   const [ejecutivoAutoEmail, setEjecutivoAutoEmail]     = useState<{ destinatarios: string[]; asunto?: string } | null>(null);
   const [showReportMenu, setShowReportMenu]     = useState(false);
   const [reportMenuPos, setReportMenuPos]       = useState({ top: 0, right: 0 });
-  const reportBtnRef = useRef<HTMLButtonElement>(null);
+  const reportBtnRef = useRef<HTMLDivElement>(null);
   const [downloadingPlan, setDownloadingPlan]   = useState(false);
 
   // Email manual del informe

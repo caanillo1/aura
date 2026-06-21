@@ -10,7 +10,8 @@ import {
   TrendingUp, TrendingDown, Activity, Calendar, Target, Building2,
   BarChart3, CircleAlert, Info, CheckCheck, Ban, Timer, Layers,
   Lightbulb, CalendarCheck, CalendarClock, ChevronRight,
-  Zap, ShieldAlert, Clock, Flag, ListChecks,
+  Zap, ShieldAlert, Clock, Flag, ListChecks, Ticket, ArrowLeftRight,
+  ExternalLink, TriangleAlert,
 } from 'lucide-react';
 import { serviceOrdersApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -47,6 +48,16 @@ interface Recommendation {
   priority: 'alta' | 'media' | 'baja'; titulo: string; accion: string;
 }
 
+interface TicketItem {
+  id: string; numero: string; titulo: string; prioridad: string;
+  estadoActual: string; ticketRubi: string | null; tipo: string;
+}
+
+interface TicketsDetail {
+  total: number; entregados: number; devueltos: number; negados: number;
+  pendientes: number; altaPrioridad: number; list: TicketItem[];
+}
+
 type RiskLevel = 'alto' | 'medio' | 'normal';
 type AlertLevel = 'critico' | 'advertencia' | 'info';
 interface Alert { level: AlertLevel; tipo: string; titulo: string; detalle: string }
@@ -66,6 +77,7 @@ interface AnalysisData {
   riskLevel: RiskLevel; alerts: Alert[]; predictions: Predictions;
   modules?: ModuleDetail[]; visits?: VisitsDetail; timeline?: TimelineDetail | null;
   activitySummary?: ActivitySummary; recommendations?: Recommendation[];
+  tickets?: TicketsDetail;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -86,6 +98,21 @@ const ALERT_CFG: Record<AlertLevel, { color: string; bg: string; border: string;
 
 const healthColor = (h: string) =>
   h === 'critico' ? '#ef4444' : h === 'completado' ? '#10b981' : h === 'en_progreso' ? '#6366f1' : '#94a3b8';
+
+const TICKET_ESTADO_COLOR: Record<string, string> = {
+  Elaborado:    '#60a5fa',
+  Priorizado:   '#a78bfa',
+  Repriorizado: '#fbbf24',
+  Devuelto:     '#fb923c',
+  Negado:       '#f87171',
+  Entregado:    '#34d399',
+};
+
+const TICKET_PRIO_COLOR: Record<string, string> = {
+  Alta:  '#ef4444',
+  Media: '#f59e0b',
+  Baja:  '#10b981',
+};
 
 const healthLabel = (h: string) =>
   h === 'critico' ? 'En riesgo' : h === 'completado' ? 'Completado'
@@ -223,16 +250,43 @@ function KpiCard({ label, value, sub, color, icon: Icon, accent = false }: {
   );
 }
 
+// ── Module Tooltip (custom) ───────────────────────────────────────────────────
+
+function ModuleTooltipContent({ active, payload, isLight }: { active?: boolean; payload?: any[]; isLight: boolean }) {
+  if (!active || !payload?.length) return null;
+  const m = payload[0]?.payload as (ModuleDetail & { progressPercent: number });
+  if (!m) return null;
+  const bg   = isLight ? '#fff' : '#0f172a';
+  const bdr  = isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)';
+  const text = isLight ? '#1e293b' : '#e2e8f0';
+  const muted= isLight ? '#64748b' : '#94a3b8';
+  const col  = healthColor(m.health);
+  return (
+    <div style={{ background: bg, border: `1px solid ${bdr}`, borderRadius: 10,
+                  padding: '10px 14px', fontSize: 12, color: text, minWidth: 200, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+      <p style={{ fontWeight: 700, marginBottom: 8, color: col }}>{m.name}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <p><span style={{ color: muted }}>Avance: </span><strong style={{ color: col }}>{Math.round(m.progressPercent)}%</strong></p>
+        <p><span style={{ color: muted }}>Completadas: </span><strong>{m.activities.done}/{m.activities.total}</strong></p>
+        <p><span style={{ color: muted }}>En progreso: </span>{m.activities.inProgress}</p>
+        <p><span style={{ color: muted }}>Pendientes: </span>{m.activities.pending}</p>
+        {m.activities.blocked > 0 && (
+          <p style={{ color: '#ef4444', fontWeight: 600 }}>✕ {m.activities.blocked} bloqueada{m.activities.blocked !== 1 ? 's' : ''}</p>
+        )}
+        {m.activities.overdue > 0 && (
+          <p style={{ color: '#f59e0b', fontWeight: 600 }}>⏰ {m.activities.overdue} vencida{m.activities.overdue !== 1 ? 's' : ''}</p>
+        )}
+        <p style={{ marginTop: 4, color: muted, fontSize: 10 }}>{m.phaseCount} fase{m.phaseCount !== 1 ? 's' : ''}</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Module Progress Chart ─────────────────────────────────────────────────────
 
 function ModuleProgressChart({ modules, isLight }: { modules: ModuleDetail[]; isLight: boolean }) {
-  const chartH    = Math.max(200, modules.length * 46 + 40);
+  const chartH    = Math.max(200, modules.length * 48 + 40);
   const tickColor = isLight ? '#64748b' : '#94a3b8';
-  const tooltipSx = {
-    background: isLight ? '#fff' : '#0f172a',
-    border: `1px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
-    borderRadius: 8, fontSize: 12, color: isLight ? '#1e293b' : '#e2e8f0',
-  };
   const data = modules.map(m => ({
     ...m,
     displayName: m.name.length > 22 ? m.name.slice(0, 20) + '…' : m.name,
@@ -247,14 +301,9 @@ function ModuleProgressChart({ modules, isLight }: { modules: ModuleDetail[]; is
         <YAxis type="category" dataKey="displayName" width={148}
           tick={{ fontSize: 11, fill: tickColor }} axisLine={false} tickLine={false} />
         <ReTooltip
-          contentStyle={tooltipSx}
-          formatter={(_v: any, _n: any, props: any) => {
-            const m = props.payload as (ModuleDetail & { displayName: string; progressPercent: number });
-            return [
-              `${m.progressPercent}% avance · ${m.activities.done}/${m.activities.total} actividades`,
-              m.name,
-            ];
-          }}
+          content={(props: any) => (
+            <ModuleTooltipContent active={props.active} payload={props.payload} isLight={isLight} />
+          )}
         />
         <Bar dataKey="progressPercent" radius={[0, 5, 5, 0]} maxBarSize={24}
           background={{ fill: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)', radius: 5 } as any}>
@@ -558,6 +607,7 @@ export default function AnalisisPage() {
   const modules    = data?.modules ?? [];
   const recs       = data?.recommendations ?? [];
   const preds      = data?.predictions;
+  const tickets    = data?.tickets;
   const critAlerts = data?.alerts.filter(a => a.level === 'critico').length ?? 0;
   const warnAlerts = data?.alerts.filter(a => a.level === 'advertencia').length ?? 0;
 
@@ -856,7 +906,84 @@ export default function AnalisisPage() {
               )}
             </div>
 
-            {/* ── 9. Module Detail Cards ─────────────────────────────────── */}
+            {/* ── 9. Tickets / Requerimientos ────────────────────────────── */}
+            {tickets && tickets.total > 0 && (
+              <div>
+                <SectionTitle icon={Ticket} title={`Requerimientos / Tickets (${tickets.total})`} />
+
+                {/* KPIs de tickets */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <KpiCard label="Total tickets"  value={tickets.total}
+                    sub="asociados a la OS" color="#8b5cf6" icon={Ticket} />
+                  <KpiCard label="Pendientes"     value={tickets.pendientes}
+                    sub="sin entrega" color={tickets.pendientes > 0 ? '#f59e0b' : '#10b981'}
+                    icon={Clock} accent={tickets.pendientes > 0} />
+                  <KpiCard label="Entregados"     value={tickets.entregados}
+                    sub="resueltos" color="#10b981" icon={CheckCheck} />
+                  <KpiCard label="Alta prioridad" value={tickets.altaPrioridad}
+                    sub="requieren atención" color={tickets.altaPrioridad > 0 ? '#ef4444' : '#10b981'}
+                    icon={TriangleAlert} accent={tickets.altaPrioridad > 0} />
+                </div>
+
+                {/* Tabla de tickets */}
+                <div className="rounded-2xl overflow-hidden"
+                  style={{ border: '1px solid var(--card-border)', background: 'var(--card-bg)' }}>
+                  <div className="px-4 py-3 border-b flex items-center justify-between"
+                    style={{ borderColor: 'var(--card-border)' }}>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                      Listado de requerimientos
+                    </p>
+                    {tickets.devueltos > 0 && (
+                      <span className="text-xs px-2 py-0.5 rounded-md font-bold"
+                        style={{ background: 'rgba(251,146,60,0.12)', color: '#fb923c' }}>
+                        <ArrowLeftRight className="w-3 h-3 inline mr-1" />
+                        {tickets.devueltos} devuelto{tickets.devueltos !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div className="divide-y" style={{ borderColor: 'var(--card-border)' }}>
+                    {tickets.list.map(t => {
+                      const estadoColor = TICKET_ESTADO_COLOR[t.estadoActual] ?? '#94a3b8';
+                      const prioColor  = TICKET_PRIO_COLOR[t.prioridad]    ?? '#94a3b8';
+                      return (
+                        <div key={t.id} className="px-4 py-3 flex items-start gap-3">
+                          <div className="shrink-0 pt-0.5">
+                            <div className="w-2 h-2 rounded-full mt-1.5" style={{ background: prioColor }} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                              <span className="text-xs font-mono font-bold" style={{ color: '#60a5fa' }}>
+                                #{t.numero}
+                              </span>
+                              {t.ticketRubi && (
+                                <span className="text-xs font-mono" style={{ color: '#a78bfa' }}>
+                                  <ExternalLink className="w-3 h-3 inline mr-0.5" />{t.ticketRubi}
+                                </span>
+                              )}
+                              <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                                {t.tipo}
+                              </span>
+                            </div>
+                            <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{t.titulo}</p>
+                          </div>
+                          <div className="shrink-0 flex flex-col items-end gap-1">
+                            <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                              style={{ background: `${estadoColor}18`, color: estadoColor }}>
+                              {t.estadoActual}
+                            </span>
+                            <span className="text-xs font-medium" style={{ color: prioColor }}>
+                              {t.prioridad}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── 10. Module Detail Cards ─────────────────────────────────── */}
             {modules.length > 0 && (
               <div>
                 <SectionTitle icon={Layers} title={`Detalle por módulo (${modules.length})`} />

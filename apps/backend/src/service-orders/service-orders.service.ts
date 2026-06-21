@@ -667,7 +667,7 @@ export class ServiceOrdersService {
     const today = new Date();
     const cutoff14 = new Date(today.getTime() - 14 * 86400000);
 
-    const [os, project, recentHistory, bloques] = await Promise.all([
+    const [os, project, recentHistory, bloques, reqs] = await Promise.all([
       this.prisma.serviceOrder.findFirst({
         where: { id: osId, companyId },
         select: {
@@ -713,6 +713,12 @@ export class ServiceOrdersService {
         where: { serviceOrderId: osId },
         select: { id: true, status: true, fecha: true, titulo: true },
         orderBy: { fecha: 'desc' },
+      }),
+      this.prisma.requerimiento.findMany({
+        where: { serviceOrderId: osId },
+        select: { id: true, numero: true, titulo: true, prioridad: true,
+                  estadoActual: true, ticketRubi: true, tipo: true },
+        orderBy: [{ prioridad: 'asc' }, { estadoActual: 'asc' }],
       }),
     ]);
 
@@ -772,7 +778,14 @@ export class ServiceOrdersService {
       }
     }
 
-    // ── 6. Sin proyecto vinculado ────────────────────────────────────────────
+    // ── 6. Tickets devueltos sin resolver ────────────────────────────────────
+    if (ticketsDetail.devueltos > 0) {
+      alerts.push({ level: 'advertencia', tipo: 'tickets_devueltos',
+        titulo: `${ticketsDetail.devueltos} requerimiento${ticketsDetail.devueltos !== 1 ? 's' : ''} devuelto${ticketsDetail.devueltos !== 1 ? 's' : ''}`,
+        detalle: 'Hay requerimientos que fueron devueltos y requieren revisión o corrección antes de continuar.' });
+    }
+
+    // ── 7. Sin proyecto vinculado ────────────────────────────────────────────
     if (!project && os.status === 'en_curso') {
       alerts.push({ level: 'advertencia', tipo: 'sin_proyecto',
         titulo: 'OS en curso sin proyecto vinculado',
@@ -791,6 +804,24 @@ export class ServiceOrdersService {
           detalle: `${timePct.toFixed(0)}% del tiempo transcurrido con solo ${progPct.toFixed(0)}% de avance.` });
       }
     }
+
+    // ── Resumen de tickets (requerimientos) ──────────────────────────────────
+    const PRIO_ORDER: Record<string, number> = { Alta: 0, Media: 1, Baja: 2 };
+    const reqsSorted = [...reqs].sort((a, b) =>
+      (PRIO_ORDER[a.prioridad] ?? 1) - (PRIO_ORDER[b.prioridad] ?? 1));
+    const ticketsDetail = {
+      total:      reqs.length,
+      entregados: reqs.filter(r => r.estadoActual === 'Entregado').length,
+      devueltos:  reqs.filter(r => r.estadoActual === 'Devuelto').length,
+      negados:    reqs.filter(r => r.estadoActual === 'Negado').length,
+      pendientes: reqs.filter(r => !['Entregado', 'Negado'].includes(r.estadoActual)).length,
+      altaPrioridad: reqs.filter(r => r.prioridad === 'Alta').length,
+      list: reqsSorted.slice(0, 25).map(r => ({
+        id: r.id, numero: r.numero, titulo: r.titulo,
+        prioridad: r.prioridad, estadoActual: r.estadoActual,
+        ticketRubi: r.ticketRubi, tipo: r.tipo,
+      })),
+    };
 
     // ── Módulos detalle ───────────────────────────────────────────────────────
     const modulesDetail = (project?.modules ?? []).map(m => {
@@ -906,6 +937,10 @@ export class ServiceOrdersService {
         recommendations.push({ priority: 'alta',
           titulo: 'Desbloquear actividades críticas',
           accion: `Identificar el impedimento que frena ${blockedActs.length} actividad${blockedActs.length !== 1 ? 'es' : ''} y resolverlo de inmediato. Puede requerir coordinación con el cliente o equipo técnico.` });
+      } else if (alert.tipo === 'tickets_devueltos') {
+        recommendations.push({ priority: 'media',
+          titulo: 'Revisar requerimientos devueltos',
+          accion: `Analizar los ${ticketsDetail.devueltos} requerimiento${ticketsDetail.devueltos !== 1 ? 's' : ''} devuelto${ticketsDetail.devueltos !== 1 ? 's' : ''} y corregir o clarificar antes de continuar la implementación.` });
       } else if (alert.tipo === 'sin_movimiento') {
         recommendations.push({ priority: 'media',
           titulo: 'Reactivar el seguimiento de la OS',
@@ -958,6 +993,7 @@ export class ServiceOrdersService {
       timeline:        timelineDetail,
       activitySummary,
       recommendations,
+      tickets:         ticketsDetail,
     };
   }
 

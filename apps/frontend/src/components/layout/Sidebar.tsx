@@ -46,7 +46,7 @@ const NAV_ITEMS: NavItem[] = [
       { href: '/implementacion/plantillas',   label: 'Plantillas',          icon: LayoutTemplate, permission: 'settings.editar' },
       { href: '/implementacion/modulos',      label: 'Módulos',             icon: Layers,         permission: 'settings.editar' },
       { href: '/implementacion/proyectos',    label: 'Proyectos',           icon: FolderKanban,   permission: 'projects.editar' },
-      { href: '/implementacion/visitas',      label: 'Visitas',             icon: MapPin,         permission: 'orders.buscar'   },
+      { href: '/implementacion/visitas',      label: 'Actas Pendientes',    icon: MapPin,         permission: 'orders.buscar'   },
       { href: '/implementacion/seguimientos', label: 'Seguimientos',        icon: Activity,       permission: 'orders.buscar'   },
       { href: '/implementacion/analisis',     label: 'Análisis',            icon: Sparkles,       permission: 'orders.buscar'   },
     ],

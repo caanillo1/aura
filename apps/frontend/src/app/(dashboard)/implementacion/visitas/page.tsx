@@ -25,6 +25,14 @@ interface VisitaBloque {
   serviceOrder?: { id: string; osNumber: string; product: string; project?: { id: string } | null } | null;
 }
 
+const TIPO_ACTA_CFG: Record<string, { label: string; color: string }> = {
+  inicio:          { label: 'Acta de Inicio',      color: '#34d399' },
+  visita:          { label: 'Acta de Visita',       color: '#60a5fa' },
+  cierre:          { label: 'Acta de Cierre',       color: '#a78bfa' },
+  capacitacion:    { label: 'Acta de Capacitación', color: '#fb923c' },
+  entrega_soporte: { label: 'Entrega a Soporte',    color: '#f472b6' },
+};
+
 const STATUS_LABELS: Record<string, string> = {
   programado: 'Programado', en_curso: 'En curso',
   completado: 'Completado', cancelado: 'Cancelado',
@@ -39,6 +47,7 @@ function VisitaCard({ b, onDiligenciar }: { b: VisitaBloque; onDiligenciar?: () 
   const isDone = !!b.actaId;
   const statusColor = STATUS_COLORS[b.status] ?? '#9ca3af';
   const dateObj = dayjs(fechaStr);
+  const tipoCfg = b.tipoActa ? TIPO_ACTA_CFG[b.tipoActa] : null;
 
   return (
     <div className="rounded-2xl p-4 flex flex-col gap-3 transition-all hover:shadow-lg"
@@ -47,11 +56,14 @@ function VisitaCard({ b, onDiligenciar }: { b: VisitaBloque; onDiligenciar?: () 
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl flex flex-col items-center justify-center shrink-0"
-            style={{ background: '#60a5fa18', border: '1px solid #60a5fa30' }}>
-            <span className="text-[9px] font-bold uppercase leading-none" style={{ color: '#60a5fa' }}>
+            style={{
+              background: tipoCfg ? `${tipoCfg.color}18` : '#60a5fa18',
+              border: `1px solid ${tipoCfg ? `${tipoCfg.color}30` : '#60a5fa30'}`,
+            }}>
+            <span className="text-[9px] font-bold uppercase leading-none" style={{ color: tipoCfg?.color ?? '#60a5fa' }}>
               {dateObj.format('MMM')}
             </span>
-            <span className="text-lg font-extrabold leading-tight" style={{ color: '#60a5fa' }}>
+            <span className="text-lg font-extrabold leading-tight" style={{ color: tipoCfg?.color ?? '#60a5fa' }}>
               {dateObj.date()}
             </span>
           </div>
@@ -70,6 +82,16 @@ function VisitaCard({ b, onDiligenciar }: { b: VisitaBloque; onDiligenciar?: () 
           </span>
         </div>
       </div>
+
+      {/* Tipo badge */}
+      {tipoCfg && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+            style={{ background: `${tipoCfg.color}18`, color: tipoCfg.color, border: `1px solid ${tipoCfg.color}30` }}>
+            {tipoCfg.label}
+          </span>
+        </div>
+      )}
 
       {/* Info rows */}
       <div className="flex flex-col gap-1.5">
@@ -127,14 +149,15 @@ export default function VisitasPage() {
       const desde = dayjs().subtract(3, 'month').format('YYYY-MM-DD');
       const hasta = dayjs().add(6, 'month').format('YYYY-MM-DD');
       const data = await cronogramaApi.list({
-        tipoActa: 'visita',
         fechaDesde: desde,
         fechaHasta: hasta,
         ...(filterClient && { clientId: filterClient }),
       });
-      setBloques(Array.isArray(data) ? data : (data.data ?? []));
+      const all: VisitaBloque[] = Array.isArray(data) ? data : (data.data ?? []);
+      // Solo bloques que tienen tipo de acta asignado
+      setBloques(all.filter(b => !!b.tipoActa));
     } catch {
-      toast.error('Error al cargar las visitas');
+      toast.error('Error al cargar las actas pendientes');
     } finally {
       setLoading(false);
     }
@@ -147,24 +170,24 @@ export default function VisitasPage() {
 
   const handleDiligenciar = (b: VisitaBloque) => {
     if (b.serviceOrder?.project?.id) {
-      router.push(`/implementacion/proyectos/${b.serviceOrder.project.id}/actas?tipo=visita&bloqueId=${b.id}`);
+      router.push(`/implementacion/proyectos/${b.serviceOrder.project.id}/actas?bloqueId=${b.id}`);
     } else {
       toast.info('Este bloque no tiene una orden de servicio con proyecto. Asígnala desde el Cronograma para poder diligenciar el acta.');
     }
   };
 
-  const pendientes = bloques.filter(b => !b.actaId && b.status !== 'cancelado');
+  const pendientes    = bloques.filter(b => !b.actaId && b.status !== 'cancelado');
   const diligenciadas = bloques.filter(b => !!b.actaId);
-  const displayed = tab === 'pendientes' ? pendientes : diligenciadas;
+  const displayed     = tab === 'pendientes' ? pendientes : diligenciadas;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Visitas</h1>
+          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Actas por Diligenciar</h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            Visitas agendadas en el cronograma pendientes por diligenciar
+            Bloques del cronograma con acta pendiente (inicio, visita, capacitación, cierre, entrega a soporte)
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -187,7 +210,7 @@ export default function VisitasPage() {
       {/* Tabs */}
       <div className="flex gap-2">
         {([
-          { key: 'pendientes' as const, label: 'Pendientes', count: pendientes.length },
+          { key: 'pendientes' as const,    label: 'Pendientes',    count: pendientes.length },
           { key: 'diligenciadas' as const, label: 'Diligenciadas', count: diligenciadas.length },
         ]).map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -218,12 +241,12 @@ export default function VisitasPage() {
           <AlertCircle className="w-10 h-10" style={{ color: 'var(--text-muted)' }} />
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
             {tab === 'pendientes'
-              ? 'No hay visitas pendientes por diligenciar'
-              : 'No hay visitas diligenciadas'}
+              ? 'No hay actas pendientes por diligenciar'
+              : 'No hay actas diligenciadas'}
           </p>
           {tab === 'pendientes' && (
             <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-muted)' }}>
-              Las visitas aparecen aquí cuando se agendan en el Cronograma con tipo "Acta de Visita"
+              Las actas aparecen aquí cuando se agrega un tipo de acta al bloque en el Cronograma
             </p>
           )}
         </div>

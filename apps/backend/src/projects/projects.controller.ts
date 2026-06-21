@@ -103,11 +103,14 @@ export class ProjectsController {
     return this.svc.deleteActivity(user.companyId, activityId);
   }
 
-  @Post('activities/bulk-status')
+  @Post('activities/bulk-update')
   @Roles(...IMPL_ROLES)
-  @ApiOperation({ summary: 'Cambiar estado de múltiples actividades' })
-  bulkUpdateStatus(@GetUser() user: JwtUser, @Body() body: { activityIds: string[]; status: string; nota?: string }) {
-    return this.svc.bulkUpdateStatus(user.companyId, user.id, body.activityIds, body.status, body.nota);
+  @ApiOperation({ summary: 'Actualizar estado de múltiples actividades con nota individual por actividad' })
+  bulkUpdateActivities(
+    @GetUser() user: JwtUser,
+    @Body() body: { items: Array<{ activityId: string; status: string; nota?: string }> },
+  ) {
+    return this.svc.bulkUpdateActivities(user.companyId, user.id, body.items);
   }
 }
 

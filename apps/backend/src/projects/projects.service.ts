@@ -293,22 +293,27 @@ export class ProjectsService {
     return { message: 'Actividad eliminada' };
   }
 
-  async bulkUpdateStatus(companyId: string, userId: string, activityIds: string[], status: string, nota?: string) {
-    if (status === 'bloqueado') throw new BadRequestException('El bloqueo requiere atribución individual');
-    for (const activityId of activityIds) {
-      await this.updateActivity(companyId, activityId, { status });
+  async bulkUpdateActivities(
+    companyId: string,
+    userId: string,
+    items: Array<{ activityId: string; status: string; nota?: string }>,
+  ) {
+    if (items.some(i => i.status === 'bloqueado')) {
+      throw new BadRequestException('El bloqueo requiere atribución individual');
     }
-    const threadContent = nota?.trim() || `Estado cambiado a "${status}" (actualización masiva)`;
-    await this.prisma.activityThread.createMany({
-      data: activityIds.map(activityId => ({
-        activityId,
-        authorId:   userId,
-        authorType: 'agent',
-        content:    threadContent,
-        newStatus:  status,
-      })),
-    });
-    return { updated: activityIds.length };
+    for (const { activityId, status, nota } of items) {
+      await this.updateActivity(companyId, activityId, { status });
+      await this.prisma.activityThread.create({
+        data: {
+          activityId,
+          authorId:   userId,
+          authorType: 'agent',
+          content:    nota?.trim() || `Estado cambiado a "${status}"`,
+          newStatus:  status,
+        },
+      });
+    }
+    return { updated: items.length };
   }
 
   async addPhaseActivity(companyId: string, phaseId: string, dto: CreateProjectActivityDto) {

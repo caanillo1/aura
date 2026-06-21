@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
@@ -956,7 +956,8 @@ export default function ProjectDetailPage() {
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkApplying, setBulkApplying] = useState(false);
-  const [bulkNote, setBulkNote] = useState('');
+  const [showBulkPanel, setShowBulkPanel] = useState(false);
+  const [bulkEdits, setBulkEdits] = useState<Map<string, { status: string; nota: string }>>(new Map());
   const [now, setNow] = useState(() => new Date());
 
   // Listas para responsables
@@ -1049,6 +1050,53 @@ export default function ProjectDetailPage() {
     const t = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(t);
   }, []);
+
+  const allActivitiesMap = useMemo(() => {
+    const map = new Map<string, ProjectActivity>();
+    project?.modules?.forEach(mod =>
+      mod.phases?.forEach(phase =>
+        phase.activities?.forEach(act => map.set(act.id, act)),
+      ),
+    );
+    return map;
+  }, [project]);
+
+  const openBulkPanel = () => {
+    const edits = new Map<string, { status: string; nota: string }>();
+    bulkSelected.forEach(id => {
+      const act = allActivitiesMap.get(id);
+      edits.set(id, { status: act?.status ?? 'pendiente', nota: '' });
+    });
+    setBulkEdits(edits);
+    setShowBulkPanel(true);
+  };
+
+  const updateBulkEdit = (actId: string, field: 'status' | 'nota', value: string) => {
+    setBulkEdits(prev => {
+      const next = new Map(prev);
+      const curr = next.get(actId) ?? { status: 'pendiente', nota: '' };
+      next.set(actId, { ...curr, [field]: value });
+      return next;
+    });
+  };
+
+  const handleBulkSave = async () => {
+    setBulkApplying(true);
+    try {
+      const items = Array.from(bulkSelected).map(actId => {
+        const edit = bulkEdits.get(actId) ?? { status: 'pendiente', nota: '' };
+        return { activityId: actId, status: edit.status, nota: edit.nota.trim() || undefined };
+      });
+      await projectsApi.bulkUpdateActivities(items);
+      toast.success(`${bulkSelected.size} actividades actualizadas`);
+      setShowBulkPanel(false);
+      setBulkSelected(new Set());
+      setBulkMode(false);
+      setBulkEdits(new Map());
+      load();
+    } catch { toast.error('Error al actualizar actividades'); }
+    finally { setBulkApplying(false); }
+  };
 
   const handleStatusSave = async () => {
     if (!project) return;
@@ -1569,50 +1617,105 @@ export default function ProjectDetailPage() {
 
       {/* Floating bulk action bar */}
       {bulkMode && bulkSelected.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 px-4 py-3 rounded-2xl shadow-2xl"
-          style={{ background: '#0f172a', border: '1px solid rgba(96,165,250,0.35)', backdropFilter: 'blur(12px)', minWidth: 420 }}>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold shrink-0" style={{ color: '#60a5fa' }}>
-              {bulkSelected.size} seleccionada{bulkSelected.size !== 1 ? 's' : ''}
-            </span>
-            <span className="text-xs shrink-0" style={{ color: 'rgba(255,255,255,0.30)' }}>→ Cambiar a:</span>
-            {([
-              { s: 'pendiente',   label: 'Pendiente',   color: '#94a3b8' },
-              { s: 'en_progreso', label: 'En progreso', color: '#60a5fa' },
-              { s: 'completado',  label: 'Completado',  color: '#34d399' },
-            ] as const).map(({ s, label, color }) => (
-              <button key={s} disabled={bulkApplying}
-                onClick={async () => {
-                  setBulkApplying(true);
-                  try {
-                    await projectsApi.bulkUpdateStatus(Array.from(bulkSelected), s, bulkNote.trim() || undefined);
-                    toast.success(`${bulkSelected.size} actividades → ${label}`);
-                    setBulkSelected(new Set());
-                    setBulkMode(false);
-                    setBulkNote('');
-                    load();
-                  } catch { toast.error('Error al actualizar actividades'); }
-                  finally { setBulkApplying(false); }
-                }}
-                className="text-xs px-3 py-1.5 rounded-full font-semibold transition-all disabled:opacity-50"
-                style={{ background: color + '20', color, border: `1px solid ${color}50` }}>
-                {bulkApplying ? '...' : label}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl"
+          style={{ background: '#0f172a', border: '1px solid rgba(96,165,250,0.35)', backdropFilter: 'blur(12px)' }}>
+          <span className="text-xs font-semibold" style={{ color: '#60a5fa' }}>
+            {bulkSelected.size} seleccionada{bulkSelected.size !== 1 ? 's' : ''}
+          </span>
+          <button onClick={openBulkPanel}
+            className="text-xs px-4 py-1.5 rounded-full font-semibold"
+            style={{ background: 'rgba(59,130,246,0.20)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.40)' }}>
+            Editar selección →
+          </button>
+          <button onClick={() => { setBulkSelected(new Set()); setBulkMode(false); setBulkEdits(new Map()); }}
+            className="text-xs px-2 py-1.5 rounded-full"
+            style={{ color: 'rgba(255,255,255,0.40)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Panel editor por actividad (bulk) */}
+      {showBulkPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)' }}
+          onClick={e => { if (e.target === e.currentTarget) setShowBulkPanel(false); }}>
+          <div className="rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden"
+            style={{ background: '#0f172a', border: '1px solid rgba(255,255,255,0.10)', maxHeight: '80vh' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 shrink-0"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: '#e2e8f0' }}>
+                  Actualizar {bulkSelected.size} actividades
+                </h3>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.40)' }}>
+                  Cada actividad guarda su propio estado y nota en el historial
+                </p>
+              </div>
+              <button onClick={() => setShowBulkPanel(false)} style={{ color: 'rgba(255,255,255,0.40)' }}>✕</button>
+            </div>
+            {/* Lista */}
+            <div className="overflow-y-auto flex-1 px-4 py-3 flex flex-col gap-2">
+              {Array.from(bulkSelected).map(actId => {
+                const act = allActivitiesMap.get(actId);
+                const edit = bulkEdits.get(actId) ?? { status: 'pendiente', nota: '' };
+                const statusColors: Record<string, string> = {
+                  pendiente: '#94a3b8', en_progreso: '#60a5fa', completado: '#34d399',
+                };
+                return (
+                  <div key={actId} className="rounded-xl p-3"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <p className="text-xs font-medium mb-2 truncate" style={{ color: '#cbd5e1' }}>
+                      {act?.name ?? actId}
+                    </p>
+                    <div className="flex gap-2 items-start">
+                      <select
+                        value={edit.status}
+                        onChange={e => updateBulkEdit(actId, 'status', e.target.value)}
+                        className="text-xs rounded-lg px-2 py-1.5 shrink-0 font-semibold"
+                        style={{
+                          background: 'rgba(255,255,255,0.06)',
+                          border: `1px solid ${statusColors[edit.status] ?? '#94a3b8'}50`,
+                          color: statusColors[edit.status] ?? '#94a3b8',
+                          outline: 'none',
+                        }}>
+                        <option value="pendiente">Pendiente</option>
+                        <option value="en_progreso">En progreso</option>
+                        <option value="completado">Completado</option>
+                      </select>
+                      <textarea
+                        rows={2}
+                        placeholder="Nota para esta actividad (opcional)"
+                        value={edit.nota}
+                        onChange={e => updateBulkEdit(actId, 'nota', e.target.value)}
+                        className="text-xs rounded-lg px-3 py-2 resize-none flex-1"
+                        style={{
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.10)',
+                          color: '#e2e8f0',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 shrink-0"
+              style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <button onClick={() => setShowBulkPanel(false)}
+                className="text-xs px-4 py-2 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.60)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                Cancelar
               </button>
-            ))}
-            <button onClick={() => { setBulkSelected(new Set()); setBulkMode(false); setBulkNote(''); }}
-              className="ml-auto text-xs px-2 py-1.5 rounded-full"
-              style={{ color: 'rgba(255,255,255,0.40)', border: '1px solid rgba(255,255,255,0.10)' }}>
-              ✕ Cancelar
-            </button>
+              <button disabled={bulkApplying} onClick={handleBulkSave}
+                className="text-xs px-5 py-2 rounded-xl font-semibold disabled:opacity-50"
+                style={{ background: '#3b82f6', color: '#fff' }}>
+                {bulkApplying ? 'Guardando...' : `Guardar ${bulkSelected.size} cambios`}
+              </button>
+            </div>
           </div>
-          <textarea
-            rows={2}
-            placeholder="Nota del cambio (opcional) — se registra individualmente en cada actividad"
-            value={bulkNote}
-            onChange={e => setBulkNote(e.target.value)}
-            className="text-xs rounded-lg px-3 py-2 resize-none w-full"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#e2e8f0', outline: 'none' }}
-          />
         </div>
       )}
 

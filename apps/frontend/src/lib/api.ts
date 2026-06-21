@@ -445,8 +445,8 @@ export const projectsApi = {
     api.post(`/projects/phases/${phaseId}/activities`, data).then((r) => r.data),
   deleteActivity: (activityId: string) =>
     api.delete(`/projects/activities/${activityId}`).then((r) => r.data),
-  bulkUpdateStatus: (activityIds: string[], status: string, nota?: string) =>
-    api.post(`/projects/activities/bulk-status`, { activityIds, status, nota }).then((r) => r.data),
+  bulkUpdateActivities: (items: Array<{ activityId: string; status: string; nota?: string }>) =>
+    api.post(`/projects/activities/bulk-update`, { items }).then((r) => r.data),
   loadTemplate: (id: string, data: {
     templateFlowId: string;
     phaseDates?: { templatePhaseId: string; startDate?: string; endDate?: string }[];

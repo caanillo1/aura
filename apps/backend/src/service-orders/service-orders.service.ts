@@ -792,8 +792,67 @@ export class ServiceOrdersService {
       }
     }
 
+    // ── Módulos detalle ───────────────────────────────────────────────────────
+    const modulesDetail = (project?.modules ?? []).map(m => {
+      const modActs = m.phases.flatMap(p => p.activities);
+      const total   = modActs.length;
+      const done    = modActs.filter(a => a.status === 'completado').length;
+      const inProg  = modActs.filter(a => a.status === 'en_progreso').length;
+      const blocked = modActs.filter(a => a.status === 'bloqueado').length;
+      const pending = modActs.filter(a => a.status === 'pendiente').length;
+      const overdue = modActs.filter(a =>
+        a.plannedEndDate && new Date(a.plannedEndDate).getTime() < today.getTime() && a.status !== 'completado').length;
+      const health  = blocked > 0 || overdue > 0 ? 'critico'
+                    : done === total && total > 0  ? 'completado'
+                    : inProg > 0                   ? 'en_progreso'
+                    : 'pendiente';
+      return {
+        id: m.id, name: m.name,
+        progressPercent: Number(m.progressPercent ?? 0),
+        phaseCount: m.phases.length,
+        activities: { total, done, inProgress: inProg, blocked, pending, overdue },
+        health,
+      };
+    });
+
+    // ── Resumen de visitas ────────────────────────────────────────────────────
+    const visitsDetail = {
+      total:     bloques.length,
+      confirmed: bloques.filter(b => b.status === 'confirmado').length,
+      pending:   bloques.filter(b => b.status === 'pendiente').length,
+      cancelled: bloques.filter(b => b.status === 'cancelado').length,
+      completed: bloques.filter(b => b.status === 'completado').length,
+      upcoming:  bloques.filter(b => new Date(b.fecha).getTime() > today.getTime() && b.status !== 'cancelado').length,
+    };
+
+    // ── Línea de tiempo ───────────────────────────────────────────────────────
+    const timelineDetail = (os.startDate && os.endDate) ? (() => {
+      const start     = new Date(os.startDate).getTime();
+      const end       = new Date(os.endDate).getTime();
+      const now       = today.getTime();
+      const totalMs   = Math.max(1, end - start);
+      const elapsedMs = now - start;
+      return {
+        daysElapsed:         Math.max(0, Math.floor(elapsedMs / 86400000)),
+        daysRemaining:       Math.max(0, Math.floor((end - now) / 86400000)),
+        totalDays:           Math.floor(totalMs / 86400000),
+        timeProgressPercent: Math.min(100, Math.max(0, Math.round((elapsedMs / totalMs) * 100))),
+      };
+    })() : null;
+
+    // ── Resumen de actividades ────────────────────────────────────────────────
+    const activitySummary = {
+      total:      totalActs,
+      done:       doneActs,
+      inProgress: allActivities.filter(a => a.status === 'en_progreso').length,
+      pending:    allActivities.filter(a => a.status === 'pendiente').length,
+      blocked:    blockedActs.length,
+      overdue:    overdueActs.length,
+    };
+
     // ── Predicciones ─────────────────────────────────────────────────────────
     let predictions: Record<string, any> = {};
+    let delayDaysPred: number | null = null;
     if (project && totalActs > 0 && os.startDate) {
       const daysSinceStart = Math.max(1,
         Math.floor((today.getTime() - new Date(os.startDate).getTime()) / 86400000));
@@ -804,7 +863,7 @@ export class ServiceOrdersService {
       const estimatedEnd   = daysToComplete != null
         ? new Date(today.getTime() + daysToComplete * 86400000)
         : null;
-      const delayDays = estimatedEnd && os.endDate
+      delayDaysPred = estimatedEnd && os.endDate
         ? Math.floor((estimatedEnd.getTime() - new Date(os.endDate).getTime()) / 86400000)
         : null;
 
@@ -816,7 +875,8 @@ export class ServiceOrdersService {
         const progPct  = Number(project.progressPercent ?? 0) / 100;
         if (timePct > 0) {
           const ratio = progPct / timePct;
-          successProbability = Math.max(0, Math.min(100, Math.round(ratio * 60 + (delayDays != null && delayDays <= 0 ? 25 : 0))));
+          successProbability = Math.max(0, Math.min(100,
+            Math.round(ratio * 60 + (delayDaysPred != null && delayDaysPred <= 0 ? 25 : 0))));
         }
       }
 
@@ -826,28 +886,78 @@ export class ServiceOrdersService {
         actividadesRestantes:   remaining,
         totalActividades:       totalActs,
         fechaEstimadaFin:       estimatedEnd?.toISOString() ?? null,
-        diasDeRetraso:          delayDays,
+        diasDeRetraso:          delayDaysPred,
         probabilidadExito:      successProbability,
       };
+    }
+
+    // ── Recomendaciones ───────────────────────────────────────────────────────
+    const recommendations: Array<{ priority: 'alta' | 'media' | 'baja'; titulo: string; accion: string }> = [];
+    for (const alert of alerts) {
+      if (alert.tipo === 'os_vencida') {
+        recommendations.push({ priority: 'alta',
+          titulo: 'Regularizar plazo de la OS',
+          accion: 'Solicitar extensión formal del contrato o marcar como completada si el trabajo ya terminó.' });
+      } else if (alert.tipo === 'actividades_vencidas') {
+        recommendations.push({ priority: 'alta',
+          titulo: 'Actualizar actividades con plazo vencido',
+          accion: `Revisar y reasignar fechas de ${overdueActs.length} actividad${overdueActs.length !== 1 ? 'es' : ''} vencida${overdueActs.length !== 1 ? 's' : ''}. Puede requerir comunicación con el cliente para ajustar expectativas.` });
+      } else if (alert.tipo === 'actividades_bloqueadas') {
+        recommendations.push({ priority: 'alta',
+          titulo: 'Desbloquear actividades críticas',
+          accion: `Identificar el impedimento que frena ${blockedActs.length} actividad${blockedActs.length !== 1 ? 'es' : ''} y resolverlo de inmediato. Puede requerir coordinación con el cliente o equipo técnico.` });
+      } else if (alert.tipo === 'sin_movimiento') {
+        recommendations.push({ priority: 'media',
+          titulo: 'Reactivar el seguimiento de la OS',
+          accion: 'Registrar avance en el historial, contactar al cliente o programar una visita de seguimiento para retomar el proceso.' });
+      } else if (alert.tipo === 'visita_cancelada_sin_reagendar') {
+        recommendations.push({ priority: 'media',
+          titulo: 'Reagendar visita cancelada',
+          accion: 'Confirmar una nueva fecha con el cliente para continuar el proceso de implementación sin perder momentum.' });
+      } else if (alert.tipo === 'sin_proyecto') {
+        recommendations.push({ priority: 'media',
+          titulo: 'Crear proyecto de implementación',
+          accion: 'Vincular un proyecto a esta OS desde Implementación › Proyectos, con módulos, fases y actividades para poder medir el avance.' });
+      } else if (alert.tipo === 'progreso_bajo') {
+        recommendations.push({ priority: 'media',
+          titulo: 'Incrementar el ritmo de trabajo',
+          accion: 'Aumentar la frecuencia de visitas, revisar la asignación de recursos o ajustar el alcance del proyecto con el cliente.' });
+      }
+    }
+    if (delayDaysPred != null && delayDaysPred > 7) {
+      recommendations.push({ priority: 'media',
+        titulo: 'Retraso proyectado detectado',
+        accion: `Al ritmo actual el proyecto finalizará con ${delayDaysPred} días de retraso. Considere aumentar los recursos disponibles o negociar el alcance con el cliente.` });
+    }
+    if (alerts.length === 0) {
+      recommendations.push({ priority: 'baja',
+        titulo: 'Implementación en buen camino',
+        accion: 'Mantener el ritmo actual y continuar documentando los avances en el historial de la OS para garantizar trazabilidad completa.' });
     }
 
     // ── Nivel de riesgo global ───────────────────────────────────────────────
     const criticos     = alerts.filter(a => a.level === 'critico').length;
     const advertencias = alerts.filter(a => a.level === 'advertencia').length;
-    const riskLevel    = criticos >= 2 ? 'alto'
-                       : criticos === 1 ? 'alto'
-                       : advertencias >= 2 ? 'medio'
-                       : advertencias === 1 ? 'medio'
-                       : 'normal';
+    const riskLevel    = criticos >= 1 ? 'alto' : advertencias >= 1 ? 'medio' : 'normal';
 
     return {
-      os: { id: os.id, osNumber: os.osNumber, product: os.product, status: os.status,
-            startDate: os.startDate, endDate: os.endDate, client: os.client },
-      project: project ? { name: project.name, status: project.status,
-                           progressPercent: Number(project.progressPercent ?? 0) } : null,
+      os: {
+        id: os.id, osNumber: os.osNumber, product: os.product, status: os.status,
+        startDate: os.startDate, endDate: os.endDate, client: os.client,
+      },
+      project: project ? {
+        name: project.name, status: project.status,
+        progressPercent: Number(project.progressPercent ?? 0),
+        startDate: project.startDate, endDate: project.endDate,
+      } : null,
       riskLevel,
       alerts,
       predictions,
+      modules:         modulesDetail,
+      visits:          visitsDetail,
+      timeline:        timelineDetail,
+      activitySummary,
+      recommendations,
     };
   }
 

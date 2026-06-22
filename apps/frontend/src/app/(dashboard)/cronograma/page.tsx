@@ -703,13 +703,15 @@ function DayModal({ day, bloques, onClose, onEdit, onNew, selectionMode, selecte
 type PrintMode = 'day' | 'week' | 'month' | 'range';
 
 function PrintModal({ open, onClose, currentDate }: { open: boolean; onClose: () => void; currentDate: Dayjs }) {
-  const [mode, setMode]       = useState<PrintMode>('week');
-  const [day, setDay]         = useState(currentDate.format('YYYY-MM-DD'));
+  const [mode, setMode]         = useState<PrintMode>('week');
+  const [day, setDay]           = useState(currentDate.format('YYYY-MM-DD'));
   const [weekStart, setWeekStart] = useState(currentDate.startOf('week').format('YYYY-MM-DD'));
-  const [month, setMonth]     = useState(currentDate.format('YYYY-MM'));
+  const [month, setMonth]       = useState(currentDate.format('YYYY-MM'));
   const [rangeFrom, setRangeFrom] = useState(currentDate.startOf('week').format('YYYY-MM-DD'));
-  const [rangeTo, setRangeTo] = useState(currentDate.endOf('week').format('YYYY-MM-DD'));
+  const [rangeTo, setRangeTo]   = useState(currentDate.endOf('week').format('YYYY-MM-DD'));
   const [printing, setPrinting] = useState(false);
+  const [printAgente, setPrintAgente] = useState('');
+  const [agentes, setAgentes]   = useState<{ id: string; firstName: string; lastName: string }[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -718,6 +720,8 @@ function PrintModal({ open, onClose, currentDate }: { open: boolean; onClose: ()
       setMonth(currentDate.format('YYYY-MM'));
       setRangeFrom(currentDate.startOf('week').format('YYYY-MM-DD'));
       setRangeTo(currentDate.endOf('week').format('YYYY-MM-DD'));
+      setPrintAgente('');
+      usersApi.listAgents({ limit: 200 }).then(r => setAgentes(Array.isArray(r) ? r : r.data ?? [])).catch(() => {});
     }
   }, [open, currentDate]);
 
@@ -743,7 +747,11 @@ function PrintModal({ open, onClose, currentDate }: { open: boolean; onClose: ()
     const { desde, hasta, label } = getRange();
     setPrinting(true);
     try {
-      const data = await cronogramaApi.list({ fechaDesde: desde, fechaHasta: hasta });
+      const params: Record<string, string> = { fechaDesde: desde, fechaHasta: hasta };
+      if (printAgente) params.agenteId = printAgente;
+      const data = await cronogramaApi.list(params);
+      const agenteSeleccionado = printAgente ? agentes.find(a => a.id === printAgente) : null;
+      const agenteLabel = agenteSeleccionado ? `${agenteSeleccionado.firstName} ${agenteSeleccionado.lastName}` : null;
       const bloques: Bloque[] = Array.isArray(data) ? data : data.data ?? [];
 
       // Agrupar por fecha
@@ -817,6 +825,7 @@ function PrintModal({ open, onClose, currentDate }: { open: boolean; onClose: ()
   </div>
   <div class="range">
     <div class="range-label">${label}</div>
+    ${agenteLabel ? `<div style="color:#60a5fa;font-size:12px;margin-top:3px;font-weight:600">Agente: ${agenteLabel}</div>` : ''}
     <div style="color:#94a3b8;font-size:12px;margin-top:4px">${bloques.length} bloque${bloques.length !== 1 ? 's' : ''} en el período</div>
   </div>
 </div>
@@ -940,6 +949,18 @@ function PrintModal({ open, onClose, currentDate }: { open: boolean; onClose: ()
             </div>
           </div>
         )}
+
+        {/* Filtro de agente */}
+        <div>
+          <label className={labelCls} style={{ color: 'var(--text-muted)' }}>Agente</label>
+          <select value={printAgente} onChange={e => setPrintAgente(e.target.value)} className={inputCls}
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
+            <option value="">— Todos los agentes (cronograma general) —</option>
+            {agentes.map(a => (
+              <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>
+            ))}
+          </select>
+        </div>
 
         {/* Footer */}
         <div className="flex gap-3 pt-1">

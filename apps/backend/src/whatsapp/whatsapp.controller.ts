@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { WhatsAppService } from './whatsapp.service';
@@ -21,5 +21,11 @@ export class WhatsAppController {
   async disconnect() {
     await this.wa.disconnect();
     return { ok: true };
+  }
+
+  @Post('send-test')
+  @ApiOperation({ summary: 'Enviar mensaje de prueba' })
+  sendTest(@Body() body: { phone: string }) {
+    return this.wa.sendTest(body.phone);
   }
 }

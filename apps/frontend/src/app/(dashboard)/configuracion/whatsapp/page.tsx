@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, Smartphone, Wifi, WifiOff, Loader2, LogOut, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { MessageCircle, Smartphone, Wifi, WifiOff, Loader2, LogOut, RefreshCw, CheckCircle2, Send } from 'lucide-react';
 import Image from 'next/image';
 import { whatsappApi } from '@/lib/api';
+import { toast } from 'sonner';
 
 type WaStatus = 'disconnected' | 'connecting' | 'qr' | 'connected';
 
@@ -18,7 +19,9 @@ export default function WhatsAppConfigPage() {
   const [status, setStatus]   = useState<WaStatus>('connecting');
   const [phone, setPhone]     = useState<string | null>(null);
   const [qr, setQr]           = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [testing, setTesting]     = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -40,6 +43,20 @@ export default function WhatsAppConfigPage() {
     setLoading(true);
     try { await whatsappApi.disconnect(); await fetchStatus(); }
     finally { setLoading(false); }
+  };
+
+  const handleSendTest = async () => {
+    if (!testPhone.trim()) { toast.error('Ingresa un número de teléfono'); return; }
+    setTesting(true);
+    try {
+      const r = await whatsappApi.sendTest(testPhone.trim());
+      if (r.ok) toast.success(r.message);
+      else toast.error(r.message);
+    } catch {
+      toast.error('Error al conectar con el servidor');
+    } finally {
+      setTesting(false);
+    }
   };
 
   const meta = STATUS_META[status];
@@ -144,6 +161,35 @@ export default function WhatsAppConfigPage() {
             Hola <strong>Carlos García</strong>, tienes un documento pendiente por firmar.<br /><br />
             👉 Ingresa aquí para firmar:<br />
             https://aura.tudominio.com/firmar/abc123
+          </div>
+        </motion.div>
+      )}
+
+      {/* Prueba de envío */}
+      {status === 'connected' && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="rounded-2xl p-5 space-y-3"
+          style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Probar envío</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Envía un mensaje de prueba a cualquier número para verificar que la conexión funciona.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="tel"
+              placeholder="Ej: 3101234567"
+              value={testPhone}
+              onChange={e => setTestPhone(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSendTest()}
+              className="flex-1 rounded-xl px-3 py-2 text-sm input-glass"
+              style={{ border: '1px solid var(--border-subtle)' }}
+            />
+            <button onClick={handleSendTest} disabled={testing}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+              style={{ background: '#25d366' }}>
+              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {testing ? 'Enviando…' : 'Enviar'}
+            </button>
           </div>
         </motion.div>
       )}

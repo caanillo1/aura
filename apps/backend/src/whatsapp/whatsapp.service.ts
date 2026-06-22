@@ -55,13 +55,17 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   }
 
   async sendMessage(phone: string, text: string): Promise<boolean> {
-    if (!this.sock || this.status !== 'connected') return false;
+    if (!this.sock || this.status !== 'connected') {
+      this.logger.warn(`WA sendMessage ignorado — status=${this.status}, sock=${!!this.sock}`);
+      return false;
+    }
     try {
-      // Normalizar: quitar todo excepto dígitos, luego agregar indicativo 57 si no está
       const digits = phone.replace(/\D/g, '');
       const normalized = digits.startsWith('57') && digits.length >= 12 ? digits : `57${digits}`;
       const jid = `${normalized}@s.whatsapp.net`;
+      this.logger.log(`Enviando WA a ${jid}`);
       await this.sock.sendMessage(jid, { text });
+      this.logger.log(`WA enviado OK → ${jid}`);
       return true;
     } catch (err: any) {
       this.logger.error(`Error enviando WA a ${phone}: ${err?.message}`);
@@ -69,11 +73,29 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async sendTest(phone: string): Promise<{ ok: boolean; message: string }> {
+    if (this.status !== 'connected') {
+      return { ok: false, message: `No hay sesión activa (estado: ${this.status}). Escanea el QR primero.` };
+    }
+    const sent = await this.sendMessage(phone, '✅ *AURA ERP* — Mensaje de prueba. La conexión de WhatsApp funciona correctamente.');
+    return sent
+      ? { ok: true,  message: `Mensaje enviado a ${phone}` }
+      : { ok: false, message: 'No se pudo enviar el mensaje. Revisa los logs del servidor.' };
+  }
+
   private async connect() {
     try {
       this.status = 'connecting';
       const { state, saveCreds } = await useMultiFileAuthState(this.sessionDir);
-      const { version } = await fetchLatestBaileysVersion();
+
+      let version: [number, number, number] = [2, 3000, 1023141645];
+      try {
+        const result = await fetchLatestBaileysVersion();
+        version = result.version;
+        this.logger.log(`Versión WA: ${version.join('.')}`);
+      } catch {
+        this.logger.warn(`No se pudo obtener versión de WA, usando versión de respaldo ${version.join('.')}`);
+      }
 
       this.sock = makeWASocket({
         version,

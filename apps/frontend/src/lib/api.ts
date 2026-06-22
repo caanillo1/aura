@@ -249,6 +249,8 @@ export const whatsappApi = {
     api.get('/whatsapp/status').then(r => r.data),
   disconnect: (): Promise<{ ok: boolean }> =>
     api.post('/whatsapp/disconnect').then(r => r.data),
+  sendTest: (phone: string): Promise<{ ok: boolean; message: string }> =>
+    api.post('/whatsapp/send-test', { phone }).then(r => r.data),
 };
 
 // ── Service Orders ────────────────────────────────────────────────────────────

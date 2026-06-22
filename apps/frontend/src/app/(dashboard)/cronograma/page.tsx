@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import {
   ChevronLeft, ChevronRight, Plus, X, CheckCircle2, Loader2,
-  Trash2, FileText, Check, Square, CheckSquare,
+  Trash2, FileText, Check, Square, CheckSquare, Printer,
 } from 'lucide-react';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/es';
@@ -567,6 +567,267 @@ function DayModal({ day, bloques, onClose, onEdit, onNew, selectionMode, selecte
   );
 }
 
+// ── Print Modal ───────────────────────────────────────────────────────────────
+type PrintMode = 'day' | 'week' | 'month' | 'range';
+
+function PrintModal({ open, onClose, currentDate }: { open: boolean; onClose: () => void; currentDate: Dayjs }) {
+  const [mode, setMode]       = useState<PrintMode>('week');
+  const [day, setDay]         = useState(currentDate.format('YYYY-MM-DD'));
+  const [weekStart, setWeekStart] = useState(currentDate.startOf('week').format('YYYY-MM-DD'));
+  const [month, setMonth]     = useState(currentDate.format('YYYY-MM'));
+  const [rangeFrom, setRangeFrom] = useState(currentDate.startOf('week').format('YYYY-MM-DD'));
+  const [rangeTo, setRangeTo] = useState(currentDate.endOf('week').format('YYYY-MM-DD'));
+  const [printing, setPrinting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setDay(currentDate.format('YYYY-MM-DD'));
+      setWeekStart(currentDate.startOf('week').format('YYYY-MM-DD'));
+      setMonth(currentDate.format('YYYY-MM'));
+      setRangeFrom(currentDate.startOf('week').format('YYYY-MM-DD'));
+      setRangeTo(currentDate.endOf('week').format('YYYY-MM-DD'));
+    }
+  }, [open, currentDate]);
+
+  const getRange = (): { desde: string; hasta: string; label: string } => {
+    if (mode === 'day') {
+      return { desde: day, hasta: day, label: dayjs(day).format('dddd D [de] MMMM [de] YYYY') };
+    }
+    if (mode === 'week') {
+      const ws = dayjs(weekStart).startOf('week');
+      return { desde: ws.format('YYYY-MM-DD'), hasta: ws.endOf('week').format('YYYY-MM-DD'),
+        label: `Semana del ${ws.format('D [de] MMMM')} al ${ws.endOf('week').format('D [de] MMMM [de] YYYY')}` };
+    }
+    if (mode === 'month') {
+      const ms = dayjs(month + '-01');
+      return { desde: ms.startOf('month').format('YYYY-MM-DD'), hasta: ms.endOf('month').format('YYYY-MM-DD'),
+        label: ms.format('MMMM [de] YYYY') };
+    }
+    return { desde: rangeFrom, hasta: rangeTo,
+      label: `${dayjs(rangeFrom).format('D [de] MMMM')} al ${dayjs(rangeTo).format('D [de] MMMM [de] YYYY')}` };
+  };
+
+  const handlePrint = async () => {
+    const { desde, hasta, label } = getRange();
+    setPrinting(true);
+    try {
+      const data = await cronogramaApi.list({ fechaDesde: desde, fechaHasta: hasta });
+      const bloques: Bloque[] = Array.isArray(data) ? data : data.data ?? [];
+
+      // Agrupar por fecha
+      const byDay = new Map<string, Bloque[]>();
+      bloques.forEach(b => {
+        const fd = (b.fecha as string).substring(0, 10);
+        if (!byDay.has(fd)) byDay.set(fd, []);
+        byDay.get(fd)!.push(b);
+      });
+      const days = Array.from(byDay.entries()).sort(([a], [b]) => a.localeCompare(b));
+
+      const STATUS_LABEL: Record<string, string> = {
+        programado: 'Programado', en_curso: 'En curso', completado: 'Completado', cancelado: 'Cancelado',
+      };
+      const TIPO_LABEL: Record<string, string> = {
+        inicio: 'Acta de Inicio', visita: 'Acta de Visita', cierre: 'Acta de Cierre',
+        capacitacion: 'Acta de Capacitación', entrega_soporte: 'Entrega a Soporte',
+      };
+
+      const rows = days.map(([fecha, bbs]) => {
+        const dj = dayjs(fecha);
+        const dayHeader = `<tr><td colspan="6" style="background:#1e3a5f;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;letter-spacing:.04em">${dj.format('dddd D [de] MMMM [de] YYYY').toUpperCase()}</td></tr>`;
+        const sorted = [...bbs].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+        const items = sorted.map(b => `
+          <tr>
+            <td style="padding:7px 10px;font-weight:700;white-space:nowrap;color:#1e3a5f">${b.horaInicio} – ${b.horaFin}</td>
+            <td style="padding:7px 10px;font-weight:600">${b.titulo}</td>
+            <td style="padding:7px 10px;color:#475569">${b.client?.businessName ?? '—'}</td>
+            <td style="padding:7px 10px;color:#475569">${b.serviceOrder ? `${b.serviceOrder.osNumber}` : '—'}</td>
+            <td style="padding:7px 10px;color:#475569">${b.agente.firstName} ${b.agente.lastName}</td>
+            <td style="padding:7px 10px">
+              ${b.tipoActa ? `<span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">${TIPO_LABEL[b.tipoActa] ?? b.tipoActa}</span>` : `<span style="color:#94a3b8;font-size:12px">${STATUS_LABEL[b.status] ?? b.status}</span>`}
+              ${b.actaId ? ' <span style="color:#16a34a;font-size:11px;font-weight:600">✓ Acta</span>' : ''}
+            </td>
+          </tr>`).join('');
+        return dayHeader + items;
+      }).join('');
+
+      const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<title>Cronograma AURA — ${label}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1e293b; background: #fff; }
+  .header { background: #0f172a; color: #fff; padding: 20px 28px; display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 22px; font-weight: 800; letter-spacing: .02em; }
+  .header .sub { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+  .header .range { text-align: right; }
+  .header .range-label { font-size: 15px; font-weight: 700; color: #60a5fa; text-transform: capitalize; }
+  .content { padding: 20px 28px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #f1f5f9; color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 6px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  td { border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  .empty { padding: 40px; text-align: center; color: #94a3b8; font-size: 14px; }
+  .footer { margin-top: 24px; font-size: 10px; color: #94a3b8; text-align: right; }
+  @media print {
+    @page { margin: 12mm 10mm; size: A4 landscape; }
+    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .no-print { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="h1-wrap"><h1>AURA ERP</h1></div>
+    <div class="sub">Cronograma de actividades</div>
+  </div>
+  <div class="range">
+    <div class="range-label">${label}</div>
+    <div style="color:#94a3b8;font-size:12px;margin-top:4px">${bloques.length} bloque${bloques.length !== 1 ? 's' : ''} en el período</div>
+  </div>
+</div>
+<div class="content">
+  ${days.length === 0
+    ? '<div class="empty">No hay bloques en el período seleccionado</div>'
+    : `<table>
+        <thead>
+          <tr>
+            <th style="width:110px">Hora</th>
+            <th>Actividad</th>
+            <th>Cliente</th>
+            <th style="width:90px">OS</th>
+            <th>Agente</th>
+            <th style="width:160px">Tipo / Estado</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`
+  }
+  <div class="footer">Generado el ${dayjs().format('D [de] MMMM [de] YYYY HH:mm')} · AURA ERP</div>
+</div>
+<script>window.onload=()=>{window.print();}<\/script>
+</body>
+</html>`;
+
+      const win = window.open('', '_blank');
+      if (win) { win.document.write(html); win.document.close(); }
+      onClose();
+    } catch {
+      toast.error('Error al generar el reporte');
+    } finally {
+      setPrinting(false);
+    }
+  };
+
+  if (!open) return null;
+
+  const inputCls = 'input-glass rounded-xl px-3 py-2 text-sm w-full';
+  const labelCls = 'block text-xs font-semibold mb-1.5 uppercase tracking-wide';
+
+  return createPortal(
+    <>
+      <motion.div className="fixed inset-0 z-[700]"
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onClose} />
+      <motion.div
+        className="fixed z-[701] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-2xl p-6 flex flex-col gap-5"
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 32px 72px rgba(0,0,0,0.5)' }}
+        initial={{ opacity: 0, scale: 0.93, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.93, y: 16 }} transition={{ duration: 0.2, ease: [0.16,1,0.3,1] }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(96,165,250,0.12)' }}>
+              <Printer className="w-4 h-4" style={{ color: '#60a5fa' }} />
+            </div>
+            <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Imprimir cronograma</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors" style={{ color: 'var(--text-muted)' }}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Modo */}
+        <div>
+          <p className={labelCls} style={{ color: 'var(--text-muted)' }}>Período a imprimir</p>
+          <div className="grid grid-cols-4 gap-2">
+            {([
+              { key: 'day'   as PrintMode, label: 'Día' },
+              { key: 'week'  as PrintMode, label: 'Semana' },
+              { key: 'month' as PrintMode, label: 'Mes' },
+              { key: 'range' as PrintMode, label: 'Rango' },
+            ]).map(({ key, label }) => (
+              <button key={key} onClick={() => setMode(key)}
+                className="py-2 rounded-xl text-xs font-semibold transition-all"
+                style={{
+                  background: mode === key ? 'var(--accent-blue)' : 'var(--surface-2)',
+                  color: mode === key ? '#fff' : 'var(--text-secondary)',
+                  border: `1px solid ${mode === key ? 'transparent' : 'var(--border-subtle)'}`,
+                }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Inputs según modo */}
+        {mode === 'day' && (
+          <div>
+            <label className={labelCls} style={{ color: 'var(--text-muted)' }}>Fecha</label>
+            <input type="date" className={inputCls} value={day} onChange={e => setDay(e.target.value)} />
+          </div>
+        )}
+        {mode === 'week' && (
+          <div>
+            <label className={labelCls} style={{ color: 'var(--text-muted)' }}>Cualquier día de la semana</label>
+            <input type="date" className={inputCls} value={weekStart} onChange={e => setWeekStart(e.target.value)} />
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              Semana: {dayjs(weekStart).startOf('week').format('D MMM')} – {dayjs(weekStart).endOf('week').format('D MMM YYYY')}
+            </p>
+          </div>
+        )}
+        {mode === 'month' && (
+          <div>
+            <label className={labelCls} style={{ color: 'var(--text-muted)' }}>Mes</label>
+            <input type="month" className={inputCls} value={month} onChange={e => setMonth(e.target.value)} />
+          </div>
+        )}
+        {mode === 'range' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls} style={{ color: 'var(--text-muted)' }}>Desde</label>
+              <input type="date" className={inputCls} value={rangeFrom} onChange={e => setRangeFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelCls} style={{ color: 'var(--text-muted)' }}>Hasta</label>
+              <input type="date" className={inputCls} value={rangeTo} onChange={e => setRangeTo(e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex gap-3 pt-1">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors"
+            style={{ border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+            Cancelar
+          </button>
+          <button onClick={handlePrint} disabled={printing}
+            className="flex-1 btn-primary py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50">
+            {printing
+              ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Generando...</>
+              : <><Printer className="w-4 h-4" /> Imprimir</>}
+          </button>
+        </div>
+      </motion.div>
+    </>,
+    document.body
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CronogramaPage() {
   useTheme();
@@ -584,6 +845,7 @@ export default function CronogramaPage() {
   const [dayView, setDayView] = useState<Dayjs | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [printModal, setPrintModal] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -919,6 +1181,11 @@ export default function CronogramaPage() {
             }}>
             {selectionMode ? <><X className="w-3.5 h-3.5" /> Cancelar</> : <><CheckSquare className="w-3.5 h-3.5" /> Seleccionar</>}
           </button>
+          <button onClick={() => setPrintModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+            style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+            <Printer className="w-3.5 h-3.5" /> Imprimir
+          </button>
           <button onClick={() => openNew()}
             className="btn-primary flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white">
             <Plus className="w-3.5 h-3.5" /> Nuevo bloque
@@ -981,6 +1248,12 @@ export default function CronogramaPage() {
         onCrearActa={handleCrearActa}
         currentUserId={user?.id}
       />
+
+      <AnimatePresence>
+        {printModal && (
+          <PrintModal key="print-modal" open={printModal} onClose={() => setPrintModal(false)} currentDate={current} />
+        )}
+      </AnimatePresence>
 
       {/* Barra flotante de eliminación masiva */}
       <AnimatePresence>

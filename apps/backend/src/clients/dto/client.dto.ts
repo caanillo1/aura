@@ -39,6 +39,7 @@ export class CreateStaffDto {
 }
 
 export class UpdateStaffDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() document?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() firstName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() lastName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() jobTitle?: string;

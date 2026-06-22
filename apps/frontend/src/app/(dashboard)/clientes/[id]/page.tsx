@@ -274,7 +274,7 @@ export default function ClienteDetailPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [editClientModal, setEditClientModal] = useState(false);
-  const [editForm, setEditForm] = useState({ address: '', municipioId: '', email: '', phone: '', economicActivity: '' });
+  const [editForm, setEditForm] = useState({ nit: '', businessName: '', commercialName: '', address: '', municipioId: '', email: '', phone: '', economicActivity: '' });
   const [savingClient, setSavingClient] = useState(false);
   const [munQuery, setMunQuery] = useState('');
   const [munOpen, setMunOpen] = useState(false);
@@ -358,6 +358,9 @@ export default function ClienteDetailPage() {
   const openEditClient = () => {
     if (!client) return;
     setEditForm({
+      nit: client.nit ?? '',
+      businessName: client.businessName ?? '',
+      commercialName: client.commercialName ?? '',
       address: client.address ?? '',
       municipioId: client.municipioId ?? '',
       email: client.email ?? '',
@@ -375,6 +378,9 @@ export default function ClienteDetailPage() {
     setSavingClient(true);
     try {
       const updated = await clientsApi.update(client.id, {
+        nit: editForm.nit || undefined,
+        businessName: editForm.businessName || undefined,
+        commercialName: editForm.commercialName || undefined,
         address: editForm.address || undefined,
         municipioId: editForm.municipioId || null,
         email: editForm.email || undefined,
@@ -717,6 +723,21 @@ export default function ClienteDetailPage() {
       {/* Modal: Editar datos del cliente */}
       <Modal open={editClientModal} onClose={() => { setEditClientModal(false); setMunOpen(false); }} title="Editar datos del cliente" width="max-w-xl">
         <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>NIT</label>
+            <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm" placeholder="900123456-7"
+              value={editForm.nit} onChange={e => setEditForm(p => ({ ...p, nit: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Nombre comercial</label>
+            <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm" placeholder="Nombre comercial"
+              value={editForm.commercialName} onChange={e => setEditForm(p => ({ ...p, commercialName: e.target.value }))} />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Razón social</label>
+            <input className="input-glass w-full rounded-xl px-3 py-2.5 text-sm" placeholder="Empresa S.A.S."
+              value={editForm.businessName} onChange={e => setEditForm(p => ({ ...p, businessName: e.target.value }))} />
+          </div>
           {/* Municipio — autocomplete */}
           <div className="col-span-2" ref={munRef} style={{ position: 'relative' }}>
             <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Municipio</label>

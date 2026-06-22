@@ -76,7 +76,7 @@ export class CronogramaService {
 
   /** Genera el contenido de un archivo .ics para agregar al calendario nativo */
   private buildIcs(bloque: any, acceptUrl: string, cancelUrl: string): Buffer {
-    const fecha = (bloque.fecha as string).substring(0, 10).replace(/-/g, ''); // YYYYMMDD
+    const fecha   = dayjs(bloque.fecha).format('YYYYMMDD'); // Date o string → YYYYMMDD
     const dtStart = `${fecha}T${bloque.horaInicio.replace(':', '')}00`;
     const dtEnd   = `${fecha}T${bloque.horaFin.replace(':', '')}00`;
     const dtstamp = new Date().toISOString().replace(/[-:.]/g, '').substring(0, 15) + 'Z';

@@ -745,6 +745,10 @@ function PrintModal({ open, onClose, currentDate }: { open: boolean; onClose: ()
 
   const handlePrint = async () => {
     const { desde, hasta, label } = getRange();
+    // Abrir la ventana ANTES del await para que el navegador móvil no lo bloquee como popup
+    const win = window.open('', '_blank');
+    if (!win) { toast.error('El navegador bloqueó la ventana emergente. Permítela e intenta de nuevo.'); return; }
+    win.document.write('<html><body style="font-family:sans-serif;padding:2rem;color:#333">Generando reporte...</body></html>');
     setPrinting(true);
     try {
       const params: Record<string, string> = { fechaDesde: desde, fechaHasta: hasta };
@@ -852,10 +856,12 @@ function PrintModal({ open, onClose, currentDate }: { open: boolean; onClose: ()
 </body>
 </html>`;
 
-      const win = window.open('', '_blank');
-      if (win) { win.document.write(html); win.document.close(); }
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
       onClose();
     } catch {
+      win.close();
       toast.error('Error al generar el reporte');
     } finally {
       setPrinting(false);

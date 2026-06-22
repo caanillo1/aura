@@ -2099,6 +2099,7 @@ export default function ActasPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromBloqueId = searchParams.get('bloqueId');
+  const fromTipo     = searchParams.get('tipo') as ActaType | null;
   const { theme } = useTheme();
   const isLight = theme === 'light';
 
@@ -2177,9 +2178,16 @@ export default function ActasPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-abre el selector de tipo cuando se llega desde el cronograma
+  // Cuando se llega desde el cronograma: si ya hay tipo definido va directo
+  // al formulario; si no, abre el selector para que el usuario elija.
   useEffect(() => {
-    if (fromBloqueId) setTypeSelector(true);
+    if (!fromBloqueId) return;
+    if (fromTipo && (Object.keys(TYPE_CFG) as ActaType[]).includes(fromTipo)) {
+      setCreateType(fromTipo);
+      setCreateModal(true);
+    } else {
+      setTypeSelector(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

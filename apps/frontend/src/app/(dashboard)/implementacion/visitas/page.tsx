@@ -170,7 +170,9 @@ export default function VisitasPage() {
 
   const handleDiligenciar = (b: VisitaBloque) => {
     if (b.serviceOrder?.project?.id) {
-      router.push(`/implementacion/proyectos/${b.serviceOrder.project.id}/actas?bloqueId=${b.id}`);
+      const params = new URLSearchParams({ bloqueId: b.id });
+      if (b.tipoActa) params.set('tipo', b.tipoActa);
+      router.push(`/implementacion/proyectos/${b.serviceOrder.project.id}/actas?${params.toString()}`);
     } else {
       toast.info('Este bloque no tiene una orden de servicio con proyecto. Asígnala desde el Cronograma para poder diligenciar el acta.');
     }

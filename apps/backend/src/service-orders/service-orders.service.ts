@@ -119,42 +119,59 @@ export class ServiceOrdersService {
   }
 
   async create(companyId: string, createdById: string, dto: CreateServiceOrderDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const count = await tx.serviceOrder.count({ where: { companyId } });
-      const year = new Date().getFullYear();
-      const osNumber = `OS-${year}-${String(count + 1).padStart(3, '0')}`;
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Use MAX(osNumber) approach to avoid race conditions with count
+        const existing = await tx.serviceOrder.findMany({
+          where: { companyId },
+          select: { osNumber: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        const year = new Date().getFullYear();
+        const nums = existing
+          .map(o => parseInt(o.osNumber.split('-')[2] ?? '0', 10))
+          .filter(n => !isNaN(n));
+        const nextNum = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
+        const osNumber = `OS-${year}-${String(nextNum).padStart(3, '0')}`;
 
-      const os = await tx.serviceOrder.create({
-        data: {
-          companyId, createdById, osNumber,
-          clientId: dto.clientId,
-          ticketRubi: dto.ticketRubi || null,
-          product: dto.product,
-          scope: dto.scope,
-          startDate: new Date(dto.startDate),
-          endDate: new Date(dto.endDate),
-          durationDays: dto.durationDays ?? 0,
-          clinicalLeaderId: dto.clinicalLeaderId,
-          financialLeaderId: dto.financialLeaderId,
-          observations: dto.observations,
-          status: 'pendiente',
-        },
-        select: OS_SELECT,
+        const os = await tx.serviceOrder.create({
+          data: {
+            companyId, createdById, osNumber,
+            clientId:         dto.clientId,
+            ticketRubi:       dto.ticketRubi        || null,
+            product:          dto.product,
+            scope:            dto.scope             ?? null,
+            startDate:        new Date(dto.startDate),
+            endDate:          new Date(dto.endDate),
+            durationDays:     dto.durationDays      ?? 0,
+            clinicalLeaderId: dto.clinicalLeaderId  ?? null,
+            financialLeaderId: dto.financialLeaderId ?? null,
+            observations:     dto.observations      ?? null,
+            status:           'pendiente',
+          },
+          select: OS_SELECT,
+        });
+
+        await tx.serviceOrderHistory.create({
+          data: {
+            serviceOrderId: os.id,
+            changedById:    createdById,
+            fieldName:      'status',
+            oldValue:       null,
+            newValue:       'pendiente',
+            reason:         'Creación de la orden de servicio',
+          },
+        });
+
+        return os;
       });
-
-      await tx.serviceOrderHistory.create({
-        data: {
-          serviceOrderId: os.id,
-          changedById: createdById,
-          fieldName: 'status',
-          oldValue: null,
-          newValue: 'pendiente',
-          reason: 'Creación de la orden de servicio',
-        },
-      });
-
-      return os;
-    });
+    } catch (err: any) {
+      // P2002 = unique constraint (race condition on osNumber)
+      if (err?.code === 'P2002') {
+        throw new ConflictException('El número de OS ya existe, intenta de nuevo');
+      }
+      throw new BadRequestException(err?.message ?? 'Error al crear la orden de servicio');
+    }
   }
 
   async update(companyId: string, id: string, dto: UpdateServiceOrderDto) {

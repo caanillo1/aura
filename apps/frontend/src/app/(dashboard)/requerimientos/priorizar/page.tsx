@@ -1877,16 +1877,17 @@ export default function PriorizarPage() {
                 {!editMode && (
                   <div className="grid grid-cols-3 gap-0">
                     {[
-                      { label: 'N° OS',   value: viewTarget.serviceOrder?.osNumber ?? '—' },
-                      { label: 'Nombre OS', value: viewTarget.serviceOrder?.product ?? '—' },
-                      { label: 'Módulo',  value: viewTarget.templateModule ? `${viewTarget.templateModule.code} — ${viewTarget.templateModule.name}` : '—' },
-                      { label: 'Fase',    value: viewTarget.templatePhase?.name ?? '—' },
+                      { label: 'N° OS',       value: viewTarget.serviceOrder?.osNumber ?? '—' },
+                      { label: 'Nombre OS',   value: viewTarget.serviceOrder?.product ?? '—' },
+                      { label: 'Módulo',      value: viewTarget.templateModule ? `${viewTarget.templateModule.code} — ${viewTarget.templateModule.name}` : '—' },
+                      { label: 'Fase',        value: viewTarget.templatePhase?.name ?? '—' },
+                      { label: 'Ticket Rubi', value: viewTarget.ticketRubi ?? '—' },
                     ].map(({ label, value }, i) => (
                       <div key={label} className="px-4 py-3"
                         style={{ borderRight: i % 2 === 0 ? `1px solid ${isLight ? 'rgba(30,60,120,0.06)' : 'rgba(255,255,255,0.06)'}` : 'none',
                                  borderTop: i >= 2 ? `1px solid ${isLight ? 'rgba(30,60,120,0.06)' : 'rgba(255,255,255,0.06)'}` : 'none' }}>
                         <p className="text-[10px] font-semibold uppercase tracking-wide mb-0.5" style={{ color: 'var(--text-muted)' }}>{label}</p>
-                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{value}</p>
+                        <p className="text-sm font-medium truncate font-mono" style={{ color: label === 'Ticket Rubi' && viewTarget.ticketRubi ? '#a78bfa' : 'var(--text-secondary)' }}>{value}</p>
                       </div>
                     ))}
                   </div>

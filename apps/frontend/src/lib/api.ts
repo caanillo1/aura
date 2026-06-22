@@ -645,6 +645,8 @@ export const cronogramaApi = {
     api.delete(`/cronograma/${id}`).then((r) => r.data),
   respond: (token: string, action: 'accept' | 'cancel', motivo?: string) =>
     api.post('/cronograma/respond', { token, action, ...(motivo && { motivo }) }).then((r) => r.data),
+  resendInvite: (id: string) =>
+    api.post(`/cronograma/${id}/resend-invite`).then((r) => r.data),
 };
 
 // ── Comercial ─────────────────────────────────────────────────────────────────

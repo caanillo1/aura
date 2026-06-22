@@ -40,6 +40,11 @@ export class CronogramaController {
     return this.svc.update(req.user.companyId, id, dto);
   }
 
+  @Post(':id/resend-invite')
+  resendInvite(@Request() req, @Param('id') id: string) {
+    return this.svc.resendInvite(req.user.companyId, id);
+  }
+
   @Delete(':id')
   remove(@Request() req, @Param('id') id: string) {
     return this.svc.remove(req.user.companyId, id);

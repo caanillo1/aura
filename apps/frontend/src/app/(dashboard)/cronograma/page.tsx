@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import {
   ChevronLeft, ChevronRight, Plus, X, CheckCircle2, Loader2,
-  Trash2, FileText, Check, Square, CheckSquare, Printer,
+  Trash2, FileText, Check, Square, CheckSquare, Printer, Mail,
 } from 'lucide-react';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/es';
@@ -71,6 +71,7 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
   const [loadingSO, setLoadingSO] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [resending, setResending] = useState(false);
   const [saved, setSaved] = useState<Bloque | null>(null);
   const [extraDates, setExtraDates] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -159,6 +160,19 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
     try { await onDelete(); onClose(); }
     catch { toast.error('Error al eliminar'); }
     finally { setDeleting(false); }
+  };
+
+  const handleResend = async () => {
+    if (!initial?.id) return;
+    setResending(true);
+    try {
+      await cronogramaApi.resendInvite(initial.id);
+      toast.success('Invitación reenviada al líder del cliente');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al reenviar la invitación');
+    } finally {
+      setResending(false);
+    }
   };
 
   if (!open || typeof window === 'undefined') return null;
@@ -475,14 +489,24 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
 
           {/* Footer */}
           <div className="flex items-center justify-between gap-3 shrink-0">
-            {isEdit && onDelete && (
-              <button onClick={handleDelete} disabled={deleting}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold hover:bg-red-500/10 transition-colors"
-                style={{ color: '#f87171' }}>
-                {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                Eliminar
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {isEdit && onDelete && (
+                <button onClick={handleDelete} disabled={deleting}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold hover:bg-red-500/10 transition-colors"
+                  style={{ color: '#f87171' }}>
+                  {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  Eliminar
+                </button>
+              )}
+              {isEdit && initial?.serviceOrder?.id && (
+                <button onClick={handleResend} disabled={resending}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold hover:bg-blue-500/10 transition-colors"
+                  style={{ color: '#60a5fa' }}>
+                  {resending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                  Reenviar invitación
+                </button>
+              )}
+            </div>
             <div className="flex gap-2 ml-auto">
               <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors"
                 style={{ color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>

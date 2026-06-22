@@ -1,4 +1,4 @@
-﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import dayjs from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,6 +8,8 @@ import { CreateBloqueDto, UpdateBloqueDto, BloqueFilterDto, RespondVisitDto } fr
 
 @Injectable()
 export class CronogramaService {
+  private readonly logger = new Logger(CronogramaService.name);
+
   constructor(
     private prisma: PrismaService,
     private mail: MailService,
@@ -66,7 +68,9 @@ export class CronogramaService {
       },
       select: this.bloqueSelect,
     });
-    this.sendVisitEmail(companyId, bloque).catch(() => {}); // no bloquear respuesta
+    this.sendVisitEmail(companyId, bloque).catch(err =>
+      this.logger.error(`Error enviando correo de visita (create) bloqueId=${bloque.id}: ${err?.message}`),
+    );
     return bloque;
   }
 
@@ -334,7 +338,7 @@ export class CronogramaService {
         id,
       );
     }
-    return this.prisma.cronogramaBloque.update({
+    const bloque = await this.prisma.cronogramaBloque.update({
       where: { id },
       data: {
         ...(dto.titulo      !== undefined && { titulo: dto.titulo }),
@@ -352,6 +356,26 @@ export class CronogramaService {
       },
       select: this.bloqueSelect,
     });
+    // Enviar correo si se acaba de asignar una OS que antes no tenía
+    const osAnterior = (existing.serviceOrder as any)?.id ?? null;
+    const osNueva    = (bloque.serviceOrder as any)?.id ?? null;
+    if (osNueva && osNueva !== osAnterior) {
+      this.sendVisitEmail(companyId, bloque).catch(err =>
+        this.logger.error(`Error enviando correo de visita (update) bloqueId=${bloque.id}: ${err?.message}`),
+      );
+    }
+    return bloque;
+  }
+
+  async resendInvite(companyId: string, id: string): Promise<{ message: string }> {
+    const bloque = await this.prisma.cronogramaBloque.findFirst({
+      where: { id, companyId },
+      select: this.bloqueSelect,
+    });
+    if (!bloque) throw new NotFoundException('Bloque no encontrado');
+    if (!(bloque.serviceOrder as any)?.id) throw new BadRequestException('El bloque no tiene una OS asignada');
+    await this.sendVisitEmail(companyId, bloque);
+    return { message: 'Invitación reenviada correctamente' };
   }
 
   async remove(companyId: string, id: string) {

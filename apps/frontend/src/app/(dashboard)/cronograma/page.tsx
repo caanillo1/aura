@@ -69,9 +69,15 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saved, setSaved] = useState<Bloque | null>(null);
+  const [extraDates, setExtraDates] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(dayjs());
+
+  const toggleExtraDate = (d: string) =>
+    setExtraDates(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort());
 
   useEffect(() => {
-    if (!open) { setSaved(null); setSoImplementers([]); return; }
+    if (!open) { setSaved(null); setSoImplementers([]); setExtraDates([]); setPickerOpen(false); return; }
     const horaDefault = initial?.horaDefault ?? '08:00';
     const [hd] = horaDefault.split(':').map(Number);
     setForm({
@@ -120,16 +126,25 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
   const submit = async () => {
     if (!form.titulo || !form.agenteId) return toast.error('Título y agente son requeridos');
     if (timeToMin(form.horaFin) <= timeToMin(form.horaInicio)) return toast.error('La hora fin debe ser mayor');
+    const allDates = [form.fecha, ...extraDates.filter(d => d !== form.fecha)].sort();
+    const isMulti = !initial?.id && allDates.length > 1;
     setSaving(true);
     try {
-      const result = await onSave({
+      const payload = {
         ...form,
         clientId:       form.clientId       || undefined,
         serviceOrderId: form.serviceOrderId || undefined,
         tipoActa:       form.tipoActa       || undefined,
-      });
-      setSaved(result);
-      toast.success(initial?.id ? 'Bloque actualizado' : 'Bloque creado');
+      };
+      if (isMulti) {
+        for (const fecha of allDates) await onSave({ ...payload, fecha });
+        toast.success(`${allDates.length} bloques creados`);
+        onClose();
+      } else {
+        const result = await onSave(payload);
+        setSaved(result);
+        toast.success(initial?.id ? 'Bloque actualizado' : 'Bloque creado');
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.message ?? 'Error al guardar');
     } finally { setSaving(false); }
@@ -184,7 +199,8 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Fecha *</label>
               <input type="date" className="input-glass rounded-xl px-3 py-2.5 text-sm"
-                value={form.fecha} onChange={e => set('fecha', e.target.value)} />
+                value={form.fecha}
+                onChange={e => { set('fecha', e.target.value); setPickerMonth(dayjs(e.target.value)); }} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Color</label>
@@ -197,6 +213,115 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
               </div>
             </div>
           </div>
+
+          {/* Multi-date picker — solo en modo creación */}
+          {!isEdit && (
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { setPickerOpen(p => !p); setPickerMonth(dayjs(form.fecha)); }}
+                className="flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl transition-all self-start"
+                style={{
+                  background: pickerOpen ? 'rgba(96,165,250,0.12)' : 'var(--surface-2)',
+                  color: pickerOpen ? '#60a5fa' : 'var(--text-secondary)',
+                  border: `1px solid ${pickerOpen ? 'rgba(96,165,250,0.3)' : 'var(--border-subtle)'}`,
+                }}>
+                <Plus className="w-3.5 h-3.5" />
+                Repetir en más días
+                {extraDates.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                    style={{ background: '#2563eb', color: '#fff' }}>
+                    +{extraDates.length}
+                  </span>
+                )}
+              </button>
+
+              {pickerOpen && (() => {
+                const startOfMonth = pickerMonth.startOf('month');
+                const startGrid    = startOfMonth.startOf('week');
+                const days = Array.from({ length: 42 }, (_, i) => startGrid.add(i, 'day'));
+                return (
+                  <div className="rounded-2xl p-3 flex flex-col gap-2"
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+                    {/* Nav mes */}
+                    <div className="flex items-center justify-between">
+                      <button onClick={() => setPickerMonth(p => p.subtract(1, 'month'))}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
+                        style={{ color: 'var(--text-muted)' }}>
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-xs font-bold capitalize" style={{ color: 'var(--text-primary)' }}>
+                        {pickerMonth.format('MMMM YYYY')}
+                      </span>
+                      <button onClick={() => setPickerMonth(p => p.add(1, 'month'))}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
+                        style={{ color: 'var(--text-muted)' }}>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {/* Cabecera días */}
+                    <div className="grid grid-cols-7 text-center">
+                      {['D','L','M','X','J','V','S'].map(d => (
+                        <span key={d} className="text-[10px] font-bold py-0.5"
+                          style={{ color: 'var(--text-muted)' }}>{d}</span>
+                      ))}
+                    </div>
+                    {/* Grilla días */}
+                    <div className="grid grid-cols-7 gap-0.5">
+                      {days.map((day, i) => {
+                        const ds         = day.format('YYYY-MM-DD');
+                        const isMain     = ds === form.fecha;
+                        const isExtra    = extraDates.includes(ds);
+                        const isSelected = isMain || isExtra;
+                        const isThisMon  = day.month() === pickerMonth.month();
+                        return (
+                          <button key={i}
+                            onClick={() => { if (!isMain) toggleExtraDate(ds); }}
+                            className="h-7 w-full rounded-lg text-xs font-semibold transition-all"
+                            style={{
+                              background: isMain
+                                ? '#2563EB'
+                                : isExtra
+                                  ? 'rgba(37,99,235,0.25)'
+                                  : 'transparent',
+                              color: isMain
+                                ? '#fff'
+                                : isExtra
+                                  ? '#60a5fa'
+                                  : isThisMon
+                                    ? 'var(--text-secondary)'
+                                    : 'var(--text-muted)',
+                              opacity: isThisMon ? 1 : 0.4,
+                              cursor: isMain ? 'default' : 'pointer',
+                            }}>
+                            {day.date()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Pills de fechas extra */}
+                    {extraDates.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
+                        {extraDates.map(d => (
+                          <span key={d} className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                            style={{ background: 'rgba(37,99,235,0.15)', color: '#60a5fa', border: '1px solid rgba(37,99,235,0.3)' }}>
+                            {dayjs(d).format('D MMM')}
+                            <button onClick={() => toggleExtraDate(d)} className="hover:opacity-70 transition-opacity">
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          </span>
+                        ))}
+                        <button onClick={() => setExtraDates([])}
+                          className="text-[10px] px-2 py-0.5 rounded-full transition-colors"
+                          style={{ color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
+                          Limpiar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Horas */}
           <div className="grid grid-cols-2 gap-3">
@@ -364,7 +489,11 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
                 <button onClick={submit} disabled={saving}
                   className="btn-primary px-5 py-2 rounded-xl text-sm font-semibold text-white flex items-center gap-2">
                   {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                  {isEdit ? 'Guardar cambios' : 'Crear bloque'}
+                  {isEdit
+                    ? 'Guardar cambios'
+                    : extraDates.length > 0
+                      ? `Crear ${extraDates.length + 1} bloques`
+                      : 'Crear bloque'}
                 </button>
               )}
             </div>

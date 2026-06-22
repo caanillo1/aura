@@ -70,6 +70,41 @@ export class CronogramaService {
     return bloque;
   }
 
+  /** Genera el contenido de un archivo .ics para agregar al calendario nativo */
+  private buildIcs(bloque: any, acceptUrl: string, cancelUrl: string): Buffer {
+    const fecha = (bloque.fecha as string).substring(0, 10).replace(/-/g, ''); // YYYYMMDD
+    const dtStart = `${fecha}T${bloque.horaInicio.replace(':', '')}00`;
+    const dtEnd   = `${fecha}T${bloque.horaFin.replace(':', '')}00`;
+    const dtstamp = new Date().toISOString().replace(/[-:.]/g, '').substring(0, 15) + 'Z';
+    const desc = `Confirmar visita: ${acceptUrl}\\nCancelar visita: ${cancelUrl}`;
+    const titulo = (bloque.titulo as string).replace(/[,;\\]/g, ' ');
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//AURA ERP//ES',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${bloque.id}@aura-erp`,
+      `DTSTAMP:${dtstamp}`,
+      `DTSTART;TZID=America/Bogota:${dtStart}`,
+      `DTEND;TZID=America/Bogota:${dtEnd}`,
+      `SUMMARY:${titulo}`,
+      `DESCRIPTION:${desc}`,
+      'STATUS:TENTATIVE',
+      'BEGIN:VALARM',
+      'ACTION:DISPLAY',
+      `DESCRIPTION:Recordatorio: ${titulo}`,
+      'TRIGGER:-PT30M',
+      'END:VALARM',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    return Buffer.from(ics, 'utf-8');
+  }
+
   private async sendVisitEmail(companyId: string, bloque: any) {
     if (!bloque.serviceOrder?.id) return; // sin OS no hay líder de cliente
 
@@ -129,7 +164,13 @@ export class CronogramaService {
   </div>
 </div>`;
 
-    await this.mail.sendFromCompany(companyId, [lider.email], `Visita programada — ${fechaFmt}: ${bloque.titulo}`, html);
+    const icsBuffer = this.buildIcs(bloque, acceptUrl, cancelUrl);
+    await this.mail.sendFromCompany(
+      companyId, [lider.email],
+      `Visita programada — ${fechaFmt}: ${bloque.titulo}`,
+      html,
+      [{ filename: 'visita.ics', content: icsBuffer, contentType: 'text/calendar' }],
+    );
   }
 
   private async notifyAgent(companyId: string, bloque: any, tipo: 'confirm' | 'cancel', motivo?: string) {

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, XCircle, Loader2, Calendar, Clock, Building2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Calendar, Clock, Building2, CalendarPlus } from 'lucide-react';
 import { cronogramaApi } from '@/lib/api';
 
 interface BloqueInfo {
@@ -60,8 +60,32 @@ function BloqueCard({ info }: { info: BloqueInfo }) {
   );
 }
 
+function buildIcsDataUri(info: BloqueInfo): string {
+  const fecha = info.fecha.substring(0, 10).replace(/-/g, '');
+  const dtStart = `${fecha}T${info.horaInicio.replace(':', '')}00`;
+  const dtEnd   = `${fecha}T${info.horaFin.replace(':', '')}00`;
+  const dtstamp = new Date().toISOString().replace(/[-:.]/g, '').substring(0, 15) + 'Z';
+  const titulo  = info.titulo.replace(/[,;\\]/g, ' ');
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AURA ERP//ES',
+    'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:visita-${fecha}-${dtStart}@aura-erp`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART;TZID=America/Bogota:${dtStart}`,
+    `DTEND;TZID=America/Bogota:${dtEnd}`,
+    `SUMMARY:${titulo}`,
+    'STATUS:CONFIRMED',
+    'BEGIN:VALARM', 'ACTION:DISPLAY',
+    `DESCRIPTION:Recordatorio: ${titulo}`,
+    'TRIGGER:-PT30M', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+  return 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+}
+
 // ── Resultado final ───────────────────────────────────────────────────────────
-function ResultScreen({ action, message }: { action: 'accept' | 'cancel'; message: string }) {
+function ResultScreen({ action, message, info }: { action: 'accept' | 'cancel'; message: string; info: BloqueInfo | null }) {
   return (
     <div className="text-center py-8 flex flex-col items-center gap-4">
       {action === 'accept'
@@ -74,6 +98,14 @@ function ResultScreen({ action, message }: { action: 'accept' | 'cancel'; messag
         </h2>
         <p className="text-sm mt-2" style={{ color: '#94a3b8' }}>{message}</p>
       </div>
+      {action === 'accept' && info && (
+        <a href={buildIcsDataUri(info)} download="visita.ics"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
+          style={{ background: '#2563eb' }}>
+          <CalendarPlus className="w-4 h-4" />
+          Agregar al calendario
+        </a>
+      )}
       <p className="text-xs" style={{ color: '#475569' }}>Puedes cerrar esta ventana.</p>
     </div>
   );
@@ -126,7 +158,7 @@ function ResponderContent() {
   }
 
   // Pantalla de resultado (accept o cancel exitoso)
-  if (result) return <ResultScreen action={action} message={result.message} />;
+  if (result) return <ResultScreen action={action} message={result.message} info={info} />;
 
   // ── Accept: spinner mientras procesa ─────────────────────────────────────
   if (action === 'accept') {

@@ -16,6 +16,7 @@ export class CreateClientDto {
 }
 
 export class UpdateClientDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() nit?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() businessName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() commercialName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;

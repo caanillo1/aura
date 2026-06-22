@@ -7,7 +7,8 @@ import {
   Search, X, LayoutDashboard, Users, Building2, FolderKanban,
   ClipboardList, BarChart3, Settings, Briefcase, LayoutTemplate,
   Layers, MessageSquarePlus, ClipboardPlus, ListOrdered,
-  FileText, ArrowRight,
+  FileText, ArrowRight, CalendarDays, TrendingUp, FileSpreadsheet,
+  MapPin, Activity, Sparkles,
 } from 'lucide-react';
 
 interface Command {
@@ -15,25 +16,47 @@ interface Command {
   href: string;
   icon: React.ElementType;
   group: string;
+  keywords?: string;   // términos adicionales de búsqueda
   shortcut?: string;
 }
 
 const COMMANDS: Command[] = [
-  { label: 'Dashboard',            href: '/dashboard',                          icon: LayoutDashboard, group: 'Navegación',     shortcut: '⌘1' },
-  { label: 'Usuarios',             href: '/usuarios',                           icon: Users,           group: 'Navegación'    },
-  { label: 'Clientes',             href: '/clientes',                           icon: Building2,       group: 'Navegación'    },
-  { label: 'Órdenes de Servicio',  href: '/implementacion/ordenes',             icon: ClipboardList,   group: 'Implementación' },
-  { label: 'Proyectos',            href: '/implementacion/proyectos',           icon: FolderKanban,    group: 'Implementación' },
-  { label: 'Plantillas',           href: '/implementacion/plantillas',          icon: LayoutTemplate,  group: 'Implementación' },
-  { label: 'Módulos',              href: '/implementacion/modulos',             icon: Layers,          group: 'Implementación' },
-  { label: 'Registrar Req.',       href: '/requerimientos/nuevo',               icon: ClipboardPlus,   group: 'Requerimientos' },
-  { label: 'Priorizar Req.',       href: '/requerimientos/priorizar',           icon: ListOrdered,     group: 'Requerimientos' },
-  { label: 'Documentos',          href: '/documentos',                          icon: FileText,        group: 'Gestión'       },
-  { label: 'Reportes',             href: '/reportes',                           icon: BarChart3,       group: 'Gestión'       },
-  { label: 'Configuración',        href: '/configuracion',                      icon: Settings,        group: 'Sistema'       },
+  // ── Navegación principal ───────────────────────────────────────
+  { label: 'Dashboard',           href: '/dashboard',                        icon: LayoutDashboard, group: 'Navegación',      shortcut: '⌘1', keywords: 'inicio home principal metricas kpi' },
+  { label: 'Usuarios',            href: '/usuarios',                         icon: Users,           group: 'Navegación',      keywords: 'agentes equipo personas cuentas' },
+  { label: 'Clientes',            href: '/clientes',                         icon: Building2,       group: 'Navegación',      keywords: 'empresas organizaciones nit' },
+  { label: 'Cronograma',          href: '/cronograma',                       icon: CalendarDays,    group: 'Navegación',      keywords: 'agenda calendario visitas bloques horario' },
+  { label: 'Documentos',          href: '/documentos',                       icon: FileText,        group: 'Navegación',      keywords: 'archivos repositorio adjuntos' },
+  { label: 'Reportes',            href: '/reportes',                         icon: BarChart3,       group: 'Navegación',      keywords: 'informes graficas estadisticas' },
+  { label: 'Configuración',       href: '/configuracion',                    icon: Settings,        group: 'Navegación',      keywords: 'ajustes empresa smtp colores sistema' },
+
+  // ── Implementación ─────────────────────────────────────────────
+  { label: 'Órdenes de Servicio', href: '/implementacion/ordenes',           icon: ClipboardList,   group: 'Implementación',  keywords: 'os ordenes contratos servicios' },
+  { label: 'Plantillas',          href: '/implementacion/plantillas',        icon: LayoutTemplate,  group: 'Implementación',  keywords: 'flujos templates fases actividades' },
+  { label: 'Módulos',             href: '/implementacion/modulos',           icon: Layers,          group: 'Implementación',  keywords: 'modulos configuracion sistema' },
+  { label: 'Proyectos',           href: '/implementacion/proyectos',         icon: FolderKanban,    group: 'Implementación',  keywords: 'kanban actividades fases progreso' },
+  { label: 'Actas Pendientes',    href: '/implementacion/visitas',           icon: MapPin,          group: 'Implementación',  keywords: 'actas visitas inicio cierre capacitacion entrega soporte diligenciar' },
+  { label: 'Seguimientos',        href: '/implementacion/seguimientos',      icon: Activity,        group: 'Implementación',  keywords: 'seguimiento tareas pendientes estado' },
+  { label: 'Análisis (Proyectos)',href: '/implementacion/analisis',          icon: Sparkles,        group: 'Implementación',  keywords: 'analisis ia inteligencia artificial proyectos metricas' },
+
+  // ── Requerimientos ─────────────────────────────────────────────
+  { label: 'Registrar Req.',      href: '/requerimientos/nuevo',             icon: ClipboardPlus,   group: 'Requerimientos',  keywords: 'nuevo requerimiento ticket solicitud funcional' },
+  { label: 'Priorizar Req.',      href: '/requerimientos/priorizar',         icon: ListOrdered,     group: 'Requerimientos',  keywords: 'priorizar listar tickets cola backlog' },
+  { label: 'Análisis (Req.)',     href: '/requerimientos/analisis',          icon: BarChart3,       group: 'Requerimientos',  keywords: 'analisis requerimientos tickets estadisticas' },
+
+  // ── Comercial ──────────────────────────────────────────────────
+  { label: 'Cotizaciones',        href: '/comercial/cotizaciones',           icon: FileSpreadsheet, group: 'Comercial',       keywords: 'cotizaciones propuestas precios valor comercial ventas' },
 ];
 
-const GROUPS = ['Navegación', 'Implementación', 'Requerimientos', 'Gestión', 'Sistema'];
+const GROUPS = ['Navegación', 'Implementación', 'Requerimientos', 'Comercial'];
+
+// Normaliza texto: quita tildes y pasa a minúsculas
+function normalize(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
 
 interface Props { open: boolean; onClose: () => void; }
 
@@ -45,11 +68,16 @@ export function CommandPalette({ open, onClose }: Props) {
   const { theme }               = useTheme();
   const isLight                 = theme === 'light';
 
-  const filtered = COMMANDS.filter(c =>
-    !query ||
-    c.label.toLowerCase().includes(query.toLowerCase()) ||
-    c.group.toLowerCase().includes(query.toLowerCase())
-  );
+  const q = normalize(query);
+
+  const filtered = COMMANDS.filter(c => {
+    if (!q) return true;
+    return (
+      normalize(c.label).includes(q) ||
+      normalize(c.group).includes(q) ||
+      (c.keywords ? normalize(c.keywords).includes(q) : false)
+    );
+  });
 
   useEffect(() => {
     if (open) {
@@ -79,6 +107,23 @@ export function CommandPalette({ open, onClose }: Props) {
   const panelBg     = isLight ? 'rgba(255,255,255,0.98)' : 'rgba(10,16,32,0.97)';
   const panelBorder = isLight ? 'rgba(15,23,42,0.10)'    : 'rgba(255,255,255,0.10)';
   const divider     = isLight ? 'rgba(15,23,42,0.07)'    : 'rgba(255,255,255,0.07)';
+
+  // Resalta la parte que coincide con la búsqueda
+  function highlight(text: string) {
+    if (!q) return <span>{text}</span>;
+    const norm = normalize(text);
+    const idx  = norm.indexOf(q);
+    if (idx === -1) return <span>{text}</span>;
+    return (
+      <span>
+        {text.slice(0, idx)}
+        <mark style={{ background: 'rgba(59,130,246,0.25)', color: 'var(--accent-blue)', borderRadius: 3, padding: '0 1px' }}>
+          {text.slice(idx, idx + q.length)}
+        </mark>
+        {text.slice(idx + q.length)}
+      </span>
+    );
+  }
 
   return (
     <AnimatePresence>
@@ -120,20 +165,22 @@ export function CommandPalette({ open, onClose }: Props) {
                 style={{ color: 'var(--text-primary)' }}
               />
               <div className="flex items-center gap-1.5">
+                {query && (
+                  <button onClick={() => { setQuery(''); setSelected(0); inputRef.current?.focus(); }}
+                    className="p-1 rounded-lg transition-colors hover:bg-white/10"
+                    style={{ color: 'var(--text-muted)' }}>
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
                 <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono"
                   style={{ background: 'var(--border-subtle)', color: 'var(--text-muted)', border: `1px solid ${divider}` }}>
                   ESC
                 </kbd>
-                <button onClick={onClose}
-                  className="p-1 rounded-lg transition-colors hover:bg-white/10"
-                  style={{ color: 'var(--text-muted)' }}>
-                  <X className="w-3.5 h-3.5" />
-                </button>
               </div>
             </div>
 
             {/* Results */}
-            <div className="max-h-[380px] overflow-y-auto">
+            <div className="max-h-[400px] overflow-y-auto">
               {filtered.length === 0 ? (
                 <div className="px-4 py-10 text-center">
                   <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -183,7 +230,7 @@ export function CommandPalette({ open, onClose }: Props) {
                                   style={{ color: isSelected ? 'var(--accent-blue)' : 'var(--text-muted)' }} />
                               </div>
                               <span className="text-sm font-medium flex-1" style={{ color: 'var(--text-primary)' }}>
-                                {cmd.label}
+                                {highlight(cmd.label)}
                               </span>
                               {cmd.shortcut && (
                                 <span className="text-[10px] font-mono hidden sm:block"

@@ -874,7 +874,7 @@ function PrintModal({ open, onClose, currentDate }: { open: boolean; onClose: ()
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         onClick={onClose} />
       <motion.div
-        className="fixed z-[701] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-2xl p-6 flex flex-col gap-5"
+        className="fixed z-[701] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl p-6 flex flex-col gap-5"
         style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: '0 32px 72px rgba(0,0,0,0.5)' }}
         initial={{ opacity: 0, scale: 0.93, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.93, y: 16 }} transition={{ duration: 0.2, ease: [0.16,1,0.3,1] }}>

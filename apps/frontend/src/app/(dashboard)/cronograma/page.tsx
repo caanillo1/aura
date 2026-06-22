@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/es';
+import updateLocale from 'dayjs/plugin/updateLocale';
 import { toast } from 'sonner';
 import { cronogramaApi, clientsApi, usersApi, serviceOrdersApi } from '@/lib/api';
 import { ClientCombobox } from '@/components/ui/ClientCombobox';
@@ -15,7 +16,9 @@ import { useAuthStore } from '@/store/auth.store';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 
+dayjs.extend(updateLocale);
 dayjs.locale('es');
+dayjs.updateLocale('es', { weekStart: 1 });
 
 interface Bloque {
   id: string; titulo: string; fecha: string;
@@ -260,7 +263,7 @@ function BloqueModal({ open, onClose, initial, agents, clients, onSave, onDelete
                     </div>
                     {/* Cabecera días */}
                     <div className="grid grid-cols-7 text-center">
-                      {['D','L','M','X','J','V','S'].map(d => (
+                      {['L','M','X','J','V','S','D'].map(d => (
                         <span key={d} className="text-[10px] font-bold py-0.5"
                           style={{ color: 'var(--text-muted)' }}>{d}</span>
                       ))}
@@ -1076,7 +1079,7 @@ export default function CronogramaPage() {
       <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
         {/* Cabecera días de la semana */}
         <div className="grid grid-cols-7 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-          {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => (
+          {['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d => (
             <div key={d} className="py-2 text-center text-xs font-bold uppercase tracking-widest"
               style={{ color: 'var(--text-muted)' }}>{d}</div>
           ))}

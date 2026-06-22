@@ -43,6 +43,8 @@ interface Req {
   area: string;
   estadoActual: Estado;
   ticketRubi: string | null;
+  descripcion: string;
+  criteriosAceptacion: string | null;
   client:       { id: string; businessName: string } | null;
   serviceOrder: { osNumber: string; product: string } | null;
   agente:       { id: string; firstName: string; lastName: string } | null;
@@ -1968,6 +1970,26 @@ export default function PriorizarPage() {
                   </div>
                 )}
               </div>
+
+              {/* Descripción */}
+              <div className="rounded-xl px-4 py-3"
+                style={{ background: isLight ? 'rgba(30,60,120,0.04)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isLight ? 'rgba(30,60,120,0.08)' : 'rgba(255,255,255,0.07)'}` }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>Descripción</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
+                  {viewTarget.descripcion || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin descripción</span>}
+                </p>
+              </div>
+
+              {/* Criterios de aceptación */}
+              {viewTarget.criteriosAceptacion && (
+                <div className="rounded-xl px-4 py-3"
+                  style={{ background: isLight ? 'rgba(34,197,94,0.04)' : 'rgba(34,197,94,0.06)', border: `1px solid ${isLight ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.18)'}` }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: '#34d399' }}>Criterios de aceptación</p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
+                    {viewTarget.criteriosAceptacion}
+                  </p>
+                </div>
+              )}
 
               {/* Última observación */}
               {lastG && (

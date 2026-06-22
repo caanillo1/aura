@@ -1286,8 +1286,8 @@ export default function CronogramaPage() {
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-140px)] gap-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3 flex-wrap shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
           <button onClick={() => setCurrent(p => p.subtract(1, view === 'month' ? 'month' : 'week'))}
             className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors"
             style={{ color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
@@ -1309,8 +1309,8 @@ export default function CronogramaPage() {
             Hoy
           </button>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <select className="input-glass rounded-xl px-3 py-1.5 text-xs"
+        <div className="flex items-center gap-2 flex-wrap ml-auto">
+          <select className="input-glass rounded-xl px-3 py-1.5 text-xs max-w-[180px] truncate"
             value={filterAgente} onChange={e => setFilterAgente(e.target.value)}>
             <option value="">Todos los agentes</option>
             {agents.map(a => <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>)}

@@ -228,6 +228,7 @@ export default function PriorizarPage() {
     serviceOrderId: '' as string | null,
     templateModuleId: '' as string | null,
     templatePhaseId: '' as string | null,
+    ticketRubi: '' as string,
   });
   const [editServiceOrders,  setEditServiceOrders]  = useState<{ id: string; osNumber: string; product: string }[]>([]);
   const [editModules,        setEditModules]        = useState<{ id: string; code: string; name: string; phases: { id: string; name: string; color: string }[] }[]>([]);
@@ -496,6 +497,7 @@ export default function PriorizarPage() {
       serviceOrderId:   soId,
       templateModuleId: req.templateModule?.id ?? null,
       templatePhaseId:  req.templatePhase?.id ?? null,
+      ticketRubi:       req.ticketRubi ?? '',
     });
     setHasProject(false);
     setProjectPhaseMap(new Map());
@@ -580,6 +582,7 @@ export default function PriorizarPage() {
         serviceOrderId:   editForm.serviceOrderId   || null,
         templateModuleId: editForm.templateModuleId || null,
         templatePhaseId:  editForm.templatePhaseId  || null,
+        ticketRubi:       editForm.ticketRubi       || undefined,
       });
       // Update local state — no need to reload everything
       const newSO  = editServiceOrders.find(o => o.id === editForm.serviceOrderId) ?? null;
@@ -587,6 +590,7 @@ export default function PriorizarPage() {
       const newPh  = newMod?.phases.find((p: any) => p.id === editForm.templatePhaseId) ?? null;
       setItems(prev => prev.map(r => r.id === viewTarget.id ? {
         ...r,
+        ticketRubi:     editForm.ticketRubi || null,
         serviceOrder:   newSO  ? { osNumber: newSO.osNumber, product: newSO.product } : null,
         templateModule: newMod ? { id: newMod.id, code: newMod.code, name: newMod.name } : null,
         templatePhase:  newPh  ? { id: newPh.id, name: newPh.name, color: (newPh as any).color ?? '#60a5fa' } : null,
@@ -1938,6 +1942,20 @@ export default function PriorizarPage() {
                       {editForm.templateModuleId && currentModPhases.length === 0 && (
                         <p className="text-[10px] mt-1" style={{ color: '#fbbf24' }}>Este módulo no tiene fases configuradas</p>
                       )}
+                    </div>
+
+                    {/* Ticket Rubi */}
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>
+                        Ticket Rubi
+                      </label>
+                      <input
+                        type="text"
+                        className="input-glass w-full rounded-xl px-3 py-2.5 text-sm font-mono"
+                        placeholder="Ej: RUBI-1234"
+                        value={editForm.ticketRubi}
+                        onChange={e => setEditForm(p => ({ ...p, ticketRubi: e.target.value }))}
+                      />
                     </div>
 
                     <button onClick={handleSaveEdit} disabled={savingEdit}

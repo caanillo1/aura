@@ -6,7 +6,8 @@ import { ServiceOrdersService } from './service-orders.service';
 
 export interface WeeklyConfig {
   enabled: boolean;
-  diaSemana: number;    // 0=Dom … 6=Sáb
+  diasSemana: number[];  // 0=Dom … 6=Sáb; admite varios días
+  /** @deprecated use diasSemana */ diaSemana?: number;
   hora: number;
   minuto: number;
   destinatarios: string[];
@@ -198,7 +199,8 @@ export class InformeSchedulerService implements OnModuleInit {
   }
 
   private registerWeeklyCron(companyId: string, osId: string, cfg: WeeklyConfig) {
-    const expr    = `0 ${cfg.minuto} ${cfg.hora} * * ${cfg.diaSemana}`;
+    const dias    = (cfg.diasSemana?.length ? cfg.diasSemana : [cfg.diaSemana ?? 1]).join(',');
+    const expr    = `0 ${cfg.minuto} ${cfg.hora} * * ${dias}`;
     const jobName = `weekly_${osId}`;
     this.logger.log(`Cron semanal [${jobName}]: ${expr}`);
     const job = new CronJob(expr, () => {

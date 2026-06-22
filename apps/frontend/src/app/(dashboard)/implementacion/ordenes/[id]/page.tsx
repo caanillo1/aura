@@ -89,7 +89,7 @@ export default function OrdenDetailPage() {
   const [autoTab, setAutoTab]               = useState<'weekly'|'bimensual'>('weekly');
   // Weekly
   const [wEnabled, setWEnabled]             = useState(false);
-  const [wDia, setWDia]                     = useState(1);     // Lunes
+  const [wDias, setWDias]                   = useState<number[]>([1]); // Lunes por defecto
   const [wHora, setWHora]                   = useState(8);
   const [wMinuto, setWMinuto]               = useState(0);
   const [wTo, setWTo]                       = useState('');
@@ -212,7 +212,8 @@ export default function OrdenDetailPage() {
         serviceOrdersApi.getBimensualSchedule(os!.id),
       ]);
       if (w) {
-        setWEnabled(w.enabled ?? false); setWDia(w.diaSemana ?? 1);
+        setWEnabled(w.enabled ?? false);
+        setWDias(w.diasSemana?.length ? w.diasSemana : (w.diaSemana != null ? [w.diaSemana] : [1]));
         setWHora(w.hora ?? 8); setWMinuto(w.minuto ?? 0);
         setWAsunto(w.asunto ?? '');
         setWReportType(w.reportType ?? 'ejecutivo');
@@ -239,7 +240,7 @@ export default function OrdenDetailPage() {
     setSavingAuto(true);
     try {
       await serviceOrdersApi.saveWeeklySchedule(os!.id, {
-        enabled: wEnabled, diaSemana: wDia, hora: wHora, minuto: wMinuto,
+        enabled: wEnabled, diasSemana: wDias, hora: wHora, minuto: wMinuto,
         destinatarios: correosList, asunto: wAsunto.trim() || undefined,
         reportType: wReportType,
       });
@@ -1748,16 +1749,28 @@ export default function OrdenDetailPage() {
                     {wEnabled ? <ToggleRight className="w-8 h-8" style={{ color: '#a78bfa' }} /> : <ToggleLeft className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />}
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Día</label>
-                    <select value={wDia} onChange={e => setWDia(+e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm"
-                      style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
-                      {['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'].map((d,i) => (
-                        <option key={i} value={i}>{d}</option>
-                      ))}
-                    </select>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Días de envío</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[['L',1],['M',2],['X',3],['J',4],['V',5],['S',6],['D',0]].map(([label, val]) => {
+                      const v = val as number;
+                      const active = wDias.includes(v);
+                      return (
+                        <button key={v} type="button"
+                          onClick={() => setWDias(prev => active ? prev.filter(x => x !== v) : [...prev, v].sort((a,b)=>a-b))}
+                          className="w-9 h-9 rounded-xl text-xs font-bold transition-all"
+                          style={{
+                            background: active ? 'rgba(167,139,250,0.18)' : 'var(--surface-2)',
+                            border: `1px solid ${active ? 'rgba(167,139,250,0.5)' : 'var(--border-subtle)'}`,
+                            color: active ? '#a78bfa' : 'var(--text-muted)',
+                          }}>
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Hora</label>
                     <input type="number" min={0} max={23} value={wHora} onChange={e => setWHora(+e.target.value)}

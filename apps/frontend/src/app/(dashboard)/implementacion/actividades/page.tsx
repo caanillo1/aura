@@ -27,11 +27,13 @@ function normalize(s: string) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-function displayDate(a: { executionDate: string | null; updatedAt: string }): string {
-  return dayjs(a.executionDate ?? a.updatedAt).fromNow();
+function displayDate(a: { threads: { createdAt: string }[]; executionDate: string | null; updatedAt: string }): string {
+  const d = a.threads[0]?.createdAt ?? a.executionDate ?? a.updatedAt;
+  return dayjs(d).fromNow();
 }
 
-function displayDateLabel(a: { executionDate: string | null }): string {
+function displayDateLabel(a: { threads: { createdAt: string }[]; executionDate: string | null }): string {
+  if (a.threads[0]?.createdAt) return 'Hilo';
   return a.executionDate ? 'Ejecución' : 'Actualizado';
 }
 

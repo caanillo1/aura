@@ -824,7 +824,7 @@ export class ProjectsService {
       threads: {
         take: 1,
         orderBy: { createdAt: 'desc' as const },
-        select: { author: { select: { id: true, firstName: true, lastName: true } } },
+        select: { createdAt: true, author: { select: { id: true, firstName: true, lastName: true } } },
       },
       phase: {
         select: {
@@ -884,7 +884,7 @@ export class ProjectsService {
       select: {
         name: true, status: true, progressPercent: true, updatedAt: true,
         assignedTo: { select: { firstName: true, lastName: true } },
-        threads: { take: 1, orderBy: { createdAt: 'desc' as const }, select: { author: { select: { firstName: true, lastName: true } } } },
+        threads: { take: 1, orderBy: { createdAt: 'desc' as const }, select: { createdAt: true, author: { select: { firstName: true, lastName: true } } } },
         phase: { select: { name: true, projectModule: { select: { name: true, project: { select: { serviceOrder: { select: { osNumber: true, client: { select: { businessName: true } } } } } } } } } },
       },
     });

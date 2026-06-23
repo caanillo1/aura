@@ -379,7 +379,7 @@ export interface GlobalActivity {
   executionDate: string | null;
   assignedTo: { id: string; firstName: string; lastName: string } | null;
   clientStaff: { id: string; firstName: string; lastName: string } | null;
-  threads: { author: { id: string; firstName: string; lastName: string } }[];
+  threads: { createdAt: string; author: { id: string; firstName: string; lastName: string } }[];
   phase: {
     id: string;
     name: string;

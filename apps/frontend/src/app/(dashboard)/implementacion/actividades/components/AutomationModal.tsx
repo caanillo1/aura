@@ -32,7 +32,6 @@ const STATUS_CONFIG = {
 };
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-const HORAS = Array.from({ length: 24 }, (_, i) => ({ value: i, label: `${String(i).padStart(2, '0')}:00` }));
 
 function normalize(s: string) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -42,16 +41,16 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
   const [tab, setTab] = useState<Tab>('ahora');
 
   // Envío ahora
-  const [emailInput, setEmailInput]   = useState('');
-  const [emails, setEmails]           = useState<string[]>([]);
-  const [subject, setSubject]         = useState('');
-  const [message, setMessage]         = useState('');
-  const [sending, setSending]         = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [emails, setEmails]         = useState<string[]>([]);
+  const [subject, setSubject]       = useState('');
+  const [message, setMessage]       = useState('');
+  const [sending, setSending]       = useState(false);
 
   // Programar
   const [schedEnabled, setSchedEnabled]             = useState(false);
   const [schedDias, setSchedDias]                   = useState<number[]>([1, 2, 3, 4, 5]);
-  const [schedHora, setSchedHora]                   = useState(8);
+  const [schedTime, setSchedTime]                   = useState('08:00');
   const [schedStatus, setSchedStatus]               = useState(['completado', 'en_progreso', 'bloqueado']);
   const [schedDestinatarios, setSchedDestinatarios] = useState<RecipientConfig[]>([]);
   const [schedEmailInput, setSchedEmailInput]       = useState('');
@@ -59,10 +58,12 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
   const [schedMensaje, setSchedMensaje]             = useState('');
   const [savingSchedule, setSavingSchedule]         = useState(false);
   const [loadingSchedule, setLoadingSchedule]       = useState(false);
-  const [agentSearch, setAgentSearch]               = useState('');
-  const [loadingAgents, setLoadingAgents]           = useState(false);
 
-  const [allAgents, setAllAgents] = useState<{ id: string; firstName: string; lastName: string; jobTitle?: string }[]>([]);
+  // Pending agent selection (for next recipient to add)
+  const [pendingAgentIds, setPendingAgentIds] = useState<string[]>([]);
+  const [agentSearch, setAgentSearch]         = useState('');
+  const [loadingAgents, setLoadingAgents]     = useState(false);
+  const [allAgents, setAllAgents]             = useState<{ id: string; firstName: string; lastName: string; jobTitle?: string }[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -78,7 +79,9 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
         if (!cfg) return;
         setSchedEnabled(cfg.enabled ?? false);
         setSchedDias(cfg.diasSemana ?? [1, 2, 3, 4, 5]);
-        setSchedHora(cfg.hora ?? 8);
+        const h = String(cfg.hora ?? 8).padStart(2, '0');
+        const m = String(cfg.minuto ?? 0).padStart(2, '0');
+        setSchedTime(`${h}:${m}`);
         setSchedStatus(cfg.status ?? ['completado', 'en_progreso', 'bloqueado']);
         setSchedAsunto(cfg.asunto ?? '');
         setSchedMensaje(cfg.mensaje ?? '');
@@ -109,28 +112,19 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
     const parts = schedEmailInput.split(/[,;\s]+/).map(e => e.trim()).filter(e => e.includes('@'));
     if (!parts.length) return;
     const existing = new Set(schedDestinatarios.map(d => d.email));
-    const newOnes = parts.filter(e => !existing.has(e)).map(email => ({ email, agentIds: [] }));
+    const newOnes  = parts.filter(e => !existing.has(e)).map(email => ({ email, agentIds: [...pendingAgentIds] }));
     if (!newOnes.length) return;
     setSchedDestinatarios(prev => [...prev, ...newOnes]);
     setSchedEmailInput('');
+    // Keep pendingAgentIds so user can quickly add more emails with same agents
   }
 
   function removeRecipient(idx: number) {
     setSchedDestinatarios(prev => prev.filter((_, i) => i !== idx));
   }
 
-  function toggleRecipientAgent(recipientIdx: number, agentId: string) {
-    setSchedDestinatarios(prev => prev.map((r, i) => {
-      if (i !== recipientIdx) return r;
-      const agentIds = r.agentIds.includes(agentId)
-        ? r.agentIds.filter(id => id !== agentId)
-        : [...r.agentIds, agentId];
-      return { ...r, agentIds };
-    }));
-  }
-
-  function clearRecipientAgents(idx: number) {
-    setSchedDestinatarios(prev => prev.map((r, i) => i === idx ? { ...r, agentIds: [] } : r));
+  function togglePendingAgent(id: string) {
+    setPendingAgentIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   }
 
   function toggleDia(d: number) {
@@ -140,6 +134,10 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
   function toggleSchedStatus(s: string) {
     setSchedStatus(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   }
+
+  const filteredAgents = agentSearch.trim()
+    ? allAgents.filter(a => normalize(`${a.firstName} ${a.lastName}`).includes(normalize(agentSearch)))
+    : allAgents;
 
   // ── Send now ──────────────────────────────────────────────────────────────
 
@@ -170,13 +168,16 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
   async function handleSaveSchedule() {
     if (schedEnabled && !schedDestinatarios.length) { toast.error('Agrega al menos un destinatario'); return; }
     if (schedEnabled && !schedDias.length)          { toast.error('Selecciona al menos un día'); return; }
+    const [horaStr, minStr] = schedTime.split(':');
+    const hora   = parseInt(horaStr  ?? '8', 10);
+    const minuto = parseInt(minStr   ?? '0', 10);
     setSavingSchedule(true);
     try {
       await projectsApi.saveActivityReportSchedule({
         enabled:       schedEnabled,
         diasSemana:    schedDias,
-        hora:          schedHora,
-        minuto:        0,
+        hora,
+        minuto,
         status:        schedStatus,
         destinatarios: schedDestinatarios.map(d => ({
           email:    d.email,
@@ -323,16 +324,14 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
                   </div>
                 </div>
 
-                {/* Hour */}
+                {/* Hour — free input */}
                 <div>
                   <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
                     <Clock className="w-3.5 h-3.5 inline mr-1" />Hora de envío
                   </label>
-                  <select value={schedHora} onChange={e => setSchedHora(Number(e.target.value))}
+                  <input type="time" value={schedTime} onChange={e => setSchedTime(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl text-sm outline-none"
-                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
-                    {HORAS.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
-                  </select>
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
                 </div>
 
                 {/* Status */}
@@ -355,131 +354,126 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
                   </div>
                 </div>
 
-                {/* Recipients — per-email agent filter */}
-                <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                    <Mail className="w-3.5 h-3.5 inline mr-1" />Destinatarios
-                  </label>
-                  <div className="flex gap-2 mb-2">
-                    <input type="email" placeholder="correo@ejemplo.com"
-                      value={schedEmailInput} onChange={e => setSchedEmailInput(e.target.value)}
-                      onKeyDown={e => (e.key === 'Enter' || e.key === ',') && (e.preventDefault(), addRecipient())}
-                      className="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
-                      style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
-                    <button onClick={addRecipient}
-                      className="px-3 py-2 rounded-xl"
-                      style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8', border: '1px solid rgba(129,140,248,0.3)' }}>
-                      <Plus className="w-4 h-4" />
-                    </button>
+                {/* ── Destinatarios: agents first, then email ── */}
+                <div className="rounded-xl overflow-hidden"
+                  style={{ border: '1px solid var(--border-subtle)' }}>
+
+                  {/* Step 1 — Select agents */}
+                  <div className="px-3 pt-3 pb-2"
+                    style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-2)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" style={{ color: '#818cf8' }} />
+                        <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          Paso 1 — Selecciona los agentes
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {pendingAgentIds.length > 0 && (
+                          <button onClick={() => setPendingAgentIds([])}
+                            className="text-[10px] hover:opacity-70"
+                            style={{ color: 'var(--text-muted)' }}>
+                            Limpiar
+                          </button>
+                        )}
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                          style={pendingAgentIds.length > 0
+                            ? { background: 'rgba(129,140,248,0.15)', color: '#818cf8' }
+                            : { background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+                          {pendingAgentIds.length === 0 ? 'Todos' : `${pendingAgentIds.length} seleccionados`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Search */}
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-1.5"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)' }}>
+                      <Search className="w-3 h-3 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                      <input placeholder="Buscar agente…" value={agentSearch}
+                        onChange={e => setAgentSearch(e.target.value)}
+                        className="flex-1 bg-transparent text-xs outline-none placeholder:opacity-40"
+                        style={{ color: 'var(--text-primary)' }} />
+                    </div>
+
+                    {/* Agent list */}
+                    <div className="max-h-36 overflow-y-auto rounded-lg"
+                      style={{ border: '1px solid var(--border-subtle)' }}>
+                      {loadingAgents ? (
+                        <div className="flex items-center justify-center gap-2 py-4">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--text-muted)' }} />
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Cargando agentes…</span>
+                        </div>
+                      ) : filteredAgents.length === 0 ? (
+                        <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>
+                          {allAgents.length === 0 ? 'No hay agentes disponibles' : 'Sin coincidencias'}
+                        </p>
+                      ) : filteredAgents.map(agent => {
+                        const selected = pendingAgentIds.includes(agent.id);
+                        return (
+                          <button key={agent.id} onClick={() => togglePendingAgent(agent.id)}
+                            className="w-full flex items-center gap-3 px-3 py-2 text-xs hover:bg-white/5 text-left"
+                            style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                            <div className="w-4 h-4 rounded shrink-0 flex items-center justify-center"
+                              style={selected
+                                ? { background: '#818cf8', border: '1px solid #818cf8' }
+                                : { border: '1px solid var(--border-subtle)' }}>
+                              {selected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span style={{ color: 'var(--text-primary)', fontWeight: selected ? 600 : 400 }}>
+                                {agent.firstName} {agent.lastName}
+                              </span>
+                              {agent.jobTitle && (
+                                <span className="block truncate" style={{ color: 'var(--text-muted)', fontSize: 10, opacity: 0.6 }}>
+                                  {agent.jobTitle}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
+                  {/* Step 2 — Add email */}
+                  <div className="px-3 py-2.5" style={{ background: 'var(--surface-2)' }}>
+                    <span className="text-xs font-semibold block mb-2" style={{ color: 'var(--text-primary)' }}>
+                      Paso 2 — Agrega el correo destino
+                    </span>
+                    <div className="flex gap-2">
+                      <input type="email" placeholder="correo@ejemplo.com"
+                        value={schedEmailInput} onChange={e => setSchedEmailInput(e.target.value)}
+                        onKeyDown={e => (e.key === 'Enter' || e.key === ',') && (e.preventDefault(), addRecipient())}
+                        className="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
+                      <button onClick={addRecipient}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold shrink-0"
+                        style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8', border: '1px solid rgba(129,140,248,0.3)' }}>
+                        <Plus className="w-3.5 h-3.5" />
+                        {pendingAgentIds.length > 0 ? `Agregar · ${pendingAgentIds.length} agente${pendingAgentIds.length !== 1 ? 's' : ''}` : 'Agregar · Todos'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Added recipients list */}
                   {schedDestinatarios.length > 0 && (
-                    <div className="space-y-3">
-                      {schedDestinatarios.map((recipient, idx) => {
-                        const agentCount = recipient.agentIds.length;
-                        const filtered   = agentSearch.trim()
-                          ? allAgents.filter(a => normalize(`${a.firstName} ${a.lastName}`).includes(normalize(agentSearch)))
-                          : allAgents;
-
+                    <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                      {schedDestinatarios.map((r, idx) => {
+                        const agentNames = r.agentIds.length
+                          ? r.agentIds.map(id => allAgents.find(a => a.id === id)).filter(Boolean).map(a => `${a!.firstName} ${a!.lastName}`).join(', ')
+                          : null;
                         return (
-                          <div key={idx} className="rounded-xl overflow-hidden"
-                            style={{ border: '1px solid var(--border-subtle)' }}>
-
-                            {/* Header: email + delete */}
-                            <div className="flex items-center justify-between px-3 py-2.5"
-                              style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border-subtle)' }}>
-                              <div className="flex items-center gap-2 min-w-0">
-                                <Mail className="w-3.5 h-3.5 shrink-0" style={{ color: '#818cf8' }} />
-                                <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                                  {recipient.email}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {agentCount > 0 && (
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
-                                    style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}>
-                                    {agentCount} agente{agentCount !== 1 ? 's' : ''}
-                                  </span>
-                                )}
-                                <button onClick={() => removeRecipient(idx)}
-                                  className="p-1 rounded-lg hover:bg-white/5">
-                                  <Trash2 className="w-3.5 h-3.5" style={{ color: '#f87171' }} />
-                                </button>
-                              </div>
+                          <div key={idx} className="flex items-start justify-between gap-3 px-3 py-2.5 hover:bg-white/3"
+                            style={{ borderBottom: idx < schedDestinatarios.length - 1 ? '1px solid var(--border-subtle)' : undefined }}>
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{r.email}</p>
+                              <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
+                                {agentNames ?? 'Todos los agentes'}
+                              </p>
                             </div>
-
-                            {/* Agent picker — always visible */}
-                            <div>
-                              <div className="flex items-center justify-between px-3 py-1.5"
-                                style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.01)' }}>
-                                <div className="flex items-center gap-1.5">
-                                  <Users className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
-                                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                                    Agentes que recibe este correo
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {agentCount > 0 && (
-                                    <button onClick={() => clearRecipientAgents(idx)}
-                                      className="text-[10px] hover:opacity-80"
-                                      style={{ color: 'var(--text-muted)' }}>
-                                      Limpiar
-                                    </button>
-                                  )}
-                                  <span className="text-[10px]" style={{ color: 'var(--text-muted)', opacity: 0.5 }}>
-                                    {agentCount === 0 ? 'Todos' : `${agentCount} seleccionados`}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Search */}
-                              <div className="flex items-center gap-2 px-3 py-1.5"
-                                style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.01)' }}>
-                                <Search className="w-3 h-3 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                                <input placeholder="Buscar agente…" value={agentSearch}
-                                  onChange={e => setAgentSearch(e.target.value)}
-                                  className="flex-1 bg-transparent text-xs outline-none placeholder:opacity-40"
-                                  style={{ color: 'var(--text-primary)' }} />
-                              </div>
-
-                              {/* Agent list */}
-                              <div className="max-h-40 overflow-y-auto">
-                                {loadingAgents ? (
-                                  <div className="flex items-center justify-center gap-2 py-4">
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--text-muted)' }} />
-                                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Cargando agentes…</span>
-                                  </div>
-                                ) : filtered.length === 0 ? (
-                                  <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>
-                                    {allAgents.length === 0 ? 'No hay agentes disponibles' : 'Sin coincidencias'}
-                                  </p>
-                                ) : filtered.map(agent => {
-                                  const selected = recipient.agentIds.includes(agent.id);
-                                  return (
-                                    <button key={agent.id} onClick={() => toggleRecipientAgent(idx, agent.id)}
-                                      className="w-full flex items-center gap-3 px-3 py-2 text-xs hover:bg-white/5 text-left"
-                                      style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                      <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-                                        style={selected
-                                          ? { background: '#34d399', border: '1px solid #34d399' }
-                                          : { border: '1px solid var(--border-subtle)' }}>
-                                        {selected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <span style={{ color: 'var(--text-primary)', fontWeight: selected ? 600 : 400 }}>
-                                          {agent.firstName} {agent.lastName}
-                                        </span>
-                                        {agent.jobTitle && (
-                                          <span className="block truncate" style={{ color: 'var(--text-muted)', fontSize: 10, opacity: 0.6 }}>
-                                            {agent.jobTitle}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
+                            <button onClick={() => removeRecipient(idx)} className="p-1 rounded-lg hover:bg-white/5 shrink-0 mt-0.5">
+                              <Trash2 className="w-3.5 h-3.5" style={{ color: '#f87171' }} />
+                            </button>
                           </div>
                         );
                       })}

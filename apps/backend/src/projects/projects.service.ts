@@ -812,7 +812,7 @@ export class ProjectsService {
       progressPercent: true, actualHours: true, updatedAt: true,
       assignedTo: { select: { id: true, firstName: true, lastName: true } },
       clientStaff: { select: { id: true, firstName: true, lastName: true } },
-      activityThreads: {
+      threads: {
         take: 1,
         orderBy: { createdAt: 'desc' as const },
         select: { author: { select: { id: true, firstName: true, lastName: true } } },

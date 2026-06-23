@@ -27,8 +27,8 @@ function normalize(s: string) {
 
 function resolveImplementor(a: GlobalActivity): string {
   if (a.assignedTo) return `${a.assignedTo.firstName} ${a.assignedTo.lastName}`;
-  if (a.activityThreads?.[0]?.author) {
-    const au = a.activityThreads[0].author;
+  if (a.threads?.[0]?.author) {
+    const au = a.threads[0].author;
     return `${au.firstName} ${au.lastName}`;
   }
   if (a.clientStaff) return `${a.clientStaff.firstName} ${a.clientStaff.lastName}`;

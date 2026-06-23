@@ -378,7 +378,7 @@ export interface GlobalActivity {
   updatedAt: string;
   assignedTo: { id: string; firstName: string; lastName: string } | null;
   clientStaff: { id: string; firstName: string; lastName: string } | null;
-  activityThreads: { author: { id: string; firstName: string; lastName: string } }[];
+  threads: { author: { id: string; firstName: string; lastName: string } }[];
   phase: {
     id: string;
     name: string;

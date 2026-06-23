@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsUUID, IsNumber, Min, Max, IsDateString, IsIn, ValidateNested, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class ModuleDateDto {
@@ -90,7 +90,7 @@ export class CreateProjectActivityDto {
 
 export class GlobalActivitiesFilterDto extends PaginationDto {
   @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true })
-  @Type(() => String)
+  @Transform(({ value }) => Array.isArray(value) ? value : value ? [value] : undefined)
   status?: string[];
 
   @ApiPropertyOptional() @IsOptional() @IsString() clientId?: string;

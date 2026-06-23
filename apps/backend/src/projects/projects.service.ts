@@ -960,36 +960,123 @@ export class ProjectsService {
       </tr>`;
     }).join('');
 
-    const period = dto.dateFrom === dto.dateTo
-      ? (dto.dateFrom ?? 'Sin filtro')
-      : `${dto.dateFrom ?? ''} — ${dto.dateTo ?? ''}`;
+    const isWeekly  = dto.dateFrom !== dto.dateTo && !!dto.dateFrom && !!dto.dateTo;
+    const period    = isWeekly
+      ? `Semana del ${dto.dateFrom} al ${dto.dateTo}`
+      : (dto.dateFrom ?? 'Sin filtro');
+
+    // ── Stats ────────────────────────────────────────────────────────────────
+    const total       = activities.length;
+    const completado  = activities.filter(a => a.status === 'completado').length;
+    const en_progreso = activities.filter(a => a.status === 'en_progreso').length;
+    const bloqueado   = activities.filter(a => a.status === 'bloqueado').length;
+
+    // Top empresas
+    const clientMap = new Map<string, number>();
+    activities.forEach(a => {
+      const n = a.phase.projectModule.project.serviceOrder.client.businessName;
+      clientMap.set(n, (clientMap.get(n) ?? 0) + 1);
+    });
+    const topClients = [...clientMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const maxClient  = topClients[0]?.[1] ?? 1;
+
+    // Top implementadores
+    const implMap = new Map<string, number>();
+    activities.forEach(a => {
+      const impl = a.assignedTo
+        ? `${a.assignedTo.firstName} ${a.assignedTo.lastName}`
+        : (a.threads[0]?.author ? `${a.threads[0].author.firstName} ${a.threads[0].author.lastName}` : 'Sin asignar');
+      implMap.set(impl, (implMap.get(impl) ?? 0) + 1);
+    });
+    const topImpl   = [...implMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const maxImpl   = topImpl[0]?.[1] ?? 1;
+
+    // ── Chart helpers ────────────────────────────────────────────────────────
+    const bar = (count: number, max: number, color: string) =>
+      `<div style="background:#e2e8f0;border-radius:4px;height:14px;width:100%">` +
+      `<div style="background:${color};height:14px;border-radius:4px;width:${Math.round((count/max)*100)}%"></div></div>`;
+
+    const chartRows = (entries: [string, number][], max: number, color: string) =>
+      entries.map(([name, n]) => `
+        <tr>
+          <td style="padding:5px 8px 5px 0;font-size:12px;color:#475569;white-space:nowrap;min-width:160px;max-width:220px;overflow:hidden;text-overflow:ellipsis">${name}</td>
+          <td style="padding:5px 4px;width:100%">${bar(n, max, color)}</td>
+          <td style="padding:5px 0 5px 8px;font-size:12px;font-weight:700;color:#1e293b;text-align:right">${n}</td>
+        </tr>`).join('');
 
     const html = `
-<div style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;color:#1e293b">
+<div style="font-family:Arial,sans-serif;max-width:860px;margin:0 auto;color:#1e293b">
+
+  <!-- Header -->
   <div style="background:#0f1629;padding:24px 32px;border-radius:12px 12px 0 0">
-    <h2 style="color:#fff;margin:0 0 4px">Reporte de Actividades Realizadas</h2>
-    <p style="color:#94a3b8;margin:0;font-size:14px">Período: ${period} · Total: ${activities.length} actividades</p>
+    <h2 style="color:#fff;margin:0 0 6px;font-size:20px">${isWeekly ? '📊 Informe Semanal de Actividades' : '📋 Reporte de Actividades Realizadas'}</h2>
+    <p style="color:#94a3b8;margin:0;font-size:13px">${period} · ${total} actividades</p>
   </div>
-  ${dto.message ? `<div style="background:#f8fafc;padding:16px 32px;border-left:4px solid #818cf8;font-size:14px">${dto.message}</div>` : ''}
-  <table style="width:100%;border-collapse:collapse;font-size:13px">
+
+  ${dto.message ? `<div style="background:#f8fafc;padding:14px 32px;border-left:4px solid #818cf8;font-size:14px;color:#334155">${dto.message}</div>` : ''}
+
+  <!-- Resumen por estado -->
+  <div style="padding:24px 32px 8px;background:#f8fafc">
+    <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px">Resumen por estado</p>
+    <table style="width:100%;border-collapse:collapse">
+      <tr>
+        ${[
+          { label: 'Total',       value: total,       color: '#818cf8', bg: '#eef2ff' },
+          { label: 'Completadas', value: completado,  color: '#34d399', bg: '#ecfdf5' },
+          { label: 'En progreso', value: en_progreso, color: '#60a5fa', bg: '#eff6ff' },
+          { label: 'Bloqueadas',  value: bloqueado,   color: '#f87171', bg: '#fef2f2' },
+        ].map(s => `
+          <td style="width:25%;padding:4px">
+            <div style="background:${s.bg};border-radius:10px;padding:16px;text-align:center">
+              <div style="font-size:28px;font-weight:800;color:${s.color}">${s.value}</div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px">${s.label}</div>
+              <div style="margin-top:8px;background:#e2e8f0;border-radius:4px;height:6px">
+                <div style="background:${s.color};height:6px;border-radius:4px;width:${total ? Math.round((s.value/total)*100) : 0}%"></div>
+              </div>
+            </div>
+          </td>`).join('')}
+      </tr>
+    </table>
+  </div>
+
+  <!-- Gráficos -->
+  <table style="width:100%;border-collapse:collapse;padding:0">
+    <tr style="vertical-align:top">
+      <td style="width:50%;padding:20px 16px 20px 32px">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px">Por empresa</p>
+        ${topClients.length ? `<table style="width:100%;border-collapse:collapse">${chartRows(topClients, maxClient, '#818cf8')}</table>` : '<p style="color:#94a3b8;font-size:12px">Sin datos</p>'}
+      </td>
+      <td style="width:50%;padding:20px 32px 20px 16px;border-left:1px solid #e2e8f0">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px">Por implementador</p>
+        ${topImpl.length ? `<table style="width:100%;border-collapse:collapse">${chartRows(topImpl, maxImpl, '#34d399')}</table>` : '<p style="color:#94a3b8;font-size:12px">Sin datos</p>'}
+      </td>
+    </tr>
+  </table>
+
+  <!-- Tabla detalle -->
+  <div style="padding:0 32px 8px">
+    <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px">Detalle de actividades</p>
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead>
       <tr style="background:#f1f5f9">
-        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600;white-space:nowrap">Actividad</th>
-        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Empresa</th>
-        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">OS</th>
-        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Módulo</th>
-        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Fase</th>
-        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Implementador</th>
-        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Estado</th>
-        <th style="padding:10px 12px;text-align:right;color:#475569;font-weight:600">%</th>
+        <th style="padding:9px 12px;text-align:left;color:#475569;font-weight:600">Actividad</th>
+        <th style="padding:9px 12px;text-align:left;color:#475569;font-weight:600">Empresa</th>
+        <th style="padding:9px 12px;text-align:left;color:#475569;font-weight:600">OS</th>
+        <th style="padding:9px 12px;text-align:left;color:#475569;font-weight:600">Módulo</th>
+        <th style="padding:9px 12px;text-align:left;color:#475569;font-weight:600">Implementador</th>
+        <th style="padding:9px 12px;text-align:left;color:#475569;font-weight:600">Estado</th>
+        <th style="padding:9px 12px;text-align:right;color:#475569;font-weight:600">%</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
   </table>
-  <p style="color:#94a3b8;font-size:12px;padding:16px 32px">Generado automáticamente por AURA ERP</p>
+  <p style="color:#94a3b8;font-size:11px;padding:16px 32px;margin:0">Generado automáticamente por AURA ERP</p>
 </div>`;
 
-    const subject = dto.subject || `Reporte Actividades – ${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    const dateLabel = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+    const subject = dto.subject
+      || (isWeekly ? `Informe Semanal de Actividades – ${dateLabel}` : `Reporte Actividades – ${dateLabel}`);
     await this.mailService.sendFromCompany(companyId, dto.emails, subject, html);
     return { enviados: activities.length, destinatarios: dto.emails.length };
   }

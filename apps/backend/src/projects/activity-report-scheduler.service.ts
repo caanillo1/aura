@@ -81,14 +81,27 @@ export class ActivityReportSchedulerService implements OnModuleInit {
 
   private async executeSend(companyId: string, cfg: ActivityScheduleConfig): Promise<{ enviados: number; destinatarios: number }> {
     if (!cfg.destinatarios.length) return { enviados: 0, destinatarios: 0 };
-    const today = new Date().toISOString().slice(0, 10);
+    const now   = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const isSaturday = now.getDay() === 6;
+
+    let dateFrom = today;
+    let dateTo   = today;
+
+    if (isSaturday) {
+      // Lunes de la semana actual → sábado (hoy)
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - 5); // Saturday - 5 = Monday
+      dateFrom = monday.toISOString().slice(0, 10);
+    }
+
     return this.projectsService.sendActivitiesReport(companyId, {
-      emails:    cfg.destinatarios,
-      subject:   cfg.asunto,
-      message:   cfg.mensaje,
-      status:    cfg.status,
-      dateFrom:  today,
-      dateTo:    today,
+      emails:   cfg.destinatarios,
+      subject:  cfg.asunto,
+      message:  cfg.mensaje,
+      status:   cfg.status,
+      dateFrom,
+      dateTo,
     });
   }
 }

@@ -86,6 +86,13 @@ export class ProjectsController {
     return this.svc.updatePhase(user.companyId, phaseId, dto);
   }
 
+  @Get('activities/clients')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Clientes con al menos una actividad en BD' })
+  getActivityClients(@GetUser() user: JwtUser) {
+    return this.svc.getActivityClients(user.companyId);
+  }
+
   @Get('activities/global')
   @Roles(...IMPL_ROLES)
   @ApiOperation({ summary: 'Listado global de actividades no pendientes' })

@@ -781,6 +781,30 @@ export class ProjectsService {
     });
   }
 
+  async getActivityClients(companyId: string) {
+    const clients = await this.prisma.client.findMany({
+      where: {
+        serviceOrders: {
+          some: {
+            companyId,
+            project: {
+              modules: {
+                some: {
+                  phases: {
+                    some: { activities: { some: {} } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      select: { id: true, businessName: true },
+      orderBy: { businessName: 'asc' },
+    });
+    return clients;
+  }
+
   async getGlobalActivities(companyId: string, dto: GlobalActivitiesFilterDto) {
     const { take, skip } = paginate(dto.page, dto.limit ?? 100);
 

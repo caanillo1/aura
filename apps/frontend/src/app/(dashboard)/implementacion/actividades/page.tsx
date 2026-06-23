@@ -11,7 +11,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   Tooltip as ReTooltip, Cell,
 } from 'recharts';
-import { projectsApi, clientsApi } from '@/lib/api';
+import { projectsApi } from '@/lib/api';
 import type { GlobalActivity } from '@/types';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -678,12 +678,10 @@ export default function ActividadesRealizadasPage() {
 
   const dateRange = useMemo(() => presetToRange(preset, customRange), [preset, customRange]);
 
-  // Clients loaded independently from the backend
+  // Clients that have at least one activity in the database
   const [allClients, setAllClients] = useState<{ id: string; businessName: string }[]>([]);
   useEffect(() => {
-    clientsApi.list({ limit: 500 }).then(res => {
-      setAllClients(res.data.map((c: any) => ({ id: c.id, businessName: c.businessName })));
-    }).catch(() => {});
+    projectsApi.getActivityClients().then(setAllClients).catch(() => {});
   }, []);
 
   const filteredClients = useMemo(() => {

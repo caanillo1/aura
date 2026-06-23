@@ -111,14 +111,18 @@ export class SendActivityReportDto {
   @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true }) agentIds?: string[];
 }
 
+export class RecipientConfigDto {
+  @ApiProperty() @IsString() email: string;
+  @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true }) agentIds?: string[];
+}
+
 export class SaveActivityScheduleDto {
   @ApiProperty() @IsBoolean() @Transform(({ value }) => value === true || value === 'true') enabled: boolean;
   @ApiProperty() @IsArray() @IsNumber({}, { each: true }) @Type(() => Number) diasSemana: number[];
   @ApiProperty() @IsNumber() @Min(0) @Max(23) @Type(() => Number) hora: number;
   @ApiProperty() @IsNumber() @Min(0) @Max(59) @Type(() => Number) minuto: number;
   @ApiProperty() @IsArray() @IsString({ each: true }) status: string[];
-  @ApiProperty() @IsArray() @IsString({ each: true }) destinatarios: string[];
+  @ApiProperty() @IsArray() @ValidateNested({ each: true }) @Type(() => RecipientConfigDto) destinatarios: RecipientConfigDto[];
   @ApiPropertyOptional() @IsOptional() @IsString() asunto?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() mensaje?: string;
-  @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true }) agentIds?: string[];
 }

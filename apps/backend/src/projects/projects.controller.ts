@@ -108,7 +108,15 @@ export class ProjectsController {
   @Roles(...IMPL_ROLES)
   @ApiOperation({ summary: 'Enviar reporte de actividades por correo' })
   sendReport(@GetUser() user: JwtUser, @Body() dto: SendActivityReportDto) {
-    return this.svc.sendActivitiesReport(user.companyId, dto);
+    return this.svc.sendActivitiesReport(user.companyId, {
+      recipients: dto.emails.map(email => ({ email, agentIds: dto.agentIds })),
+      subject: dto.subject,
+      message: dto.message,
+      status: dto.status,
+      clientId: dto.clientId,
+      dateFrom: dto.dateFrom,
+      dateTo: dto.dateTo,
+    });
   }
 
   @Get('activities/report-schedule')

@@ -96,11 +96,10 @@ export class ActivityReportSchedulerService implements OnModuleInit {
     }
 
     return this.projectsService.sendActivitiesReport(companyId, {
-      emails:   cfg.destinatarios,
-      subject:  cfg.asunto,
-      message:  cfg.mensaje,
-      status:   cfg.status,
-      agentIds: cfg.agentIds?.length ? cfg.agentIds : undefined,
+      recipients: cfg.destinatarios,
+      subject:    cfg.asunto,
+      message:    cfg.mensaje,
+      status:     cfg.status,
       dateFrom,
       dateTo,
     });

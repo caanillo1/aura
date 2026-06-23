@@ -474,7 +474,7 @@ export const projectsApi = {
     api.post('/projects/activities/send-report', body).then((r) => r.data) as Promise<{ enviados: number; destinatarios: number }>,
   getActivityReportSchedule: () =>
     api.get('/projects/activities/report-schedule').then((r) => r.data),
-  saveActivityReportSchedule: (body: { enabled: boolean; diasSemana: number[]; hora: number; minuto: number; status: string[]; destinatarios: string[]; asunto?: string; mensaje?: string; agentIds?: string[] }) =>
+  saveActivityReportSchedule: (body: { enabled: boolean; diasSemana: number[]; hora: number; minuto: number; status: string[]; destinatarios: { email: string; agentIds?: string[] }[]; asunto?: string; mensaje?: string }) =>
     api.patch('/projects/activities/report-schedule', body).then((r) => r.data),
   loadTemplate: (id: string, data: {
     templateFlowId: string;

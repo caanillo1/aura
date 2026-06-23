@@ -376,6 +376,7 @@ export interface GlobalActivity {
   progressPercent: number;
   actualHours: number;
   updatedAt: string;
+  executionDate: string | null;
   assignedTo: { id: string; firstName: string; lastName: string } | null;
   clientStaff: { id: string; firstName: string; lastName: string } | null;
   threads: { author: { id: string; firstName: string; lastName: string } }[];

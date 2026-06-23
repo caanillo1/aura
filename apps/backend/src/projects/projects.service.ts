@@ -809,14 +809,16 @@ export class ProjectsService {
     if (dto.status?.length) where.status = { in: dto.status };
     if (Object.keys(dateWhere).length) {
       where.OR = [
-        { updatedAt: dateWhere },
+        { updatedAt:      dateWhere },
+        { executionDate:  dateWhere },
+        { actualStartDate: dateWhere },
         { threads: { some: { createdAt: dateWhere } } },
       ];
     }
 
     const SELECT = {
       id: true, code: true, name: true, status: true, priority: true,
-      progressPercent: true, actualHours: true, updatedAt: true,
+      progressPercent: true, actualHours: true, updatedAt: true, executionDate: true,
       assignedTo: { select: { id: true, firstName: true, lastName: true } },
       clientStaff: { select: { id: true, firstName: true, lastName: true } },
       threads: {
@@ -870,7 +872,9 @@ export class ProjectsService {
     if (dto.status?.length) where.status = { in: dto.status };
     if (Object.keys(dateWhere).length) {
       where.OR = [
-        { updatedAt: dateWhere },
+        { updatedAt:       dateWhere },
+        { executionDate:   dateWhere },
+        { actualStartDate: dateWhere },
         { threads: { some: { createdAt: dateWhere } } },
       ];
     }

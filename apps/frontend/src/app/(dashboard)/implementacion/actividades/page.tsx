@@ -27,6 +27,14 @@ function normalize(s: string) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
+function displayDate(a: { executionDate: string | null; updatedAt: string }): string {
+  return dayjs(a.executionDate ?? a.updatedAt).fromNow();
+}
+
+function displayDateLabel(a: { executionDate: string | null }): string {
+  return a.executionDate ? 'Ejecución' : 'Actualizado';
+}
+
 function resolveImplementor(a: GlobalActivity): string {
   if (a.assignedTo) return `${a.assignedTo.firstName} ${a.assignedTo.lastName}`;
   if (a.threads?.[0]?.author) {
@@ -136,7 +144,7 @@ function ActivityCard({ a }: { a: GlobalActivity }) {
       <ProgressBar pct={pct} color={cfg.color} />
       <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
         <Clock className="w-3 h-3" />
-        {dayjs(a.updatedAt).fromNow()}
+        {displayDate(a)}
       </div>
     </div>
   );
@@ -157,7 +165,7 @@ function ListView({ activities, loading, total, page, onLoadMore }: {
         <table className="w-full text-sm">
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-2)' }}>
-              {['Actividad', 'Empresa / OS', 'Módulo', 'Fase', 'Implementador', 'Estado', 'Progreso', 'Actualizado'].map(h => (
+              {['Actividad', 'Empresa / OS', 'Módulo', 'Fase', 'Implementador', 'Estado', 'Progreso', 'Fecha'].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold whitespace-nowrap"
                   style={{ color: 'var(--text-muted)' }}>{h}</th>
               ))}
@@ -202,7 +210,7 @@ function ListView({ activities, loading, total, page, onLoadMore }: {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                      <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{dayjs(a.updatedAt).fromNow()}</span>
+                      <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{displayDate(a)}</span>
                     </div>
                   </td>
                 </tr>
@@ -278,7 +286,7 @@ function KanbanCard({ a, cfg }: { a: GlobalActivity; cfg: typeof STATUS_CONFIG[s
         </div>
       </div>
       <ProgressBar pct={pct} color={cfg.color} />
-      <p className="text-[11px]" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>{dayjs(a.updatedAt).fromNow()}</p>
+      <p className="text-[11px]" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>{displayDate(a)}</p>
     </div>
   );
 }
@@ -371,7 +379,7 @@ function GroupedView({ activities, loading, groupKey, groupLabel, groupIcon: Gro
                           </td>
                           <td className="px-4 py-2.5"><StatusBadge status={a.status} /></td>
                           <td className="px-4 py-2.5 min-w-[90px]"><ProgressBar pct={pct} color={cfg.color} /></td>
-                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{dayjs(a.updatedAt).fromNow()}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{displayDate(a)}</td>
                         </tr>
                       );
                     })}

@@ -27,9 +27,12 @@ function normalize(s: string) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
+function getRawDate(a: { threads: { createdAt: string }[]; executionDate: string | null; updatedAt: string }): string {
+  return a.threads[0]?.createdAt ?? a.executionDate ?? a.updatedAt;
+}
+
 function displayDate(a: { threads: { createdAt: string }[]; executionDate: string | null; updatedAt: string }): string {
-  const d = a.threads[0]?.createdAt ?? a.executionDate ?? a.updatedAt;
-  return dayjs(d).fromNow();
+  return dayjs(getRawDate(a)).fromNow();
 }
 
 function displayDateLabel(a: { threads: { createdAt: string }[]; executionDate: string | null }): string {
@@ -354,7 +357,7 @@ function GroupedView({ activities, loading, groupKey, groupLabel, groupIcon: Gro
                 <table className="w-full text-xs">
                   <thead>
                     <tr style={{ background: 'var(--surface-2)' }}>
-                      {['Actividad', 'OS', 'Módulo', 'Implementador', 'Estado', 'Progreso', 'Actualizado'].map(h => (
+                      {['Actividad', 'OS', 'Módulo', 'Implementador', 'Estado', 'Progreso', 'Fecha'].map(h => (
                         <th key={h} className="px-4 py-2 text-left font-semibold whitespace-nowrap"
                           style={{ color: 'var(--text-muted)' }}>{h}</th>
                       ))}
@@ -590,22 +593,23 @@ async function exportPDF(activities: GlobalActivity[], presetLabel: string, stat
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
 
-  // Column definitions [label, x, width, align]
+  // Column definitions [label, x, maxChars, align]
   const cols: [string, number, number, 'left'|'right'][] = [
-    ['Actividad',      margin,  62, 'left'],
-    ['Empresa',        78,      45, 'left'],
-    ['OS',             125,     22, 'left'],
-    ['Módulo',         149,     38, 'left'],
-    ['Implementador',  189,     38, 'left'],
-    ['Estado',         229,     30, 'left'],
-    ['%',              261,     14, 'right'],
+    ['Actividad',      margin, 34, 'left'],
+    ['Empresa',        71,     25, 'left'],
+    ['OS',             113,    12, 'left'],
+    ['Módulo',         135,    20, 'left'],
+    ['Implementador',  169,    20, 'left'],
+    ['Estado',         203,    12, 'left'],
+    ['Fecha',          233,    10, 'left'],
+    ['%',              265,     4, 'right'],
   ];
 
   // Table header bg
   doc.setFillColor(241, 245, 249);
   doc.rect(margin, y - 5, pageW - margin * 2, 8, 'F');
   cols.forEach(([label, x, , align]) => {
-    doc.text(label, align === 'right' ? x + cols.find(c => c[1] === x)![2] : x, y, { align });
+    doc.text(label, align === 'right' ? x + 8 : x, y, { align });
   });
 
   y += 6;
@@ -629,18 +633,20 @@ async function exportPDF(activities: GlobalActivity[], presetLabel: string, stat
     const impl = resolveImplementor(a);
     const pct = Math.round(Number(a.progressPercent));
     const trunc = (s: string, max: number) => s.length > max ? s.slice(0, max - 1) + '…' : s;
+    const dateStr = dayjs(getRawDate(a)).format('DD/MM/YYYY');
 
-    doc.text(trunc(a.name, 38), margin, y);
-    doc.text(trunc(so.client.businessName, 27), 78, y);
-    doc.text(so.osNumber, 125, y);
-    doc.text(trunc(a.phase.projectModule.name, 22), 149, y);
-    doc.text(trunc(impl, 22), 189, y);
+    doc.text(trunc(a.name, 34), margin, y);
+    doc.text(trunc(so.client.businessName, 25), 71, y);
+    doc.text(so.osNumber, 113, y);
+    doc.text(trunc(a.phase.projectModule.name, 20), 135, y);
+    doc.text(trunc(impl, 20), 169, y);
 
     const [r, g, b] = STATUS_COLORS_RGB[a.status] ?? [148, 163, 184];
     doc.setTextColor(r, g, b);
-    doc.text(STATUS_LABELS[a.status] ?? a.status, 229, y);
+    doc.text(STATUS_LABELS[a.status] ?? a.status, 203, y);
     doc.setTextColor(30, 41, 59);
-    doc.text(`${pct}%`, 261 + 14, y, { align: 'right' });
+    doc.text(dateStr, 233, y);
+    doc.text(`${pct}%`, 273, y, { align: 'right' });
 
     y += 7;
   });

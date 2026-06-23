@@ -37,13 +37,14 @@ function resolveImplementor(a: GlobalActivity): string {
   return 'Sin asignar';
 }
 
-type DatePreset = 'today' | 'yesterday' | 'last7' | 'month' | 'custom';
+type DatePreset = 'all' | 'today' | 'yesterday' | 'last7' | 'month' | 'custom';
 type ViewMode = 'lista' | 'kanban' | 'empresa' | 'implementador' | 'tarjetas' | 'resumen';
 
 interface DateRange { from: string; to: string }
 
 function presetToRange(preset: DatePreset, custom: DateRange): DateRange {
   const today = dayjs().format('YYYY-MM-DD');
+  if (preset === 'all')       return { from: '', to: '' };
   if (preset === 'today')     return { from: today, to: today };
   if (preset === 'yesterday') { const y = dayjs().subtract(1, 'd').format('YYYY-MM-DD'); return { from: y, to: y }; }
   if (preset === 'last7')     return { from: dayjs().subtract(6, 'd').format('YYYY-MM-DD'), to: today };
@@ -60,6 +61,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 const ALL_STATUSES = ['completado', 'en_progreso', 'bloqueado'];
 
 const DATE_PRESETS: { id: DatePreset; label: string }[] = [
+  { id: 'all',       label: 'Todo'           },
   { id: 'today',     label: 'Hoy'            },
   { id: 'yesterday', label: 'Ayer'           },
   { id: 'last7',     label: 'Últimos 7 días' },
@@ -642,7 +644,7 @@ export default function ActividadesRealizadasPage() {
   const [exportingPDF, setExportingPDF]     = useState(false);
 
   // Filters
-  const [preset, setPreset]             = useState<DatePreset>('today');
+  const [preset, setPreset]             = useState<DatePreset>('month');
   const [customRange, setCustomRange]   = useState<DateRange>({ from: '', to: '' });
   const [statuses, setStatuses]         = useState<string[]>([...ALL_STATUSES]);
   const [clientSearch, setClientSearch] = useState('');

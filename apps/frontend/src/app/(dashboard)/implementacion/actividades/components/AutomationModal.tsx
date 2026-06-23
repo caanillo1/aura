@@ -68,7 +68,8 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
   useEffect(() => {
     if (!open) return;
     usersApi.listAgents({ limit: 200 }).then(res => {
-      setAllAgents(res.data.map((u: any) => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, jobTitle: u.jobTitle })));
+      const list: any[] = Array.isArray(res) ? res : ((res as any).data ?? []);
+      setAllAgents(list.map((u: any) => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, jobTitle: u.jobTitle })));
     }).catch(() => {});
 
     setLoadingSchedule(true);
@@ -116,7 +117,13 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
     const existing = new Set(schedDestinatarios.map(d => d.email));
     const newOnes = parts.filter(e => !existing.has(e)).map(email => ({ email, agentIds: [] }));
     if (!newOnes.length) return;
-    setSchedDestinatarios(prev => [...prev, ...newOnes]);
+    setSchedDestinatarios(prev => {
+      const updated = [...prev, ...newOnes];
+      // Auto-expand the picker for the first newly added recipient
+      setExpandedIdx(updated.length - 1);
+      setAgentSearch('');
+      return updated;
+    });
     setSchedEmailInput('');
   }
 
@@ -369,9 +376,12 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
 
                 {/* Recipients — per-email agent filter */}
                 <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>
                     <Mail className="w-3.5 h-3.5 inline mr-1" />Destinatarios
                   </label>
+                  <p className="text-[10px] mb-1.5 opacity-60" style={{ color: 'var(--text-muted)' }}>
+                    Al agregar un correo puedes elegir qué agentes le llegan. Sin selección = todos.
+                  </p>
                   <div className="flex gap-2 mb-2">
                     <input type="email" placeholder="correo@ejemplo.com"
                       value={schedEmailInput} onChange={e => setSchedEmailInput(e.target.value)}

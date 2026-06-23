@@ -678,11 +678,21 @@ export default function ActividadesRealizadasPage() {
 
   const dateRange = useMemo(() => presetToRange(preset, customRange), [preset, customRange]);
 
-  // Clients that have at least one activity in the database
+  // Clients that have at least one activity in the selected period
   const [allClients, setAllClients] = useState<{ id: string; businessName: string }[]>([]);
   useEffect(() => {
-    projectsApi.getActivityClients().then(setAllClients).catch(() => {});
-  }, []);
+    const params = dateRange.from || dateRange.to
+      ? { dateFrom: dateRange.from || undefined, dateTo: dateRange.to || undefined }
+      : undefined;
+    projectsApi.getActivityClients(params).then(res => {
+      setAllClients(res);
+      // If the previously selected client no longer has activities in this period, clear it
+      if (selectedClientId && !res.find(c => c.id === selectedClientId)) {
+        setSelectedClientId(null);
+        setSelectedClientName('');
+      }
+    }).catch(() => {});
+  }, [dateRange]);
 
   const filteredClients = useMemo(() => {
     if (!clientSearch.trim()) return allClients;

@@ -88,9 +88,13 @@ export class ProjectsController {
 
   @Get('activities/clients')
   @Roles(...IMPL_ROLES)
-  @ApiOperation({ summary: 'Clientes con al menos una actividad en BD' })
-  getActivityClients(@GetUser() user: JwtUser) {
-    return this.svc.getActivityClients(user.companyId);
+  @ApiOperation({ summary: 'Clientes con al menos una actividad en el período' })
+  getActivityClients(
+    @GetUser() user: JwtUser,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.svc.getActivityClients(user.companyId, dateFrom, dateTo);
   }
 
   @Get('activities/global')

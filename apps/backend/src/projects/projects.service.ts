@@ -781,7 +781,21 @@ export class ProjectsService {
     });
   }
 
-  async getActivityClients(companyId: string) {
+  async getActivityClients(companyId: string, dateFrom?: string, dateTo?: string) {
+    const dateWhere: any = {};
+    if (dateFrom) dateWhere.gte = new Date(dateFrom);
+    if (dateTo) { const to = new Date(dateTo); to.setUTCHours(23, 59, 59, 999); dateWhere.lte = to; }
+
+    const activityWhere: any = { status: { in: ['bloqueado', 'en_progreso', 'completado'] } };
+    if (Object.keys(dateWhere).length) {
+      activityWhere.OR = [
+        { updatedAt:       dateWhere },
+        { executionDate:   dateWhere },
+        { actualStartDate: dateWhere },
+        { threads: { some: { createdAt: dateWhere } } },
+      ];
+    }
+
     const clients = await this.prisma.client.findMany({
       where: {
         serviceOrders: {
@@ -791,7 +805,7 @@ export class ProjectsService {
               modules: {
                 some: {
                   phases: {
-                    some: { activities: { some: { status: { in: ['bloqueado', 'en_progreso', 'completado'] } } } },
+                    some: { activities: { some: activityWhere } },
                   },
                 },
               },

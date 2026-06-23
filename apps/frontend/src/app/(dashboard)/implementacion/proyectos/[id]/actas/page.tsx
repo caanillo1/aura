@@ -38,7 +38,7 @@ const TYPE_CFG: Record<ActaType, { label: string; color: string; bg: string; sho
 };
 
 const STATUS_CFG: Record<string, { label: string; color: string }> = {
-  borrador:   { label: 'Borrador',   color: '#94a3b8' },
+  borrador:   { label: 'Borrador',   color: 'var(--text-muted)' },
   finalizado: { label: 'Finalizado', color: '#34d399' },
 };
 
@@ -177,13 +177,13 @@ function FirmantesPanel({ acta, userSignature, onSetupSignature, onClose, onRefr
     <div className="fixed inset-0 z-[55] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(8px)' }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl flex flex-col"
-        style={{ background: '#0f1629', border: '1px solid rgba(255,255,255,0.12)', maxHeight: '82vh' }}>
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)', maxHeight: '82vh' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0"
-          style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          style={{ borderColor: 'var(--border-subtle)' }}>
           <div>
-            <p className="text-sm font-semibold text-white flex items-center gap-2">
+            <p className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <PenLine className="w-4 h-4 text-blue-400" /> Gestionar firmas
             </p>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -233,12 +233,12 @@ function FirmantesPanel({ acta, userSignature, onSetupSignature, onClose, onRefr
               return (
                 <div key={f.id} className="p-3 rounded-xl"
                   style={{
-                    background: signed ? 'rgba(52,211,153,0.06)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${signed ? 'rgba(52,211,153,0.20)' : 'rgba(255,255,255,0.07)'}`,
+                    background: signed ? 'rgba(52,211,153,0.06)' : 'var(--surface-2)',
+                    border: `1px solid ${signed ? 'rgba(52,211,153,0.20)' : 'var(--border-subtle)'}`,
                   }}>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{f.nombre}</p>
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{f.nombre}</p>
                       {f.cargo   && <p className="text-xs text-slate-400">{f.cargo}</p>}
                       {f.empresa && <p className="text-xs text-slate-500">{f.empresa}</p>}
                     </div>
@@ -298,10 +298,10 @@ function FirmantesPanel({ acta, userSignature, onSetupSignature, onClose, onRefr
           )}
         </div>
 
-        <div className="px-5 py-3 border-t shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div className="px-5 py-3 border-t shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
           <button onClick={onClose}
             className="w-full py-2 rounded-xl text-sm font-medium"
-            style={{ color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)' }}>
+            style={{ color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
             Cerrar
           </button>
         </div>
@@ -344,11 +344,11 @@ function SetupSignatureModal({ onClose, onSaved }: {
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.80)', backdropFilter: 'blur(8px)' }}>
       <div className="w-full max-w-md rounded-2xl shadow-2xl flex flex-col"
-        style={{ background: '#0f1629', border: '1px solid rgba(255,255,255,0.12)' }}>
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
 
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
           <div>
-            <p className="text-sm font-semibold text-white flex items-center gap-2">
+            <p className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               <Shield className="w-4 h-4 text-blue-400" /> Configura tu firma digital
             </p>
             <p className="text-xs text-slate-400 mt-0.5">Se guardará en tu perfil y se usará en todas las actas</p>
@@ -362,7 +362,7 @@ function SetupSignatureModal({ onClose, onSaved }: {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={tab === k
                 ? { background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.30)' }
-                : { background: 'transparent', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)' }}>
+                : { background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
               <Icon className="w-3.5 h-3.5" /> {label}
             </button>
           ))}
@@ -375,7 +375,7 @@ function SetupSignatureModal({ onClose, onSaved }: {
               <SignaturePad ref={padRef} height={180} strokeColor="#1e40af" />
               <button onClick={() => padRef.current?.clear()}
                 className="flex items-center gap-1 text-xs mt-2 px-2 py-1 rounded"
-                style={{ color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)' }}>
+                style={{ color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
                 <RotateCcw className="w-3 h-3" /> Limpiar
               </button>
             </div>
@@ -393,7 +393,7 @@ function SetupSignatureModal({ onClose, onSaved }: {
               ) : (
                 <button onClick={() => fileRef.current?.click()}
                   className="w-full py-10 rounded-xl border-2 border-dashed flex flex-col items-center gap-2"
-                  style={{ borderColor: 'rgba(255,255,255,0.15)', color: '#94a3b8' }}
+                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }}
                   onDragOver={e => e.preventDefault()}
                   onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (!f) return; const r = new FileReader(); r.onload = ev => setPreview(ev.target?.result as string); r.readAsDataURL(f); }}>
                   <Upload className="w-8 h-8 opacity-50" />
@@ -406,7 +406,7 @@ function SetupSignatureModal({ onClose, onSaved }: {
         </div>
 
         <div className="flex gap-3 px-5 pb-5">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl text-sm" style={{ color: '#94a3b8' }}>Cancelar</button>
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl text-sm" style={{ color: 'var(--text-muted)' }}>Cancelar</button>
           <button onClick={handleSave} disabled={saving}
             className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
             style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.30)' }}>
@@ -425,7 +425,7 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
   agents?: StaffOption[];
   userSignature?: string | null; onSetupSignature?: () => void;
 }) {
-  const inputRowStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: tc.s };
+  const inputRowStyle = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s };
   const [agentSigning, setAgentSigning] = useState<number | null>(null);
 
   const update = (i: number, k: keyof Firmante, v: string | number) =>
@@ -501,7 +501,7 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
           {agents && agents.length > 0 && (
             <select defaultValue="" onChange={e => { if (e.target.value) { addFromAgent(e.target.value); e.target.value = ''; } }}
               className="w-full text-xs px-3 py-2 rounded-xl outline-none"
-              style={{ background: '#1e2537', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', colorScheme: 'dark' as const }}>
+              style={{ background: 'var(--surface-2)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa' }}>
               <option value="">Agregar del equipo →</option>
               {agents.map(a => (
                 <option key={a.id} value={a.id}>{a.firstName} {a.lastName}{a.jobTitle ? ` — ${a.jobTitle}` : ''}</option>
@@ -511,7 +511,7 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
           {clientStaff && clientStaff.length > 0 && (
             <select defaultValue="" onChange={e => { if (e.target.value) { addFromStaff(e.target.value); e.target.value = ''; } }}
               className="w-full text-xs px-3 py-2 rounded-xl outline-none"
-              style={{ background: '#1e2537', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', colorScheme: 'dark' as const }}>
+              style={{ background: 'var(--surface-2)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa' }}>
               <option value="">Agregar del cliente →</option>
               {clientStaff.map(s => (
                 <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` — ${s.jobTitle}` : ''}</option>
@@ -541,12 +541,12 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
         return (
           <div key={i} className="mb-3 rounded-xl overflow-hidden"
             style={{
-              background: 'rgba(255,255,255,0.03)',
+              background: 'var(--surface-2)',
               border: `1px solid ${isClient ? 'rgba(96,165,250,0.18)' : 'rgba(167,139,250,0.18)'}`,
             }}>
             {/* Card header: tipo badge + eliminar */}
             <div className="flex items-center justify-between px-3 py-2 border-b"
-              style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.025)' }}>
+              style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-2)' }}>
               <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
                 style={{
                   background: isClient ? 'rgba(96,165,250,0.12)' : 'rgba(167,139,250,0.12)',
@@ -588,7 +588,7 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
               </div>
 
               {/* Zona de firma */}
-              <div className="pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+              <div className="pt-1 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
                 {hasSig ? (
                   <div className="flex items-center gap-3 flex-wrap">
                     <div className="bg-white rounded-lg px-2 py-1 inline-flex">
@@ -600,7 +600,7 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
                         {isClient ? 'Firmado · cliente' : 'Firmado · agente'}
                       </p>
                       {r.signedAt && (
-                        <p className="text-[10px] mt-0.5" style={{ color: '#94a3b8' }}>
+                        <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
                           {new Date(r.signedAt).toLocaleDateString('es-CO')}
                         </p>
                       )}
@@ -624,10 +624,10 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
                       </button>
                     )}
                     {r.signerType !== 'agent' && !firmId && (
-                      <p className="text-xs italic" style={{ color: '#94a3b8' }}>Guarda el acta para generar enlace de firma</p>
+                      <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>Guarda el acta para generar enlace de firma</p>
                     )}
                     {!hasSig && r.signerType !== 'client' && r.signerType !== 'agent' && (
-                      <p className="text-xs italic" style={{ color: '#94a3b8' }}>Pendiente de firma</p>
+                      <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>Pendiente de firma</p>
                     )}
                   </div>
                 )}
@@ -678,7 +678,7 @@ function DynamicTable<T extends Record<string, any>>({ title, rows, setRows, col
                 <select value={row[col.key] === true ? 'si' : row[col.key] === false ? 'no' : ''}
                   onChange={e => update(i, col.key, e.target.value === 'si' ? true : e.target.value === 'no' ? false : null)}
                   className="w-full text-sm px-2 py-1.5 rounded-lg outline-none"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: tc.s }}>
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s }}>
                   <option value="">—</option>
                   <option value="si">Sí</option>
                   <option value="no">No</option>
@@ -686,7 +686,7 @@ function DynamicTable<T extends Record<string, any>>({ title, rows, setRows, col
               ) : col.type === 'select' ? (
                 <select value={row[col.key] ?? ''} onChange={e => update(i, col.key, e.target.value)}
                   className="w-full text-sm px-2 py-1.5 rounded-lg outline-none"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: tc.s }}>
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s }}>
                   {col.opts?.map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
               ) : (
@@ -697,7 +697,7 @@ function DynamicTable<T extends Record<string, any>>({ title, rows, setRows, col
                   min={col.type === 'date' ? '2000-01-01' : undefined}
                   onChange={e => update(i, col.key, col.type === 'date' ? clampDateYear(e.target.value) : e.target.value)}
                   className="w-full text-sm px-2 py-1.5 rounded-lg outline-none"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: tc.s,
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s,
                     ...(col.type === 'time' ? { colorScheme: 'dark' } : {}) }} />
               )}
             </div>
@@ -722,10 +722,10 @@ function ChecklistTable({ title, items, setItems, showMedio, tc }: {
   return (
     <div className="mb-4">
       <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: tc.m }}>{title}</p>
-      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
         <table className="w-full text-sm">
           <thead>
-            <tr style={{ background: 'rgba(255,255,255,0.04)', color: tc.m }}>
+            <tr style={{ background: 'var(--surface-2)', color: tc.m }}>
               <th className="text-left px-3 py-2 text-xs font-medium">Ítem</th>
               <th className="px-3 py-2 text-xs font-medium w-20">Sí / No</th>
               {showMedio && <th className="px-3 py-2 text-xs font-medium w-28">Medio</th>}
@@ -734,27 +734,27 @@ function ChecklistTable({ title, items, setItems, showMedio, tc }: {
           </thead>
           <tbody>
             {items.map((item, i) => (
-              <tr key={i} className="border-t" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+              <tr key={i} className="border-t" style={{ borderColor: 'var(--border-subtle)' }}>
                 <td className="px-3 py-2" style={{ color: tc.s }}>{item.label}</td>
                 <td className="px-3 py-2 text-center">
                   <button onClick={() => toggle(i)}
                     className="w-8 h-5 rounded-full relative transition-colors"
-                    style={{ background: item.checked ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.10)' }}>
+                    style={{ background: item.checked ? 'rgba(52,211,153,0.4)' : 'var(--surface-2)' }}>
                     <span className="absolute top-0.5 transition-all rounded-full w-4 h-4 shadow"
-                      style={{ left: item.checked ? '14px' : '2px', background: item.checked ? '#34d399' : '#94a3b8' }} />
+                      style={{ left: item.checked ? '14px' : '2px', background: item.checked ? '#34d399' : 'var(--text-muted)' }} />
                   </button>
                 </td>
                 {showMedio && (
                   <td className="px-2 py-1.5">
                     <input value={item.medio ?? ''} onChange={e => setMed(i, e.target.value)} placeholder="Medio"
                       className="w-full text-xs px-2 py-1 rounded outline-none"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: tc.s }} />
+                      style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s }} />
                   </td>
                 )}
                 <td className="px-2 py-1.5">
                   <input value={item.obs} onChange={e => setObs(i, e.target.value)} placeholder="—"
                     className="w-full text-xs px-2 py-1 rounded outline-none"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: tc.s }} />
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s }} />
                 </td>
               </tr>
             ))}
@@ -776,7 +776,7 @@ function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff,
   tc: any;
   actaFecha: string;
 }) {
-  const inputSty = { background: '#1a2235', border: '1px solid rgba(255,255,255,0.12)', color: tc.s, colorScheme: 'dark' as const };
+  const inputSty = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s };
 
   const add = () => setRows([...rows, { numero: rows.length + 1, compromiso: '', responsable: '', estado: 'pendiente' }]);
   const del = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
@@ -806,7 +806,7 @@ function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff,
           : [];
         return (
           <div key={i} className="mb-3 p-3 rounded-xl space-y-2"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             {/* Fila 1: compromiso + estado + borrar */}
             <div className="flex gap-2 items-start">
               <textarea rows={2} placeholder="Descripción del compromiso"
@@ -899,7 +899,7 @@ function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff,
 // ── Actividades del Plan de Trabajo para acta de visita ───────────────────
 
 const ACT_STATUS_CFG: Record<string, { label: string; color: string; bg: string; pct: number }> = {
-  pendiente:   { label: 'Pendiente',    color: '#94a3b8', bg: 'rgba(148,163,184,0.15)', pct: 0   },
+  pendiente:   { label: 'Pendiente',    color: 'var(--text-muted)', bg: 'rgba(148,163,184,0.15)', pct: 0   },
   en_progreso: { label: 'En progreso',  color: '#60a5fa', bg: 'rgba(96,165,250,0.15)',  pct: 50  },
   completado:  { label: 'Completado',   color: '#34d399', bg: 'rgba(52,211,153,0.15)',  pct: 100 },
   bloqueado:   { label: 'Bloqueado',    color: '#f87171', bg: 'rgba(248,113,113,0.15)', pct: 0   },
@@ -916,7 +916,7 @@ function ActividadesVisitaEditor({ rows, setRows, projectModules, agents, client
   statusLabel?: string;
 }) {
   const [openModuleId, setOpenModuleId] = useState<string | null>(null);
-  const inputSty = { background: '#1a2235', border: '1px solid rgba(255,255,255,0.12)', color: tc.s, colorScheme: 'dark' as const };
+  const inputSty = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s };
 
   const selectedIds = new Set(rows.map(r => r.activityId));
 
@@ -960,10 +960,10 @@ function ActividadesVisitaEditor({ rows, setRows, projectModules, agents, client
             const selectedInMod = modActivities.filter((a: any) => selectedIds.has(a.id)).length;
             const isOpen = openModuleId === mod.id;
             return (
-              <div key={mod.id} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div key={mod.id} className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
                 <button type="button" onClick={() => setOpenModuleId(isOpen ? null : mod.id)}
                   className="w-full flex items-center justify-between px-3 py-2.5 text-left"
-                  style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  style={{ background: 'var(--surface-2)' }}>
                   <span className="text-sm font-medium" style={{ color: tc.p }}>{mod.name}</span>
                   <div className="flex items-center gap-2">
                     {selectedInMod > 0 && (
@@ -1002,8 +1002,8 @@ function ActividadesVisitaEditor({ rows, setRows, projectModules, agents, client
                                       <span className="font-mono text-[10px]" style={{ color: '#60a5fa' }}>{act.code}</span>
                                       <span className="text-xs" style={{ color: selected ? tc.p : tc.m }}>{act.name}</span>
                                       <span className="text-[10px] px-1 rounded" style={{
-                                        background: act.status === 'completado' ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.06)',
-                                        color: act.status === 'completado' ? '#34d399' : '#94a3b8',
+                                        background: act.status === 'completado' ? 'rgba(52,211,153,0.15)' : 'var(--surface-2)',
+                                        color: act.status === 'completado' ? '#34d399' : 'var(--text-muted)',
                                       }}>{act.status}</span>
                                     </div>
                                   </div>
@@ -1021,9 +1021,9 @@ function ActividadesVisitaEditor({ rows, setRows, projectModules, agents, client
                                             onClick={() => updateRow(act.id, { status: key })}
                                             className="text-[10px] px-2 py-0.5 rounded-full font-semibold transition-all"
                                             style={{
-                                              background: rowStatus === key ? cfg.bg : 'rgba(255,255,255,0.04)',
-                                              color: rowStatus === key ? cfg.color : '#94a3b8',
-                                              border: `1px solid ${rowStatus === key ? cfg.color + '60' : 'rgba(255,255,255,0.08)'}`,
+                                              background: rowStatus === key ? cfg.bg : 'var(--surface-2)',
+                                              color: rowStatus === key ? cfg.color : 'var(--text-muted)',
+                                              border: `1px solid ${rowStatus === key ? cfg.color + '60' : 'var(--border-subtle)'}`,
                                             }}>
                                             {cfg.label} ({cfg.pct}%)
                                           </button>
@@ -1076,7 +1076,7 @@ function ActividadesVisitaEditor({ rows, setRows, projectModules, agents, client
             const cfg = ACT_STATUS_CFG[row.status] ?? ACT_STATUS_CFG.completado;
             return (
               <div key={row.activityId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                 <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
                   style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
                 <span className="flex-1 truncate" style={{ color: tc.p }}>{act.moduleName} › {act.phaseName} › {act.name}</span>
@@ -1095,7 +1095,7 @@ function ActividadesVisitaEditor({ rows, setRows, projectModules, agents, client
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium mb-1" style={{ color: '#94a3b8' }}>{label}</label>
+      <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>{label}</label>
       {children}
     </div>
   );
@@ -1124,7 +1124,7 @@ interface ActaModalProps {
 
 function ActaModal({ mode, defaultType, acta, projectId, projectModules, municipios, clientMunicipioId, clientName, clientStaff, agentOptions, userSignature, currentUser, onSetupSignature, onClose, onSaved, tc }: ActaModalProps) {
   const inputCls = "w-full text-sm px-3 py-2 rounded-xl outline-none";
-  const inputStyle = { background: '#1a2235', border: '1px solid rgba(255,255,255,0.12)', color: tc.s, colorScheme: 'dark' as const };
+  const inputStyle = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s };
 
   // ── Estado base ──
   const [type, setType]     = useState<ActaType>(acta?.type ?? defaultType ?? 'inicio');
@@ -1358,11 +1358,11 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 pb-6"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
       <div className="relative flex flex-col rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh]"
-        style={{ background: '#0f1629', border: '1px solid rgba(255,255,255,0.10)' }}>
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0"
-          style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          style={{ borderColor: 'var(--border-subtle)' }}>
           <div className="flex items-center gap-3">
             <span className="px-2.5 py-1 rounded-full text-xs font-bold"
               style={{ background: cfg.bg, color: cfg.color }}>{cfg.short}</span>
@@ -1560,7 +1560,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                   Módulos a cerrar
                 </p>
                 <div className="rounded-xl p-3 flex flex-wrap gap-2"
-                  style={{ background: '#1a2235', border: '1px solid rgba(255,255,255,0.10)' }}>
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   {projectModules.map((m: any) => {
                     const selected = cierreModulos.some(cm => cm.id === m.id);
                     return (
@@ -1575,7 +1575,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                         style={selected
                           ? { background: 'rgba(167,139,250,0.20)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.40)' }
-                          : { background: 'rgba(255,255,255,0.04)', color: tc.m, border: '1px solid rgba(255,255,255,0.10)' }
+                          : { background: 'var(--surface-2)', color: tc.m, border: '1px solid var(--border-subtle)' }
                         }
                       >
                         {selected && <span style={{ fontSize: 10 }}>✓</span>}
@@ -1699,10 +1699,10 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
               {participantes.length === 0 ? (
                 <p className="text-xs text-center py-3" style={{ color: tc.m }}>Sin registros</p>
               ) : (
-                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
                   <table className="w-full text-xs">
                     <thead>
-                      <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
+                      <tr style={{ background: 'var(--surface-2)' }}>
                         {['Nombre', 'Cargo', 'Documento', ''].map(h => (
                           <th key={h} className="px-2 py-2 text-left font-medium" style={{ color: tc.m }}>{h}</th>
                         ))}
@@ -1710,7 +1710,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                     </thead>
                     <tbody>
                       {participantes.map((p, i) => (
-                        <tr key={i} className="border-t" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                        <tr key={i} className="border-t" style={{ borderColor: 'var(--border-subtle)' }}>
                           {(['nombre', 'cargo', 'documento'] as const).map(k => (
                             <td key={k} className="px-2 py-1">
                               <input
@@ -1774,7 +1774,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
             </div>
 
             {/* Capacitación resumen */}
-            <div className="p-4 rounded-xl space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="p-4 rounded-xl space-y-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
               <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: tc.m }}>Resumen de capacitación</p>
               <div className="grid grid-cols-3 gap-3">
                 <Field label="Modalidad">
@@ -1821,7 +1821,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
           </>)}
 
           {/* Firmantes (todos los tipos) */}
-          <div className="border-t pt-4" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div className="border-t pt-4" style={{ borderColor: 'var(--border-subtle)' }}>
             <FirmantesEditor rows={firmantes} setRows={setFirmantes} tc={tc}
               clientStaff={clientStaff} clientName={clientName} agents={agentOptions}
               userSignature={userSignature} onSetupSignature={onSetupSignature} />
@@ -1830,7 +1830,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t shrink-0"
-          style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+          style={{ borderColor: 'var(--border-subtle)' }}>
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm" style={{ color: tc.m }}>Cancelar</button>
           <button onClick={handleSave} disabled={saving}
             className="px-5 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2"
@@ -1890,11 +1890,11 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
     <div className="fixed inset-0 z-[65] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(8px)' }}>
       <div className="w-full max-w-lg rounded-2xl shadow-2xl flex flex-col"
-        style={{ background: '#0f1629', border: '1px solid rgba(255,255,255,0.12)', maxHeight: '88vh' }}>
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)', maxHeight: '88vh' }}>
 
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0"
-          style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-          <p className="text-sm font-semibold text-white flex items-center gap-2">
+          style={{ borderColor: 'var(--border-subtle)' }}>
+          <p className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
             <Settings className="w-4 h-4 text-blue-400" /> Configurar branding del reporte
           </p>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400"><X className="w-4 h-4" /></button>
@@ -1903,7 +1903,7 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
           {/* Logo */}
           <div>
-            <p className="text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">Logo de la empresa</p>
+            <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Logo de la empresa</p>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={handleLogoFile} />
             <div className="flex items-center gap-4">
               <div className="w-32 h-16 rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden"
@@ -1925,7 +1925,7 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
 
           {/* Colores */}
           <div>
-            <p className="text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">Colores corporativos</p>
+            <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Colores corporativos</p>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-slate-400 mb-1 block">Color primario</label>
@@ -1933,8 +1933,8 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
                   <input type="color" value={primary} onChange={e => setPrimary(e.target.value)}
                     className="w-10 h-9 rounded cursor-pointer border-0 p-0" style={{ background: 'none' }} />
                   <input type="text" value={primary} onChange={e => setPrimary(e.target.value)}
-                    className="flex-1 px-2 py-1.5 rounded-lg text-sm outline-none text-white font-mono"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
+                    className="flex-1 px-2 py-1.5 rounded-lg text-sm outline-none font-mono"
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1">Encabezado, fondo principal</p>
               </div>
@@ -1944,8 +1944,8 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
                   <input type="color" value={secondary} onChange={e => setSecondary(e.target.value)}
                     className="w-10 h-9 rounded cursor-pointer border-0 p-0" style={{ background: 'none' }} />
                   <input type="text" value={secondary} onChange={e => setSecondary(e.target.value)}
-                    className="flex-1 px-2 py-1.5 rounded-lg text-sm outline-none text-white font-mono"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
+                    className="flex-1 px-2 py-1.5 rounded-lg text-sm outline-none font-mono"
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1">Secciones alternadas</p>
               </div>
@@ -1954,7 +1954,7 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
 
           {/* Datos pie de página */}
           <div>
-            <p className="text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">Pie de pagina del reporte</p>
+            <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Pie de pagina del reporte</p>
             <div className="space-y-2">
               {[
                 { label: 'Direccion', value: addr, set: setAddr, placeholder: 'Calle 62 # 44-43, Barranquilla' },
@@ -1965,8 +1965,8 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
                 <div key={label}>
                   <label className="text-xs text-slate-400 mb-0.5 block">{label}</label>
                   <input type="text" value={value} onChange={e => set(e.target.value)} placeholder={placeholder}
-                    className="w-full px-2.5 py-1.5 rounded-lg text-sm outline-none text-white"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }} />
+                    className="w-full px-2.5 py-1.5 rounded-lg text-sm outline-none"
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
                 </div>
               ))}
             </div>
@@ -1974,8 +1974,8 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
 
           {/* Preview mini */}
           <div>
-            <p className="text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">Vista previa</p>
-            <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'rgba(255,255,255,0.10)' }}>
+            <p className="text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Vista previa</p>
+            <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-subtle)' }}>
               <div className="h-10 flex items-center px-3 gap-3" style={{ background: primary }}>
                 {logoPreview
                   ? <img src={logoPreview} alt="logo" className="h-7 object-contain bg-white rounded px-1" />
@@ -1989,9 +1989,9 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
           </div>
         </div>
 
-        <div className="flex gap-3 px-5 pb-5 pt-3 border-t shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div className="flex gap-3 px-5 pb-5 pt-3 border-t shrink-0" style={{ borderColor: 'var(--border-subtle)' }}>
           <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-sm" style={{ color: '#94a3b8' }}>Cancelar</button>
+            className="flex-1 py-2.5 rounded-xl text-sm" style={{ color: 'var(--text-muted)' }}>Cancelar</button>
           <button onClick={handleSave} disabled={saving}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
             style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.30)' }}>
@@ -2064,7 +2064,7 @@ function PrintView({ acta, project, company, userSignature, onClose, onConfigure
               {downloading ? 'Generando...' : 'Descargar PDF'}
             </button>
             <button onClick={onClose} style={{ padding: 8, borderRadius: 12, cursor: 'pointer',
-              color: '#94a3b8', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
+              color: 'var(--text-muted)', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -2111,7 +2111,7 @@ export default function ActasPage() {
   };
   const cardStyle = {
     background: isLight ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.04)',
-    border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+    border: '1px solid var(--border-subtle)',
     borderRadius: '16px',
     padding: '20px',
   };
@@ -2286,7 +2286,7 @@ export default function ActasPage() {
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-2">
-        {[{ k: 'todas', label: 'Todas', color: '#94a3b8', bg: 'rgba(148,163,184,0.12)' },
+        {[{ k: 'todas', label: 'Todas', color: 'var(--text-muted)', bg: 'rgba(148,163,184,0.12)' },
           ...Object.entries(TYPE_CFG).map(([k, v]) => ({ k, label: v.label, color: v.color, bg: v.bg }))
         ].map(({ k, label, color, bg }) => (
           <button key={k} onClick={() => setFilterType(k as any)}
@@ -2294,7 +2294,7 @@ export default function ActasPage() {
             style={{
               background: filterType === k ? bg : 'transparent',
               color: filterType === k ? color : tc.m,
-              border: filterType === k ? `1px solid ${color}40` : '1px solid rgba(255,255,255,0.10)',
+              border: filterType === k ? `1px solid ${color}40` : '1px solid var(--border-subtle)',
             }}>
             {label}
           </button>
@@ -2316,7 +2316,7 @@ export default function ActasPage() {
             return (
               <motion.div key={acta.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
                 className="flex flex-col rounded-2xl p-4 gap-3"
-                style={{ background: isLight ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.08)` }}>
+                style={{ background: isLight ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)' }}>
 
                 {/* Badge + status */}
                 <div className="flex items-center justify-between">
@@ -2355,7 +2355,7 @@ export default function ActasPage() {
                   const isLocked = acta.firmantes?.some((f: any) => f.signerType === 'client' && f.signedAt);
                   const isPrintLoading = printLoading === acta.id;
                   return (
-                    <div className="flex items-center gap-2 mt-auto pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <div className="flex items-center gap-2 mt-auto pt-2 border-t" style={{ borderColor: 'var(--border-subtle)' }}>
                       {/* Ver / Imprimir — carga datos frescos */}
                       <button onClick={() => handlePrint(acta.id)} disabled={isPrintLoading}
                         title="Ver / Imprimir"
@@ -2390,9 +2390,9 @@ export default function ActasPage() {
                         title={isLocked ? 'No editable: el cliente ya firmó' : 'Editar'}
                         className="p-1.5 rounded-lg"
                         style={{
-                          background: isLocked ? 'rgba(255,255,255,0.03)' : 'rgba(251,191,36,0.08)',
-                          color: isLocked ? '#475569' : '#fbbf24',
-                          border: `1px solid ${isLocked ? 'rgba(255,255,255,0.06)' : 'rgba(251,191,36,0.15)'}`,
+                          background: isLocked ? 'var(--surface-2)' : 'rgba(251,191,36,0.08)',
+                          color: isLocked ? 'var(--text-muted)' : '#fbbf24',
+                          border: `1px solid ${isLocked ? 'var(--border-subtle)' : 'rgba(251,191,36,0.15)'}`,
                           cursor: isLocked ? 'not-allowed' : 'pointer',
                         }}>
                         {isLocked ? <Lock className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
@@ -2418,7 +2418,7 @@ export default function ActasPage() {
             style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
               className="rounded-2xl p-6 w-full max-w-md shadow-2xl"
-              style={{ background: '#0f1629', border: '1px solid rgba(255,255,255,0.10)' }}>
+              style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-base font-semibold" style={{ color: tc.p }}>Selecciona el tipo de acta</h3>
                 <button onClick={() => setTypeSelector(false)} style={{ color: tc.m }}><X className="w-4 h-4" /></button>
@@ -2535,7 +2535,7 @@ export default function ActasPage() {
             style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
               className="rounded-2xl p-6 w-full max-w-sm shadow-2xl"
-              style={{ background: '#0f1629', border: '1px solid rgba(248,113,113,0.20)' }}>
+              style={{ background: 'var(--card-bg)', border: '1px solid rgba(248,113,113,0.20)' }}>
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2.5 rounded-xl" style={{ background: 'rgba(248,113,113,0.12)' }}>
                   <Trash2 className="w-5 h-5" style={{ color: '#f87171' }} />

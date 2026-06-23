@@ -117,13 +117,10 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
     const existing = new Set(schedDestinatarios.map(d => d.email));
     const newOnes = parts.filter(e => !existing.has(e)).map(email => ({ email, agentIds: [] }));
     if (!newOnes.length) return;
-    setSchedDestinatarios(prev => {
-      const updated = [...prev, ...newOnes];
-      // Auto-expand the picker for the first newly added recipient
-      setExpandedIdx(updated.length - 1);
-      setAgentSearch('');
-      return updated;
-    });
+    const updated = [...schedDestinatarios, ...newOnes];
+    setSchedDestinatarios(updated);
+    setExpandedIdx(updated.length - 1);
+    setAgentSearch('');
     setSchedEmailInput('');
   }
 

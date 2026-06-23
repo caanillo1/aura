@@ -792,11 +792,7 @@ export class ProjectsService {
       phase: { projectModule: { project: { serviceOrder: { companyId } } } },
     };
     if (Object.keys(dateWhere).length) {
-      where.OR = [
-        { executionDate:   dateWhere },
-        { actualStartDate: dateWhere },
-        { threads: { some: { createdAt: dateWhere } } },
-      ];
+      where.threads = { some: { createdAt: dateWhere } };
     }
 
     const activities = await this.prisma.activity.findMany({
@@ -857,11 +853,7 @@ export class ProjectsService {
 
     if (dto.status?.length) where.status = { in: dto.status };
     if (Object.keys(dateWhere).length) {
-      where.OR = [
-        { executionDate:   dateWhere },
-        { actualStartDate: dateWhere },
-        { threads: { some: { createdAt: dateWhere } } },
-      ];
+      where.threads = { some: { createdAt: dateWhere } };
     }
 
     const SELECT = {
@@ -919,11 +911,7 @@ export class ProjectsService {
     };
     if (dto.status?.length) where.status = { in: dto.status };
     if (Object.keys(dateWhere).length) {
-      where.OR = [
-        { executionDate:   dateWhere },
-        { actualStartDate: dateWhere },
-        { threads: { some: { createdAt: dateWhere } } },
-      ];
+      where.threads = { some: { createdAt: dateWhere } };
     }
 
     const activities = await this.prisma.activity.findMany({

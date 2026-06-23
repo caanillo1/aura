@@ -108,6 +108,7 @@ export class SendActivityReportDto {
   @ApiPropertyOptional() @IsOptional() @IsString() clientId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() dateFrom?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() dateTo?: string;
+  @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true }) agentIds?: string[];
 }
 
 export class SaveActivityScheduleDto {
@@ -119,4 +120,5 @@ export class SaveActivityScheduleDto {
   @ApiProperty() @IsArray() @IsString({ each: true }) destinatarios: string[];
   @ApiPropertyOptional() @IsOptional() @IsString() asunto?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() mensaje?: string;
+  @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true }) agentIds?: string[];
 }

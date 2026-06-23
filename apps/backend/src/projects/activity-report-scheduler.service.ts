@@ -100,6 +100,7 @@ export class ActivityReportSchedulerService implements OnModuleInit {
       subject:  cfg.asunto,
       message:  cfg.mensaje,
       status:   cfg.status,
+      agentIds: cfg.agentIds?.length ? cfg.agentIds : undefined,
       dateFrom,
       dateTo,
     });

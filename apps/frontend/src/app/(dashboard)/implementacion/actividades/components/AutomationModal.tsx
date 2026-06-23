@@ -1,16 +1,15 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   X, Send, Clock, Mail, Calendar, ToggleLeft, ToggleRight,
-  CheckCircle2, Activity, Ban, Loader2, Plus, Trash2,
+  CheckCircle2, Activity, Ban, Loader2, Plus, Trash2, Users, Search,
 } from 'lucide-react';
-import { projectsApi } from '@/lib/api';
+import { projectsApi, usersApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  // filters activos en la página (para envío puntual)
   activeFilters: {
     status: string[];
     clientId: string | null;
@@ -30,31 +29,45 @@ const STATUS_CONFIG = {
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const HORAS = Array.from({ length: 24 }, (_, i) => ({ value: i, label: `${String(i).padStart(2, '0')}:00` }));
 
+function normalize(s: string) {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
 export default function AutomationModal({ open, onClose, activeFilters }: Props) {
   const [tab, setTab] = useState<Tab>('ahora');
 
   // Envío ahora
   const [emailInput, setEmailInput] = useState('');
-  const [emails, setEmails] = useState<string[]>([]);
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
-  const [sending, setSending] = useState(false);
+  const [emails, setEmails]         = useState<string[]>([]);
+  const [subject, setSubject]       = useState('');
+  const [message, setMessage]       = useState('');
+  const [sending, setSending]       = useState(false);
 
   // Programar
-  const [schedEnabled, setSchedEnabled] = useState(false);
-  const [schedDias, setSchedDias]       = useState<number[]>([1, 2, 3, 4, 5]);
-  const [schedHora, setSchedHora]       = useState(8);
-  const [schedStatus, setSchedStatus]   = useState(['completado', 'en_progreso', 'bloqueado']);
-  const [schedEmails, setSchedEmails]   = useState<string[]>([]);
-  const [schedEmailInput, setSchedEmailInput] = useState('');
-  const [schedAsunto, setSchedAsunto]   = useState('');
-  const [schedMensaje, setSchedMensaje] = useState('');
-  const [savingSchedule, setSavingSchedule] = useState(false);
-  const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [schedEnabled, setSchedEnabled]         = useState(false);
+  const [schedDias, setSchedDias]               = useState<number[]>([1, 2, 3, 4, 5]);
+  const [schedHora, setSchedHora]               = useState(8);
+  const [schedStatus, setSchedStatus]           = useState(['completado', 'en_progreso', 'bloqueado']);
+  const [schedEmails, setSchedEmails]           = useState<string[]>([]);
+  const [schedEmailInput, setSchedEmailInput]   = useState('');
+  const [schedAsunto, setSchedAsunto]           = useState('');
+  const [schedMensaje, setSchedMensaje]         = useState('');
+  const [schedAgentIds, setSchedAgentIds]       = useState<string[]>([]);
+  const [agentSearch, setAgentSearch]           = useState('');
+  const [savingSchedule, setSavingSchedule]     = useState(false);
+  const [loadingSchedule, setLoadingSchedule]   = useState(false);
 
-  // Load existing schedule on open
+  // Agents list
+  const [allAgents, setAllAgents] = useState<{ id: string; firstName: string; lastName: string; jobTitle?: string }[]>([]);
+
   useEffect(() => {
     if (!open) return;
+    // Load agents
+    usersApi.listAgents({ limit: 200 }).then(res => {
+      setAllAgents(res.data.map((u: any) => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, jobTitle: u.jobTitle })));
+    }).catch(() => {});
+
+    // Load schedule config
     setLoadingSchedule(true);
     projectsApi.getActivityReportSchedule()
       .then((cfg: any) => {
@@ -66,14 +79,21 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
         setSchedEmails(cfg.destinatarios ?? []);
         setSchedAsunto(cfg.asunto ?? '');
         setSchedMensaje(cfg.mensaje ?? '');
+        setSchedAgentIds(cfg.agentIds ?? []);
       })
       .catch(() => {})
       .finally(() => setLoadingSchedule(false));
   }, [open]);
 
+  const filteredAgents = useMemo(() => {
+    if (!agentSearch.trim()) return allAgents;
+    const q = normalize(agentSearch);
+    return allAgents.filter(a => normalize(`${a.firstName} ${a.lastName}`).includes(q));
+  }, [allAgents, agentSearch]);
+
   if (!open) return null;
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
+  // ── Helpers ──────────────────────────────────────────────────────────────────
 
   function addEmail(list: string[], setList: (v: string[]) => void, input: string, setInput: (v: string) => void) {
     const parts = input.split(/[,;\s]+/).map(e => e.trim()).filter(e => e.includes('@'));
@@ -94,6 +114,10 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
     setSchedDias(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d].sort());
   }
 
+  function toggleAgent(id: string) {
+    setSchedAgentIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+
   // ── Send now ─────────────────────────────────────────────────────────────────
 
   async function handleSendNow() {
@@ -102,9 +126,9 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
     try {
       const res = await projectsApi.sendActivityReport({
         emails,
-        subject: subject || undefined,
-        message: message || undefined,
-        status:  activeFilters.status.length ? activeFilters.status : undefined,
+        subject:  subject || undefined,
+        message:  message || undefined,
+        status:   activeFilters.status.length ? activeFilters.status : undefined,
         clientId: activeFilters.clientId || undefined,
         dateFrom: activeFilters.dateFrom || undefined,
         dateTo:   activeFilters.dateTo   || undefined,
@@ -121,8 +145,8 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
   // ── Save schedule ─────────────────────────────────────────────────────────────
 
   async function handleSaveSchedule() {
-    if (schedEnabled && !schedEmails.length) { toast.error('Agrega al menos un destinatario para el envío automático'); return; }
-    if (schedEnabled && !schedDias.length)   { toast.error('Selecciona al menos un día de la semana'); return; }
+    if (schedEnabled && !schedEmails.length) { toast.error('Agrega al menos un destinatario'); return; }
+    if (schedEnabled && !schedDias.length)   { toast.error('Selecciona al menos un día'); return; }
     setSavingSchedule(true);
     try {
       await projectsApi.saveActivityReportSchedule({
@@ -134,6 +158,7 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
         destinatarios: schedEmails,
         asunto:        schedAsunto || undefined,
         mensaje:       schedMensaje || undefined,
+        agentIds:      schedAgentIds.length ? schedAgentIds : undefined,
       });
       toast.success(schedEnabled ? 'Envío automático activado' : 'Envío automático desactivado');
     } catch (e: any) {
@@ -177,27 +202,21 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
           ))}
         </div>
 
-        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
 
           {/* ── Tab: Enviar ahora ── */}
           {tab === 'ahora' && (
             <>
               <div>
-                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                  Destinatarios *
-                </label>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Destinatarios *</label>
                 <div className="flex gap-2">
-                  <input
-                    type="email"
-                    placeholder="correo@ejemplo.com"
-                    value={emailInput}
+                  <input type="email" placeholder="correo@ejemplo.com" value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     onKeyDown={e => (e.key === 'Enter' || e.key === ',') && (e.preventDefault(), addEmail(emails, setEmails, emailInput, setEmailInput))}
                     className="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
-                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
-                  />
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
                   <button onClick={() => addEmail(emails, setEmails, emailInput, setEmailInput)}
-                    className="px-3 py-2 rounded-xl text-sm font-medium transition-colors"
+                    className="px-3 py-2 rounded-xl transition-colors"
                     style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8', border: '1px solid rgba(129,140,248,0.3)' }}>
                     <Plus className="w-4 h-4" />
                   </button>
@@ -207,8 +226,7 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
                     {emails.map(e => (
                       <span key={e} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
                         style={{ background: 'rgba(129,140,248,0.1)', color: '#818cf8', border: '1px solid rgba(129,140,248,0.2)' }}>
-                        {e}
-                        <button onClick={() => removeEmail(emails, setEmails, e)}><X className="w-3 h-3" /></button>
+                        {e}<button onClick={() => removeEmail(emails, setEmails, e)}><X className="w-3 h-3" /></button>
                       </span>
                     ))}
                   </div>
@@ -225,14 +243,14 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
 
               <div>
                 <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Mensaje adicional (opcional)</label>
-                <textarea rows={3} placeholder="Escribe un mensaje introductorio para el correo…"
+                <textarea rows={3} placeholder="Escribe un mensaje introductorio…"
                   value={message} onChange={e => setMessage(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
                   style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
               </div>
 
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Se enviarán las actividades con los filtros activos en este momento (estado, empresa, período).
+                Se enviarán las actividades con los filtros activos en este momento.
               </p>
 
               <button onClick={handleSendNow} disabled={sending || !emails.length}
@@ -268,10 +286,11 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
                   </button>
                 </div>
 
-                {/* Days of week */}
+                {/* Days */}
                 <div>
                   <label className="text-xs font-medium block mb-2" style={{ color: 'var(--text-muted)' }}>
                     <Calendar className="w-3.5 h-3.5 inline mr-1" />Días de envío
+                    <span className="ml-2 opacity-60">(Sáb = informe semanal)</span>
                   </label>
                   <div className="flex gap-1.5 flex-wrap">
                     {DIAS.map((d, i) => (
@@ -318,13 +337,75 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
                   </div>
                 </div>
 
+                {/* Agents filter */}
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    <Users className="w-3.5 h-3.5 inline mr-1" />Agentes a incluir
+                    <span className="ml-1 opacity-60">(vacío = todos)</span>
+                  </label>
+
+                  {/* Selected agents chips */}
+                  {schedAgentIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {schedAgentIds.map(id => {
+                        const agent = allAgents.find(a => a.id === id);
+                        if (!agent) return null;
+                        return (
+                          <span key={id} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
+                            style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}>
+                            {agent.firstName} {agent.lastName}
+                            <button onClick={() => toggleAgent(id)}><X className="w-3 h-3" /></button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Search + list */}
+                  <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)' }}>
+                    <div className="flex items-center gap-2 px-3 py-2" style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border-subtle)' }}>
+                      <Search className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                      <input placeholder="Buscar agente…" value={agentSearch}
+                        onChange={e => setAgentSearch(e.target.value)}
+                        className="flex-1 bg-transparent text-xs outline-none placeholder:opacity-50"
+                        style={{ color: 'var(--text-primary)' }} />
+                    </div>
+                    <div className="max-h-36 overflow-y-auto">
+                      {filteredAgents.length === 0 ? (
+                        <p className="text-xs text-center py-3" style={{ color: 'var(--text-muted)' }}>Sin agentes</p>
+                      ) : filteredAgents.map(agent => {
+                        const selected = schedAgentIds.includes(agent.id);
+                        return (
+                          <button key={agent.id} onClick={() => toggleAgent(agent.id)}
+                            className="w-full flex items-center justify-between px-3 py-2 text-xs transition-colors hover:bg-white/5"
+                            style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                            <div className="text-left">
+                              <span style={{ color: 'var(--text-primary)', fontWeight: selected ? 600 : 400 }}>
+                                {agent.firstName} {agent.lastName}
+                              </span>
+                              {agent.jobTitle && (
+                                <span className="block opacity-50" style={{ color: 'var(--text-muted)', fontSize: 10 }}>{agent.jobTitle}</span>
+                              )}
+                            </div>
+                            <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                              style={selected
+                                ? { background: '#34d399', border: '1px solid #34d399' }
+                                : { border: '1px solid var(--border-subtle)' }}>
+                              {selected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Recipients */}
                 <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Destinatarios</label>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Destinatarios del correo</label>
                   <div className="flex gap-2">
                     <input type="email" placeholder="correo@ejemplo.com"
-                      value={schedEmailInput}
-                      onChange={e => setSchedEmailInput(e.target.value)}
+                      value={schedEmailInput} onChange={e => setSchedEmailInput(e.target.value)}
                       onKeyDown={e => (e.key === 'Enter' || e.key === ',') && (e.preventDefault(), addEmail(schedEmails, setSchedEmails, schedEmailInput, setSchedEmailInput))}
                       className="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
                       style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
@@ -339,8 +420,7 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
                       {schedEmails.map(e => (
                         <span key={e} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
                           style={{ background: 'rgba(129,140,248,0.1)', color: '#818cf8', border: '1px solid rgba(129,140,248,0.2)' }}>
-                          {e}
-                          <button onClick={() => removeEmail(schedEmails, setSchedEmails, e)}><Trash2 className="w-3 h-3" /></button>
+                          {e}<button onClick={() => removeEmail(schedEmails, setSchedEmails, e)}><Trash2 className="w-3 h-3" /></button>
                         </span>
                       ))}
                     </div>

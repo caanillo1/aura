@@ -908,7 +908,7 @@ export class ProjectsService {
 
   async sendActivitiesReport(
     companyId: string,
-    dto: Pick<SendActivityReportDto, 'emails' | 'subject' | 'message' | 'status' | 'clientId' | 'dateFrom' | 'dateTo'>,
+    dto: Pick<SendActivityReportDto, 'emails' | 'subject' | 'message' | 'status' | 'clientId' | 'dateFrom' | 'dateTo' | 'agentIds'>,
   ): Promise<{ enviados: number; destinatarios: number }> {
     const dateWhere: any = {};
     if (dto.dateFrom) dateWhere.gte = new Date(dto.dateFrom);
@@ -919,12 +919,21 @@ export class ProjectsService {
       phase: { projectModule: { project: { serviceOrder: { companyId, ...(dto.clientId ? { clientId: dto.clientId } : {}) } } } },
     };
     if (dto.status?.length) where.status = { in: dto.status };
+
+    const andConditions: any[] = [];
     if (Object.keys(dateWhere).length) {
-      where.OR = [
+      andConditions.push({ OR: [
         { threads: { some: { createdAt: dateWhere } } },
         { executionDate: dateWhere },
-      ];
+      ]});
     }
+    if (dto.agentIds?.length) {
+      andConditions.push({ OR: [
+        { assignedToId: { in: dto.agentIds } },
+        { threads: { some: { authorId: { in: dto.agentIds } } } },
+      ]});
+    }
+    if (andConditions.length) where.AND = andConditions;
 
     const activities = await this.prisma.activity.findMany({
       where, orderBy: { updatedAt: 'desc' }, take: 1000,

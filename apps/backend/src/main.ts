@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -26,6 +27,9 @@ async function bootstrap() {
     }
   }
   app.enableCors({ origin: rawOrigins.map((o) => o.trim()), credentials: true });
+
+  // Filtro global de errores de Prisma
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   // Validación global
   app.useGlobalPipes(

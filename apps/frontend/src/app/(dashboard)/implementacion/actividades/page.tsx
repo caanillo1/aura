@@ -11,7 +11,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   Tooltip as ReTooltip, Cell,
 } from 'recharts';
-import { projectsApi } from '@/lib/api';
+import { projectsApi, clientsApi } from '@/lib/api';
 import type { GlobalActivity } from '@/types';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -678,15 +678,13 @@ export default function ActividadesRealizadasPage() {
 
   const dateRange = useMemo(() => presetToRange(preset, customRange), [preset, customRange]);
 
-  // Extract distinct clients from loaded data
-  const allClients = useMemo(() => {
-    const map = new Map<string, string>();
-    activities.forEach(a => {
-      const c = a.phase.projectModule.project.serviceOrder.client;
-      map.set(c.id, c.businessName);
-    });
-    return [...map.entries()].map(([id, businessName]) => ({ id, businessName }));
-  }, [activities]);
+  // Clients loaded independently from the backend
+  const [allClients, setAllClients] = useState<{ id: string; businessName: string }[]>([]);
+  useEffect(() => {
+    clientsApi.list({ limit: 500 }).then(res => {
+      setAllClients(res.data.map((c: any) => ({ id: c.id, businessName: c.businessName })));
+    }).catch(() => {});
+  }, []);
 
   const filteredClients = useMemo(() => {
     if (!clientSearch.trim()) return allClients;
@@ -890,9 +888,7 @@ export default function ActividadesRealizadasPage() {
               <div className="absolute z-30 mt-1 w-full rounded-xl shadow-xl overflow-hidden"
                 style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
                 {filteredClients.length === 0 ? (
-                  <p className="px-3 py-3 text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-                    {activities.length === 0 ? 'Carga actividades primero' : 'Sin resultados'}
-                  </p>
+                  <p className="px-3 py-3 text-xs text-center" style={{ color: 'var(--text-muted)' }}>Sin resultados</p>
                 ) : (
                   <ul className="max-h-52 overflow-y-auto">
                     {filteredClients.map(c => (

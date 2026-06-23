@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsUUID, IsNumber, Min, Max, IsDateString, IsIn, ValidateNested, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsNumber, Min, Max, IsDateString, IsIn, ValidateNested, IsArray, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
@@ -96,4 +96,27 @@ export class GlobalActivitiesFilterDto extends PaginationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() clientId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() dateFrom?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() dateTo?: string;
+}
+
+export class SendActivityReportDto {
+  @ApiProperty() @IsArray() @IsString({ each: true }) emails: string[];
+  @ApiPropertyOptional() @IsOptional() @IsString() subject?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() message?: string;
+  @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true })
+  @Transform(({ value }) => Array.isArray(value) ? value : value ? [value] : undefined)
+  status?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsString() clientId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() dateFrom?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() dateTo?: string;
+}
+
+export class SaveActivityScheduleDto {
+  @ApiProperty() @IsBoolean() @Transform(({ value }) => value === true || value === 'true') enabled: boolean;
+  @ApiProperty() @IsArray() @IsNumber({}, { each: true }) @Type(() => Number) diasSemana: number[];
+  @ApiProperty() @IsNumber() @Min(0) @Max(23) @Type(() => Number) hora: number;
+  @ApiProperty() @IsNumber() @Min(0) @Max(59) @Type(() => Number) minuto: number;
+  @ApiProperty() @IsArray() @IsString({ each: true }) status: string[];
+  @ApiProperty() @IsArray() @IsString({ each: true }) destinatarios: string[];
+  @ApiPropertyOptional() @IsOptional() @IsString() asunto?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() mensaje?: string;
 }

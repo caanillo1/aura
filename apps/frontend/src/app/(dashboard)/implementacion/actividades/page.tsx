@@ -4,7 +4,8 @@ import {
   CheckSquare, RefreshCw, Search, X, ChevronDown, ChevronRight,
   Clock, CheckCircle2, Loader2, Ban, AlertTriangle,
   User, Building2, Layers, GitBranch, Activity,
-  List, Kanban, Users, LayoutGrid, BarChart3, PieChart,
+  List, Kanban, Users, LayoutGrid, PieChart,
+  FileDown, Mail,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
@@ -16,6 +17,7 @@ import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import AutomationModal from './components/AutomationModal';
 dayjs.locale('es');
 dayjs.extend(relativeTime);
 
@@ -549,8 +551,95 @@ function LoadMoreBtn({ loading, remaining, onLoad }: { loading: boolean; remaini
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+async function exportPDF(activities: GlobalActivity[], presetLabel: string, statuses: string[]) {
+  if (!activities.length) { return; }
+  const { jsPDF } = await import('jspdf') as any;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  const STATUS_LABELS: Record<string, string> = { completado: 'Completado', en_progreso: 'En progreso', bloqueado: 'Bloqueado' };
+  const pageW = 297;
+  const margin = 14;
+  let y = 18;
+
+  // Header
+  doc.setFillColor(15, 22, 41);
+  doc.rect(0, 0, pageW, 28, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Actividades Realizadas', margin, 12);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(148, 163, 184);
+  doc.text(`Período: ${presetLabel}  ·  Estados: ${statuses.map(s => STATUS_LABELS[s] || s).join(', ')}  ·  Total: ${activities.length}  ·  ${dayjs().format('DD/MM/YYYY HH:mm')}`, margin, 21);
+
+  y = 36;
+  doc.setTextColor(71, 85, 105);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+
+  // Column definitions [label, x, width, align]
+  const cols: [string, number, number, 'left'|'right'][] = [
+    ['Actividad',      margin,  62, 'left'],
+    ['Empresa',        78,      45, 'left'],
+    ['OS',             125,     22, 'left'],
+    ['Módulo',         149,     38, 'left'],
+    ['Implementador',  189,     38, 'left'],
+    ['Estado',         229,     30, 'left'],
+    ['%',              261,     14, 'right'],
+  ];
+
+  // Table header bg
+  doc.setFillColor(241, 245, 249);
+  doc.rect(margin, y - 5, pageW - margin * 2, 8, 'F');
+  cols.forEach(([label, x, , align]) => {
+    doc.text(label, align === 'right' ? x + cols.find(c => c[1] === x)![2] : x, y, { align });
+  });
+
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+
+  const STATUS_COLORS_RGB: Record<string, [number,number,number]> = {
+    completado:  [52,  211, 153],
+    en_progreso: [96,  165, 250],
+    bloqueado:   [248, 113, 113],
+  };
+
+  activities.forEach((a, i) => {
+    if (y > 188) { doc.addPage(); y = 18; }
+    if (i % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin, y - 4.5, pageW - margin * 2, 7, 'F');
+    }
+    doc.setTextColor(30, 41, 59);
+    const so = a.phase.projectModule.project.serviceOrder;
+    const impl = resolveImplementor(a);
+    const pct = Math.round(Number(a.progressPercent));
+    const trunc = (s: string, max: number) => s.length > max ? s.slice(0, max - 1) + '…' : s;
+
+    doc.text(trunc(a.name, 38), margin, y);
+    doc.text(trunc(so.client.businessName, 27), 78, y);
+    doc.text(so.osNumber, 125, y);
+    doc.text(trunc(a.phase.projectModule.name, 22), 149, y);
+    doc.text(trunc(impl, 22), 189, y);
+
+    const [r, g, b] = STATUS_COLORS_RGB[a.status] ?? [148, 163, 184];
+    doc.setTextColor(r, g, b);
+    doc.text(STATUS_LABELS[a.status] ?? a.status, 229, y);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`${pct}%`, 261 + 14, y, { align: 'right' });
+
+    y += 7;
+  });
+
+  doc.save(`actividades-realizadas-${dayjs().format('YYYY-MM-DD')}.pdf`);
+}
+
 export default function ActividadesRealizadasPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('lista');
+  const [automationOpen, setAutomationOpen] = useState(false);
+  const [exportingPDF, setExportingPDF]     = useState(false);
 
   // Filters
   const [preset, setPreset]             = useState<DatePreset>('today');
@@ -669,6 +758,27 @@ export default function ActividadesRealizadasPage() {
               );
             })}
           </div>
+
+          <button
+            onClick={async () => {
+              setExportingPDF(true);
+              try { await exportPDF(activities, DATE_PRESETS.find(p => p.id === preset)?.label ?? preset, statuses); }
+              catch { toast.error('Error al generar el PDF'); }
+              finally { setExportingPDF(false); }
+            }}
+            disabled={exportingPDF || activities.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+            {exportingPDF ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            PDF
+          </button>
+
+          <button onClick={() => setAutomationOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors"
+            style={{ background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)', color: '#818cf8' }}>
+            <Mail className="w-4 h-4" />
+            Automatización
+          </button>
 
           <button onClick={() => fetchData(1)} disabled={loading}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors"
@@ -808,6 +918,17 @@ export default function ActividadesRealizadasPage() {
       )}
       {viewMode === 'tarjetas'      && <TarjetasView {...commonProps} />}
       {viewMode === 'resumen'       && <ResumenView activities={activities} loading={loading} />}
+
+      <AutomationModal
+        open={automationOpen}
+        onClose={() => setAutomationOpen(false)}
+        activeFilters={{
+          status:   statuses,
+          clientId: selectedClientId,
+          dateFrom: dateRange.from,
+          dateTo:   dateRange.to,
+        }}
+      />
     </div>
   );
 }

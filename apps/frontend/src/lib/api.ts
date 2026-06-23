@@ -468,6 +468,12 @@ export const projectsApi = {
       page: number;
       limit: number;
     }>,
+  sendActivityReport: (body: { emails: string[]; subject?: string; message?: string; status?: string[]; clientId?: string; dateFrom?: string; dateTo?: string }) =>
+    api.post('/projects/activities/send-report', body).then((r) => r.data) as Promise<{ enviados: number; destinatarios: number }>,
+  getActivityReportSchedule: () =>
+    api.get('/projects/activities/report-schedule').then((r) => r.data),
+  saveActivityReportSchedule: (body: { enabled: boolean; diasSemana: number[]; hora: number; minuto: number; status: string[]; destinatarios: string[]; asunto?: string; mensaje?: string }) =>
+    api.patch('/projects/activities/report-schedule', body).then((r) => r.data),
   loadTemplate: (id: string, data: {
     templateFlowId: string;
     phaseDates?: { templatePhaseId: string; startDate?: string; endDate?: string }[];

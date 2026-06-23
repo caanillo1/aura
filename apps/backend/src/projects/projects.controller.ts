@@ -8,7 +8,8 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import type { JwtUser } from '../common/decorators/get-user.decorator';
 import { ProjectsService } from './projects.service';
-import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto } from './dto/project.dto';
+import { ActivityReportSchedulerService } from './activity-report-scheduler.service';
+import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto, SendActivityReportDto, SaveActivityScheduleDto } from './dto/project.dto';
 
 const IMPL_ROLES = ['admin', 'coordinator', 'implementer_clinical', 'implementer_financial', 'implementer_support'] as const;
 
@@ -17,7 +18,10 @@ const IMPL_ROLES = ['admin', 'coordinator', 'implementer_clinical', 'implementer
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly svc: ProjectsService) {}
+  constructor(
+    private readonly svc: ProjectsService,
+    private readonly scheduler: ActivityReportSchedulerService,
+  ) {}
 
   @Get()
   @Roles(...IMPL_ROLES)
@@ -87,6 +91,27 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Listado global de actividades no pendientes' })
   getGlobalActivities(@GetUser() user: JwtUser, @Query() dto: GlobalActivitiesFilterDto) {
     return this.svc.getGlobalActivities(user.companyId, dto);
+  }
+
+  @Post('activities/send-report')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Enviar reporte de actividades por correo' })
+  sendReport(@GetUser() user: JwtUser, @Body() dto: SendActivityReportDto) {
+    return this.svc.sendActivitiesReport(user.companyId, dto);
+  }
+
+  @Get('activities/report-schedule')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Obtener configuración de automatización de reporte' })
+  getSchedule(@GetUser() user: JwtUser) {
+    return this.scheduler.getSchedule(user.companyId);
+  }
+
+  @Patch('activities/report-schedule')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Guardar configuración de automatización de reporte' })
+  saveSchedule(@GetUser() user: JwtUser, @Body() dto: SaveActivityScheduleDto) {
+    return this.scheduler.saveSchedule(user.companyId, dto);
   }
 
   @Patch('activities/:activityId')

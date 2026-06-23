@@ -2,9 +2,10 @@ import { randomUUID } from 'crypto';
 import { Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate, buildMeta } from '../common/dto/pagination.dto';
-import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto } from './dto/project.dto';
+import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto, SendActivityReportDto } from './dto/project.dto';
 import { EventsGateway } from '../gateway/events.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class ProjectsService {
@@ -13,6 +14,7 @@ export class ProjectsService {
     private prisma: PrismaService,
     private gateway: EventsGateway,
     private notifications: NotificationsService,
+    private mailService: MailService,
   ) {}
 
   async findAll(companyId: string, dto: ProjectFilterDto) {
@@ -846,5 +848,88 @@ export class ProjectsService {
     ]);
 
     return { data, total, page: dto.page ?? 1, limit: take };
+  }
+
+  async sendActivitiesReport(
+    companyId: string,
+    dto: Pick<SendActivityReportDto, 'emails' | 'subject' | 'message' | 'status' | 'clientId' | 'dateFrom' | 'dateTo'>,
+  ): Promise<{ enviados: number; destinatarios: number }> {
+    const dateWhere: any = {};
+    if (dto.dateFrom) dateWhere.gte = new Date(dto.dateFrom);
+    if (dto.dateTo) { const to = new Date(dto.dateTo); to.setUTCHours(23, 59, 59, 999); dateWhere.lte = to; }
+
+    const where: any = {
+      NOT: { status: 'pendiente' },
+      phase: { projectModule: { project: { serviceOrder: { companyId, ...(dto.clientId ? { clientId: dto.clientId } : {}) } } } },
+    };
+    if (dto.status?.length) where.status = { in: dto.status };
+    if (Object.keys(dateWhere).length) where.updatedAt = dateWhere;
+
+    const activities = await this.prisma.activity.findMany({
+      where, orderBy: { updatedAt: 'desc' }, take: 1000,
+      select: {
+        name: true, status: true, progressPercent: true, updatedAt: true,
+        assignedTo: { select: { firstName: true, lastName: true } },
+        threads: { take: 1, orderBy: { createdAt: 'desc' as const }, select: { author: { select: { firstName: true, lastName: true } } } },
+        phase: { select: { name: true, projectModule: { select: { name: true, project: { select: { serviceOrder: { select: { osNumber: true, client: { select: { businessName: true } } } } } } } } } },
+      },
+    });
+
+    const STATUS_LABELS: Record<string, string> = { completado: 'Completado', en_progreso: 'En progreso', bloqueado: 'Bloqueado', pendiente: 'Pendiente' };
+    const STATUS_COLORS: Record<string, string> = { completado: '#34d399', en_progreso: '#60a5fa', bloqueado: '#f87171', pendiente: '#94a3b8' };
+
+    const rows = activities.map(a => {
+      const impl = a.assignedTo ? `${a.assignedTo.firstName} ${a.assignedTo.lastName}`
+        : a.threads[0]?.author ? `${a.threads[0].author.firstName} ${a.threads[0].author.lastName}` : 'Sin asignar';
+      const so = a.phase.projectModule.project.serviceOrder;
+      const color = STATUS_COLORS[a.status] ?? '#94a3b8';
+      const label = STATUS_LABELS[a.status] ?? a.status;
+      const pct = Math.round(Number(a.progressPercent));
+      return `<tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;max-width:220px">${a.name}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">${so.client.businessName}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px">${so.osNumber}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">${a.phase.projectModule.name}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">${a.phase.name}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">${impl}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0">
+          <span style="background:${color}20;color:${color};padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600">${label}</span>
+        </td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600">${pct}%</td>
+      </tr>`;
+    }).join('');
+
+    const period = dto.dateFrom === dto.dateTo
+      ? (dto.dateFrom ?? 'Sin filtro')
+      : `${dto.dateFrom ?? ''} — ${dto.dateTo ?? ''}`;
+
+    const html = `
+<div style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;color:#1e293b">
+  <div style="background:#0f1629;padding:24px 32px;border-radius:12px 12px 0 0">
+    <h2 style="color:#fff;margin:0 0 4px">Reporte de Actividades Realizadas</h2>
+    <p style="color:#94a3b8;margin:0;font-size:14px">Período: ${period} · Total: ${activities.length} actividades</p>
+  </div>
+  ${dto.message ? `<div style="background:#f8fafc;padding:16px 32px;border-left:4px solid #818cf8;font-size:14px">${dto.message}</div>` : ''}
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr style="background:#f1f5f9">
+        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600;white-space:nowrap">Actividad</th>
+        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Empresa</th>
+        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">OS</th>
+        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Módulo</th>
+        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Fase</th>
+        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Implementador</th>
+        <th style="padding:10px 12px;text-align:left;color:#475569;font-weight:600">Estado</th>
+        <th style="padding:10px 12px;text-align:right;color:#475569;font-weight:600">%</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <p style="color:#94a3b8;font-size:12px;padding:16px 32px">Generado automáticamente por AURA ERP</p>
+</div>`;
+
+    const subject = dto.subject || `Reporte Actividades – ${new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    await this.mailService.sendFromCompany(companyId, dto.emails, subject, html);
+    return { enviados: activities.length, destinatarios: dto.emails.length };
   }
 }

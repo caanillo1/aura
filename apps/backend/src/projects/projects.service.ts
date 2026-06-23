@@ -793,7 +793,6 @@ export class ProjectsService {
     };
     if (Object.keys(dateWhere).length) {
       where.OR = [
-        { updatedAt:       dateWhere },
         { executionDate:   dateWhere },
         { actualStartDate: dateWhere },
         { threads: { some: { createdAt: dateWhere } } },
@@ -859,8 +858,7 @@ export class ProjectsService {
     if (dto.status?.length) where.status = { in: dto.status };
     if (Object.keys(dateWhere).length) {
       where.OR = [
-        { updatedAt:      dateWhere },
-        { executionDate:  dateWhere },
+        { executionDate:   dateWhere },
         { actualStartDate: dateWhere },
         { threads: { some: { createdAt: dateWhere } } },
       ];
@@ -922,7 +920,6 @@ export class ProjectsService {
     if (dto.status?.length) where.status = { in: dto.status };
     if (Object.keys(dateWhere).length) {
       where.OR = [
-        { updatedAt:       dateWhere },
         { executionDate:   dateWhere },
         { actualStartDate: dateWhere },
         { threads: { some: { createdAt: dateWhere } } },

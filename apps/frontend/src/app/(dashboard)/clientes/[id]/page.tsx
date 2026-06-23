@@ -351,7 +351,7 @@ export default function ClienteDetailPage() {
       toast.success('Funcionario eliminado');
       setClient(prev => prev ? { ...prev, staff: prev.staff.filter(s => s.id !== deleteTarget.id) } : prev);
       setDeleteTarget(null);
-    } catch { toast.error('Error al eliminar funcionario'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al eliminar funcionario'); }
     finally { setDeleting(false); }
   };
 

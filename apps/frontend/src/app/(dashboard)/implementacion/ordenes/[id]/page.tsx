@@ -199,7 +199,7 @@ export default function OrdenDetailPage() {
         }),
       ]);
       toast.success('Destinatarios guardados');
-    } catch { toast.error('Error al guardar destinatarios'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al guardar destinatarios'); }
     finally { setSavingCorreos(false); }
   };
 
@@ -433,7 +433,7 @@ export default function OrdenDetailPage() {
       await serviceOrdersApi.removeImplementer(id, userId);
       toast.success('Implementador removido');
       load();
-    } catch { toast.error('Error al remover implementador'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al remover implementador'); }
   };
 
   const handleAddNote = async () => {
@@ -475,7 +475,7 @@ export default function OrdenDetailPage() {
       setNoteSubtype('');
       setNoteMitigation('');
       load();
-    } catch { toast.error('Error al agregar la nota'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al agregar la nota'); }
     finally { setSavingNote(false); }
   };
 
@@ -485,7 +485,7 @@ export default function OrdenDetailPage() {
       await serviceOrdersApi.deleteHistoryEntry(id, historyId);
       toast.success('Entrada eliminada');
       load();
-    } catch { toast.error('Error al eliminar la entrada'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al eliminar la entrada'); }
   };
 
   const loadCapacitaciones = async () => {
@@ -621,8 +621,8 @@ export default function OrdenDetailPage() {
       a.download = `plan-trabajo-${os.osNumber ?? 'doc'}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Error al generar el Plan de Trabajo');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al generar el Plan de Trabajo');
     } finally {
       setDownloadingPlan(false);
     }

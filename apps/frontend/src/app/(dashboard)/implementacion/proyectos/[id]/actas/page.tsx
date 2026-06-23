@@ -157,7 +157,7 @@ function FirmantesPanel({ acta, userSignature, onSetupSignature, onClose, onRefr
       ));
       toast.success('Firma registrada');
       onRefresh();
-    } catch { toast.error('Error al firmar'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al firmar'); }
     finally { setSigning(null); }
   };
 
@@ -336,7 +336,7 @@ function SetupSignatureModal({ onClose, onSaved }: {
       await usersApi.updateSignature(data);
       toast.success('Firma guardada en tu perfil');
       onSaved(data);
-    } catch { toast.error('Error al guardar la firma'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al guardar la firma'); }
     finally { setSaving(false); }
   };
 
@@ -473,7 +473,7 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
         ? { ...row, signatureData: userSignature, signedAt: now, signerType: 'agent' }
         : row));
       toast.success('Firma registrada');
-    } catch { toast.error('Error al registrar la firma'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al registrar la firma'); }
     finally { setAgentSigning(null); }
   };
 
@@ -1882,7 +1882,7 @@ function BrandingConfigModal({ company, onClose, onSaved }: {
       toast.success('Branding actualizado');
       onSaved({ ...company, ...updated, logoData: logoPreview });
       onClose();
-    } catch { toast.error('Error al guardar el branding'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al guardar el branding'); }
     finally { setSaving(false); }
   };
 
@@ -2199,7 +2199,7 @@ export default function ActasPage() {
       setActas(prev => prev.filter(a => a.id !== deleteId));
       setDeleteId(null);
       toast.success('Acta eliminada');
-    } catch { toast.error('Error al eliminar'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al eliminar'); }
     finally { setDeleting(false); }
   };
 
@@ -2209,7 +2209,7 @@ export default function ActasPage() {
       await actasApi.finalize(actaId);
       setActas(prev => prev.map(a => a.id === actaId ? { ...a, status: 'finalizado' } : a));
       toast.success('Acta finalizada');
-    } catch { toast.error('Error al finalizar'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al finalizar'); }
     finally { setFinalizing(null); }
   };
 
@@ -2219,7 +2219,7 @@ export default function ActasPage() {
     try {
       const fresh = await actasApi.get(actaId);
       setPrintActa(fresh);
-    } catch { toast.error('Error al cargar el acta'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al cargar el acta'); }
     finally { setPrintLoading(null); }
   };
 

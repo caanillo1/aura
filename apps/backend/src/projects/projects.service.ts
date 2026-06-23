@@ -811,6 +811,12 @@ export class ProjectsService {
       id: true, code: true, name: true, status: true, priority: true,
       progressPercent: true, actualHours: true, updatedAt: true,
       assignedTo: { select: { id: true, firstName: true, lastName: true } },
+      clientStaff: { select: { id: true, firstName: true, lastName: true } },
+      activityThreads: {
+        take: 1,
+        orderBy: { createdAt: 'desc' as const },
+        select: { author: { select: { id: true, firstName: true, lastName: true } } },
+      },
       phase: {
         select: {
           id: true, name: true,

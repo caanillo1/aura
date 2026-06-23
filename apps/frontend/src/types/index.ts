@@ -377,6 +377,8 @@ export interface GlobalActivity {
   actualHours: number;
   updatedAt: string;
   assignedTo: { id: string; firstName: string; lastName: string } | null;
+  clientStaff: { id: string; firstName: string; lastName: string } | null;
+  activityThreads: { author: { id: string; firstName: string; lastName: string } }[];
   phase: {
     id: string;
     name: string;

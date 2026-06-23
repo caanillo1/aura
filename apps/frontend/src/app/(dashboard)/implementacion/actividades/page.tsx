@@ -1,10 +1,15 @@
 'use client';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  CheckSquare, RefreshCw, Search, X, ChevronDown,
+  CheckSquare, RefreshCw, Search, X, ChevronDown, ChevronRight,
   Clock, CheckCircle2, Loader2, Ban, AlertTriangle,
   User, Building2, Layers, GitBranch, Activity,
+  List, Kanban, Users, LayoutGrid, BarChart3, PieChart,
 } from 'lucide-react';
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
+  Tooltip as ReTooltip, Cell,
+} from 'recharts';
 import { projectsApi } from '@/lib/api';
 import type { GlobalActivity } from '@/types';
 import { toast } from 'sonner';
@@ -20,46 +25,541 @@ function normalize(s: string) {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
+function resolveImplementor(a: GlobalActivity): string {
+  if (a.assignedTo) return `${a.assignedTo.firstName} ${a.assignedTo.lastName}`;
+  if (a.activityThreads?.[0]?.author) {
+    const au = a.activityThreads[0].author;
+    return `${au.firstName} ${au.lastName}`;
+  }
+  if (a.clientStaff) return `${a.clientStaff.firstName} ${a.clientStaff.lastName}`;
+  return 'Sin asignar';
+}
+
 type DatePreset = 'today' | 'yesterday' | 'last7' | 'month' | 'custom';
+type ViewMode = 'lista' | 'kanban' | 'empresa' | 'implementador' | 'tarjetas' | 'resumen';
 
 interface DateRange { from: string; to: string }
 
 function presetToRange(preset: DatePreset, custom: DateRange): DateRange {
   const today = dayjs().format('YYYY-MM-DD');
-  if (preset === 'today')     return { from: today,                             to: today };
-  if (preset === 'yesterday') return { from: dayjs().subtract(1, 'd').format('YYYY-MM-DD'), to: dayjs().subtract(1, 'd').format('YYYY-MM-DD') };
+  if (preset === 'today')     return { from: today, to: today };
+  if (preset === 'yesterday') { const y = dayjs().subtract(1, 'd').format('YYYY-MM-DD'); return { from: y, to: y }; }
   if (preset === 'last7')     return { from: dayjs().subtract(6, 'd').format('YYYY-MM-DD'), to: today };
   if (preset === 'month')     return { from: dayjs().startOf('month').format('YYYY-MM-DD'), to: today };
   return custom;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  completado:   { label: 'Completado',  color: '#34d399', bg: 'rgba(52,211,153,0.12)',  icon: CheckCircle2  },
-  en_progreso:  { label: 'En progreso', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  icon: Activity      },
-  bloqueado:    { label: 'Bloqueado',   color: '#f87171', bg: 'rgba(248,113,113,0.12)', icon: Ban           },
+  completado:  { label: 'Completado',  color: '#34d399', bg: 'rgba(52,211,153,0.12)',  icon: CheckCircle2 },
+  en_progreso: { label: 'En progreso', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  icon: Activity     },
+  bloqueado:   { label: 'Bloqueado',   color: '#f87171', bg: 'rgba(248,113,113,0.12)', icon: Ban          },
 };
 
 const ALL_STATUSES = ['completado', 'en_progreso', 'bloqueado'];
 
 const DATE_PRESETS: { id: DatePreset; label: string }[] = [
-  { id: 'today',     label: 'Hoy'           },
-  { id: 'yesterday', label: 'Ayer'          },
+  { id: 'today',     label: 'Hoy'            },
+  { id: 'yesterday', label: 'Ayer'           },
   { id: 'last7',     label: 'Últimos 7 días' },
-  { id: 'month',     label: 'Mes actual'    },
-  { id: 'custom',    label: 'Rango libre'   },
+  { id: 'month',     label: 'Mes actual'     },
+  { id: 'custom',    label: 'Rango libre'    },
 ];
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const VIEWS: { id: ViewMode; label: string; icon: React.ElementType }[] = [
+  { id: 'lista',         label: 'Lista',             icon: List       },
+  { id: 'kanban',        label: 'Kanban',            icon: Kanban     },
+  { id: 'empresa',       label: 'Por empresa',       icon: Building2  },
+  { id: 'implementador', label: 'Por implementador', icon: Users      },
+  { id: 'tarjetas',      label: 'Tarjetas',          icon: LayoutGrid },
+  { id: 'resumen',       label: 'Resumen',           icon: PieChart   },
+];
+
+// ── Shared sub-components ─────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.completado;
+  const Icon = cfg.icon;
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
+      style={{ background: cfg.bg, color: cfg.color }}>
+      <Icon className="w-3 h-3" />
+      {cfg.label}
+    </span>
+  );
+}
+
+function ProgressBar({ pct, color }: { pct: number; color: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)', minWidth: 60 }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="text-xs font-mono w-7 text-right shrink-0" style={{ color: 'var(--text-muted)' }}>{pct}%</span>
+    </div>
+  );
+}
+
+function ActivityCard({ a }: { a: GlobalActivity }) {
+  const cfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.completado;
+  const so = a.phase.projectModule.project.serviceOrder;
+  const implementor = resolveImplementor(a);
+  const pct = Math.round(Number(a.progressPercent));
+  return (
+    <div className="rounded-xl p-4 space-y-3 transition-shadow hover:shadow-md"
+      style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
+      <div className="flex items-start justify-between gap-2">
+        <StatusBadge status={a.status} />
+        <span className="text-xs font-mono shrink-0" style={{ color: 'var(--text-muted)' }}>{so.osNumber}</span>
+      </div>
+      <div>
+        <p className="font-semibold text-sm leading-snug line-clamp-2" style={{ color: 'var(--text-primary)' }}>{a.name}</p>
+        <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--text-secondary)' }}>{so.client.businessName}</p>
+      </div>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <Layers className="w-3 h-3 shrink-0" />
+          <span className="truncate">{a.phase.projectModule.name}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <GitBranch className="w-3 h-3 shrink-0" />
+          <span className="truncate">{a.phase.name}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <User className="w-3 h-3 shrink-0" />
+          <span className="truncate">{implementor}</span>
+        </div>
+      </div>
+      <ProgressBar pct={pct} color={cfg.color} />
+      <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
+        <Clock className="w-3 h-3" />
+        {dayjs(a.updatedAt).fromNow()}
+      </div>
+    </div>
+  );
+}
+
+// ── View: Lista ───────────────────────────────────────────────────────────────
+
+function ListView({ activities, loading, total, page, onLoadMore }: {
+  activities: GlobalActivity[]; loading: boolean; total: number; page: number;
+  onLoadMore: () => void;
+}) {
+  const hasMore = activities.length < total;
+  if (loading && activities.length === 0) return <LoadingState />;
+  if (activities.length === 0) return <EmptyState />;
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)', background: 'var(--card-bg)' }}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-2)' }}>
+              {['Actividad', 'Empresa / OS', 'Módulo', 'Fase', 'Implementador', 'Estado', 'Progreso', 'Actualizado'].map(h => (
+                <th key={h} className="px-4 py-3 text-left text-xs font-semibold whitespace-nowrap"
+                  style={{ color: 'var(--text-muted)' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {activities.map((a, i) => {
+              const cfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.completado;
+              const so = a.phase.projectModule.project.serviceOrder;
+              const pct = Math.round(Number(a.progressPercent));
+              return (
+                <tr key={a.id} className="transition-colors hover:bg-white/[0.03]"
+                  style={{ borderBottom: i < activities.length - 1 ? '1px solid var(--border-subtle)' : undefined }}>
+                  <td className="px-4 py-3 max-w-[240px]">
+                    <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{a.name}</p>
+                    {a.code && <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{a.code}</p>}
+                  </td>
+                  <td className="px-4 py-3 max-w-[180px]">
+                    <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{so.client.businessName}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{so.osNumber}</p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                      <span className="truncate max-w-[130px] text-xs" style={{ color: 'var(--text-secondary)' }}>{a.phase.projectModule.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <GitBranch className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                      <span className="truncate max-w-[130px] text-xs" style={{ color: 'var(--text-secondary)' }}>{a.phase.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{resolveImplementor(a)}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+                  <td className="px-4 py-3 min-w-[100px]"><ProgressBar pct={pct} color={cfg.color} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{dayjs(a.updatedAt).fromNow()}</span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {hasMore && <LoadMoreBtn loading={loading} remaining={total - activities.length} onLoad={onLoadMore} />}
+    </div>
+  );
+}
+
+// ── View: Kanban ──────────────────────────────────────────────────────────────
+
+function KanbanView({ activities, loading }: { activities: GlobalActivity[]; loading: boolean }) {
+  if (loading && activities.length === 0) return <LoadingState />;
+  if (activities.length === 0) return <EmptyState />;
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+      {ALL_STATUSES.map(status => {
+        const cfg = STATUS_CONFIG[status];
+        const Icon = cfg.icon;
+        const items = activities.filter(a => a.status === status);
+        return (
+          <div key={status} className="rounded-2xl overflow-hidden"
+            style={{ border: `1px solid ${cfg.color}25`, background: 'var(--card-bg)' }}>
+            {/* Column header */}
+            <div className="px-4 py-3 flex items-center justify-between"
+              style={{ background: cfg.bg, borderBottom: `1px solid ${cfg.color}20` }}>
+              <div className="flex items-center gap-2">
+                <Icon className="w-4 h-4" style={{ color: cfg.color }} />
+                <span className="text-sm font-semibold" style={{ color: cfg.color }}>{cfg.label}</span>
+              </div>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                style={{ background: `${cfg.color}20`, color: cfg.color }}>{items.length}</span>
+            </div>
+            {/* Cards */}
+            <div className="p-3 space-y-3 max-h-[70vh] overflow-y-auto">
+              {items.length === 0 ? (
+                <p className="text-xs text-center py-6" style={{ color: 'var(--text-muted)' }}>Sin actividades</p>
+              ) : items.map(a => (
+                <KanbanCard key={a.id} a={a} cfg={cfg} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function KanbanCard({ a, cfg }: { a: GlobalActivity; cfg: typeof STATUS_CONFIG[string] }) {
+  const so = a.phase.projectModule.project.serviceOrder;
+  const pct = Math.round(Number(a.progressPercent));
+  return (
+    <div className="rounded-xl p-3 space-y-2.5 transition-shadow hover:shadow-md"
+      style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-medium text-sm leading-snug line-clamp-2" style={{ color: 'var(--text-primary)' }}>{a.name}</p>
+        <span className="text-[10px] font-mono shrink-0 px-1.5 py-0.5 rounded"
+          style={{ background: 'var(--card-bg)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
+          {so.osNumber}
+        </span>
+      </div>
+      <p className="text-xs font-medium truncate" style={{ color: 'var(--text-secondary)' }}>{so.client.businessName}</p>
+      <div className="space-y-1">
+        <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <Layers className="w-3 h-3 shrink-0" /><span className="truncate">{a.phase.projectModule.name}</span>
+        </div>
+        <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <User className="w-3 h-3 shrink-0" /><span className="truncate">{resolveImplementor(a)}</span>
+        </div>
+      </div>
+      <ProgressBar pct={pct} color={cfg.color} />
+      <p className="text-[11px]" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>{dayjs(a.updatedAt).fromNow()}</p>
+    </div>
+  );
+}
+
+// ── View: Por empresa / Por implementador (genérico) ─────────────────────────
+
+function GroupedView({ activities, loading, groupKey, groupLabel, groupIcon: GroupIcon }: {
+  activities: GlobalActivity[];
+  loading: boolean;
+  groupKey: (a: GlobalActivity) => string;
+  groupLabel: (a: GlobalActivity) => string;
+  groupIcon: React.ElementType;
+}) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
+
+  const groups = useMemo(() => {
+    const map = new Map<string, { label: string; items: GlobalActivity[] }>();
+    activities.forEach(a => {
+      const key = groupKey(a);
+      const lbl = groupLabel(a);
+      if (!map.has(key)) map.set(key, { label: lbl, items: [] });
+      map.get(key)!.items.push(a);
+    });
+    return [...map.entries()].sort((a, b) => b[1].items.length - a[1].items.length);
+  }, [activities, groupKey, groupLabel]);
+
+  useEffect(() => {
+    if (groups.length > 0) setOpen(new Set([groups[0][0]]));
+  }, [groups.length]);
+
+  if (loading && activities.length === 0) return <LoadingState />;
+  if (activities.length === 0) return <EmptyState />;
+
+  function toggle(key: string) {
+    setOpen(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  }
+
+  return (
+    <div className="space-y-3">
+      {groups.map(([key, { label, items }]) => {
+        const isOpen = open.has(key);
+        return (
+          <div key={key} className="rounded-2xl overflow-hidden"
+            style={{ border: '1px solid var(--border-subtle)', background: 'var(--card-bg)' }}>
+            <button className="w-full flex items-center justify-between px-5 py-3.5 transition-colors hover:bg-white/[0.03]"
+              onClick={() => toggle(key)}>
+              <div className="flex items-center gap-3">
+                <GroupIcon className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{label}</span>
+                <StatusSummaryPills items={items} />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                  style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+                  {items.length}
+                </span>
+                {isOpen ? <ChevronDown className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                         : <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />}
+              </div>
+            </button>
+            {isOpen && (
+              <div className="overflow-x-auto" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr style={{ background: 'var(--surface-2)' }}>
+                      {['Actividad', 'OS', 'Módulo', 'Implementador', 'Estado', 'Progreso', 'Actualizado'].map(h => (
+                        <th key={h} className="px-4 py-2 text-left font-semibold whitespace-nowrap"
+                          style={{ color: 'var(--text-muted)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((a, i) => {
+                      const cfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.completado;
+                      const so = a.phase.projectModule.project.serviceOrder;
+                      const pct = Math.round(Number(a.progressPercent));
+                      return (
+                        <tr key={a.id} className="hover:bg-white/[0.03]"
+                          style={{ borderTop: i > 0 ? '1px solid var(--border-subtle)' : undefined }}>
+                          <td className="px-4 py-2.5 max-w-[220px]">
+                            <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{a.name}</p>
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{so.osNumber}</td>
+                          <td className="px-4 py-2.5 max-w-[140px]">
+                            <p className="truncate" style={{ color: 'var(--text-secondary)' }}>{a.phase.projectModule.name}</p>
+                            <p className="truncate opacity-70" style={{ color: 'var(--text-muted)' }}>{a.phase.name}</p>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className="truncate max-w-[120px] inline-block" style={{ color: 'var(--text-secondary)' }}>{resolveImplementor(a)}</span>
+                          </td>
+                          <td className="px-4 py-2.5"><StatusBadge status={a.status} /></td>
+                          <td className="px-4 py-2.5 min-w-[90px]"><ProgressBar pct={pct} color={cfg.color} /></td>
+                          <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{dayjs(a.updatedAt).fromNow()}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StatusSummaryPills({ items }: { items: GlobalActivity[] }) {
+  const counts = ALL_STATUSES.map(s => ({ s, n: items.filter(a => a.status === s).length })).filter(x => x.n > 0);
+  return (
+    <div className="flex items-center gap-1.5">
+      {counts.map(({ s, n }) => {
+        const cfg = STATUS_CONFIG[s];
+        return (
+          <span key={s} className="text-[10px] px-1.5 py-0.5 rounded font-bold"
+            style={{ background: cfg.bg, color: cfg.color }}>{n}</span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── View: Tarjetas ────────────────────────────────────────────────────────────
+
+function TarjetasView({ activities, loading, total, page, onLoadMore }: {
+  activities: GlobalActivity[]; loading: boolean; total: number; page: number; onLoadMore: () => void;
+}) {
+  const hasMore = activities.length < total;
+  if (loading && activities.length === 0) return <LoadingState />;
+  if (activities.length === 0) return <EmptyState />;
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {activities.map(a => <ActivityCard key={a.id} a={a} />)}
+      </div>
+      {hasMore && <LoadMoreBtn loading={loading} remaining={total - activities.length} onLoad={onLoadMore} />}
+    </div>
+  );
+}
+
+// ── View: Resumen ─────────────────────────────────────────────────────────────
+
+function ResumenView({ activities, loading }: { activities: GlobalActivity[]; loading: boolean }) {
+  if (loading && activities.length === 0) return <LoadingState />;
+  if (activities.length === 0) return <EmptyState />;
+
+  const counts = {
+    completado: activities.filter(a => a.status === 'completado').length,
+    en_progreso: activities.filter(a => a.status === 'en_progreso').length,
+    bloqueado: activities.filter(a => a.status === 'bloqueado').length,
+  };
+
+  // Top clients
+  const clientMap = new Map<string, number>();
+  activities.forEach(a => {
+    const name = a.phase.projectModule.project.serviceOrder.client.businessName;
+    clientMap.set(name, (clientMap.get(name) ?? 0) + 1);
+  });
+  const topClients = [...clientMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([name, count]) => ({ name: name.length > 22 ? name.slice(0, 22) + '…' : name, count }));
+
+  // Top implementors
+  const implMap = new Map<string, number>();
+  activities.forEach(a => {
+    const name = resolveImplementor(a);
+    if (name !== 'Sin asignar') implMap.set(name, (implMap.get(name) ?? 0) + 1);
+  });
+  const topImpl = [...implMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([name, count]) => ({ name: name.length > 22 ? name.slice(0, 22) + '…' : name, count }));
+
+  // Top modules
+  const modMap = new Map<string, number>();
+  activities.forEach(a => {
+    const name = a.phase.projectModule.name;
+    modMap.set(name, (modMap.get(name) ?? 0) + 1);
+  });
+  const topMods = [...modMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([name, count]) => ({ name: name.length > 22 ? name.slice(0, 22) + '…' : name, count }));
+
+  const CHART_COLORS = ['#818cf8', '#34d399', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c', '#38bdf8'];
+
+  function MiniBar({ data, title }: { data: { name: string; count: number }[]; title: string }) {
+    return (
+      <div className="rounded-2xl p-5" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
+        <p className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>{title}</p>
+        {data.length === 0 ? (
+          <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>Sin datos</p>
+        ) : (
+          <div style={{ height: Math.max(data.length * 36, 120) }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} layout="vertical" margin={{ left: 0, right: 20, top: 0, bottom: 0 }}>
+                <XAxis type="number" hide />
+                <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
+                <ReTooltip
+                  contentStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)', borderRadius: 8, fontSize: 12 }}
+                  formatter={(v: any) => [v, 'actividades']}
+                />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total', value: activities.length, color: '#818cf8', bg: 'rgba(129,140,248,0.1)' },
+          { label: 'Completadas', value: counts.completado, color: '#34d399', bg: 'rgba(52,211,153,0.1)' },
+          { label: 'En progreso', value: counts.en_progreso, color: '#60a5fa', bg: 'rgba(96,165,250,0.1)' },
+          { label: 'Bloqueadas', value: counts.bloqueado, color: '#f87171', bg: 'rgba(248,113,113,0.1)' },
+        ].map(({ label, value, color, bg }) => (
+          <div key={label} className="rounded-2xl p-5 text-center"
+            style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
+            <p className="text-3xl font-bold" style={{ color }}>{value}</p>
+            <p className="text-xs mt-1 font-medium" style={{ color: 'var(--text-muted)' }}>{label}</p>
+            <div className="mt-3 h-1 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+              <div className="h-full rounded-full" style={{ width: `${activities.length ? (value / activities.length) * 100 : 0}%`, background: color }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <MiniBar data={topClients} title="Por empresa" />
+        <MiniBar data={topImpl} title="Por implementador" />
+        <MiniBar data={topMods} title="Por módulo" />
+      </div>
+    </div>
+  );
+}
+
+// ── Shared states ─────────────────────────────────────────────────────────────
+
+function LoadingState() {
+  return (
+    <div className="flex items-center justify-center py-24 gap-2" style={{ color: 'var(--text-muted)' }}>
+      <Loader2 className="w-5 h-5 animate-spin" />
+      <span className="text-sm">Cargando actividades…</span>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 gap-3">
+      <AlertTriangle className="w-8 h-8" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
+      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No hay actividades para los filtros seleccionados</p>
+    </div>
+  );
+}
+
+function LoadMoreBtn({ loading, remaining, onLoad }: { loading: boolean; remaining: number; onLoad: () => void }) {
+  return (
+    <div className="px-4 py-3 text-center" style={{ borderTop: '1px solid var(--border-subtle)' }}>
+      <button onClick={onLoad} disabled={loading}
+        className="flex items-center gap-1.5 mx-auto px-4 py-2 rounded-xl text-sm font-medium transition-colors"
+        style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+        {loading ? 'Cargando…' : `Cargar más (${remaining} restantes)`}
+      </button>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ActividadesRealizadasPage() {
+  const [viewMode, setViewMode] = useState<ViewMode>('lista');
+
   // Filters
-  const [preset, setPreset]           = useState<DatePreset>('today');
-  const [customRange, setCustomRange] = useState<DateRange>({ from: '', to: '' });
-  const [statuses, setStatuses]       = useState<string[]>([...ALL_STATUSES]);
+  const [preset, setPreset]             = useState<DatePreset>('today');
+  const [customRange, setCustomRange]   = useState<DateRange>({ from: '', to: '' });
+  const [statuses, setStatuses]         = useState<string[]>([...ALL_STATUSES]);
   const [clientSearch, setClientSearch] = useState('');
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId]   = useState<string | null>(null);
   const [selectedClientName, setSelectedClientName] = useState('');
-  const [clientOpen, setClientOpen]   = useState(false);
+  const [clientOpen, setClientOpen]     = useState(false);
   const clientRef = useRef<HTMLDivElement>(null);
 
   // Data
@@ -69,10 +569,9 @@ export default function ActividadesRealizadasPage() {
   const [page, setPage]             = useState(1);
   const LIMIT = 50;
 
-  // Derived date range
   const dateRange = useMemo(() => presetToRange(preset, customRange), [preset, customRange]);
 
-  // Distinct clients from loaded data (for combobox)
+  // Extract distinct clients from loaded data
   const allClients = useMemo(() => {
     const map = new Map<string, string>();
     activities.forEach(a => {
@@ -88,21 +587,15 @@ export default function ActividadesRealizadasPage() {
     return allClients.filter(c => normalize(c.businessName).includes(q));
   }, [allClients, clientSearch]);
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
-
-  const fetch = useCallback(async (p = 1) => {
+  // Fetch
+  const fetchData = useCallback(async (p = 1) => {
     if (statuses.length === 0) { setActivities([]); setTotal(0); return; }
     setLoading(true);
     try {
-      const params: any = {
-        status: statuses,
-        page: p,
-        limit: LIMIT,
-      };
+      const params: any = { status: statuses, page: p, limit: LIMIT };
       if (dateRange.from) params.dateFrom = dateRange.from;
       if (dateRange.to)   params.dateTo   = dateRange.to;
       if (selectedClientId) params.clientId = selectedClientId;
-
       const res = await projectsApi.getGlobalActivities(params);
       if (p === 1) setActivities(res.data);
       else         setActivities(prev => [...prev, ...res.data]);
@@ -115,20 +608,16 @@ export default function ActividadesRealizadasPage() {
     }
   }, [statuses, dateRange, selectedClientId]);
 
-  useEffect(() => { fetch(1); }, [fetch]);
+  useEffect(() => { fetchData(1); }, [fetchData]);
 
-  // Close client dropdown on outside click
+  // Close dropdown on outside click
   useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (clientRef.current && !clientRef.current.contains(e.target as Node)) {
-        setClientOpen(false);
-      }
-    }
+    const handle = (e: MouseEvent) => {
+      if (clientRef.current && !clientRef.current.contains(e.target as Node)) setClientOpen(false);
+    };
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
   }, []);
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   function toggleStatus(s: string) {
     setStatuses(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -136,27 +625,20 @@ export default function ActividadesRealizadasPage() {
   }
 
   function selectClient(id: string, name: string) {
-    setSelectedClientId(id);
-    setSelectedClientName(name);
-    setClientSearch('');
-    setClientOpen(false);
+    setSelectedClientId(id); setSelectedClientName(name); setClientSearch(''); setClientOpen(false);
   }
 
   function clearClient() {
-    setSelectedClientId(null);
-    setSelectedClientName('');
-    setClientSearch('');
+    setSelectedClientId(null); setSelectedClientName(''); setClientSearch('');
   }
 
-  const hasMore = activities.length < total;
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const commonProps = { activities, loading, total, page, onLoadMore: () => fetchData(page + 1) };
 
   return (
     <div className="space-y-5">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)' }}>
@@ -169,14 +651,32 @@ export default function ActividadesRealizadasPage() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => fetch(1)}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors"
-          style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Actualizar
-        </button>
+
+        <div className="flex items-center gap-2">
+          {/* View switcher */}
+          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+            {VIEWS.map(v => {
+              const Icon = v.icon;
+              const active = viewMode === v.id;
+              return (
+                <button key={v.id} onClick={() => setViewMode(v.id)} title={v.label}
+                  className="p-2 rounded-lg transition-colors"
+                  style={active
+                    ? { background: 'rgba(99,102,241,0.15)', color: '#818cf8' }
+                    : { color: 'var(--text-muted)' }}>
+                  <Icon className="w-4 h-4" />
+                </button>
+              );
+            })}
+          </div>
+
+          <button onClick={() => fetchData(1)} disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors"
+            style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -187,8 +687,7 @@ export default function ActividadesRealizadasPage() {
         <div className="flex flex-wrap gap-2 items-center">
           <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Período:</span>
           {DATE_PRESETS.map(p => (
-            <button key={p.id}
-              onClick={() => { setPreset(p.id); setPage(1); }}
+            <button key={p.id} onClick={() => { setPreset(p.id); setPage(1); }}
               className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
               style={preset === p.id
                 ? { background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)', color: '#818cf8' }
@@ -213,21 +712,19 @@ export default function ActividadesRealizadasPage() {
 
         <div className="flex flex-wrap gap-4 items-end">
           {/* Status chips */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Estado:</span>
             {ALL_STATUSES.map(s => {
               const cfg = STATUS_CONFIG[s];
               const active = statuses.includes(s);
               const Icon = cfg.icon;
               return (
-                <button key={s}
-                  onClick={() => toggleStatus(s)}
+                <button key={s} onClick={() => toggleStatus(s)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                   style={active
                     ? { background: cfg.bg, border: `1px solid ${cfg.color}40`, color: cfg.color }
                     : { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', opacity: 0.6 }}>
-                  <Icon className="w-3.5 h-3.5" />
-                  {cfg.label}
+                  <Icon className="w-3.5 h-3.5" />{cfg.label}
                 </button>
               );
             })}
@@ -261,7 +758,6 @@ export default function ActividadesRealizadasPage() {
                 <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
               )}
             </div>
-
             {clientOpen && !selectedClientId && (
               <div className="absolute z-30 mt-1 w-full rounded-xl shadow-xl overflow-hidden"
                 style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
@@ -273,12 +769,10 @@ export default function ActividadesRealizadasPage() {
                   <ul className="max-h-52 overflow-y-auto">
                     {filteredClients.map(c => (
                       <li key={c.id}>
-                        <button
-                          className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-white/5"
+                        <button className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-white/5"
                           style={{ color: 'var(--text-primary)' }}
                           onClick={() => selectClient(c.id, c.businessName)}>
-                          <Building2 className="w-3.5 h-3.5 inline mr-2 opacity-50" />
-                          {c.businessName}
+                          <Building2 className="w-3.5 h-3.5 inline mr-2 opacity-50" />{c.businessName}
                         </button>
                       </li>
                     ))}
@@ -290,133 +784,30 @@ export default function ActividadesRealizadasPage() {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-2xl overflow-hidden"
-        style={{ border: '1px solid var(--border-subtle)', background: 'var(--card-bg)' }}>
-        {loading && activities.length === 0 ? (
-          <div className="flex items-center justify-center py-20 gap-2" style={{ color: 'var(--text-muted)' }}>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm">Cargando actividades…</span>
-          </div>
-        ) : activities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <AlertTriangle className="w-8 h-8" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              No hay actividades para los filtros seleccionados
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-2)' }}>
-                    {['Actividad', 'Empresa / OS', 'Módulo', 'Fase', 'Implementador', 'Estado', 'Progreso', 'Actualizado'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold whitespace-nowrap"
-                        style={{ color: 'var(--text-muted)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activities.map((a, i) => {
-                    const cfg = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.completado;
-                    const Icon = cfg.icon;
-                    const so = a.phase.projectModule.project.serviceOrder;
-                    const implementor = a.assignedTo
-                      ? `${a.assignedTo.firstName} ${a.assignedTo.lastName}`
-                      : '—';
-                    return (
-                      <tr key={a.id}
-                        className="transition-colors hover:bg-white/3"
-                        style={{ borderBottom: i < activities.length - 1 ? '1px solid var(--border-subtle)' : undefined }}>
-                        {/* Actividad */}
-                        <td className="px-4 py-3 max-w-[260px]">
-                          <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{a.name}</p>
-                          {a.code && <p className="text-xs mt-0.5 font-mono" style={{ color: 'var(--text-muted)' }}>{a.code}</p>}
-                        </td>
-                        {/* Empresa / OS */}
-                        <td className="px-4 py-3 max-w-[200px]">
-                          <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{so.client.businessName}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{so.osNumber}</p>
-                        </td>
-                        {/* Módulo */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <Layers className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                            <span className="truncate max-w-[140px]" style={{ color: 'var(--text-secondary)' }}>
-                              {a.phase.projectModule.name}
-                            </span>
-                          </div>
-                        </td>
-                        {/* Fase */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <GitBranch className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                            <span className="truncate max-w-[140px]" style={{ color: 'var(--text-secondary)' }}>
-                              {a.phase.name}
-                            </span>
-                          </div>
-                        </td>
-                        {/* Implementador */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{implementor}</span>
-                          </div>
-                        </td>
-                        {/* Estado */}
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
-                            style={{ background: cfg.bg, color: cfg.color }}>
-                            <Icon className="w-3 h-3" />
-                            {cfg.label}
-                          </span>
-                        </td>
-                        {/* Progreso */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2 min-w-[80px]">
-                            <div className="flex-1 h-1.5 rounded-full overflow-hidden"
-                              style={{ background: 'var(--surface-2)' }}>
-                              <div className="h-full rounded-full transition-all"
-                                style={{ width: `${a.progressPercent}%`, background: cfg.color }} />
-                            </div>
-                            <span className="text-xs font-mono w-8 text-right" style={{ color: 'var(--text-muted)' }}>
-                              {Math.round(Number(a.progressPercent))}%
-                            </span>
-                          </div>
-                        </td>
-                        {/* Actualizado */}
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                            <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                              {dayjs(a.updatedAt).fromNow()}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Load more */}
-            {hasMore && (
-              <div className="px-4 py-3 text-center" style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                <button
-                  onClick={() => fetch(page + 1)}
-                  disabled={loading}
-                  className="flex items-center gap-1.5 mx-auto px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  {loading ? 'Cargando…' : `Cargar más (${total - activities.length} restantes)`}
-                </button>
-              </div>
-            )}
-          </>
-        )}
+      {/* Active view label */}
+      <div className="flex items-center gap-2">
+        {(() => { const v = VIEWS.find(x => x.id === viewMode)!; const Icon = v.icon;
+          return <><Icon className="w-4 h-4" style={{ color: '#818cf8' }} /><span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{v.label}</span></>;
+        })()}
       </div>
+
+      {/* View content */}
+      {viewMode === 'lista'         && <ListView {...commonProps} />}
+      {viewMode === 'kanban'        && <KanbanView activities={activities} loading={loading} />}
+      {viewMode === 'empresa'       && (
+        <GroupedView activities={activities} loading={loading}
+          groupKey={a => a.phase.projectModule.project.serviceOrder.client.id}
+          groupLabel={a => a.phase.projectModule.project.serviceOrder.client.businessName}
+          groupIcon={Building2} />
+      )}
+      {viewMode === 'implementador' && (
+        <GroupedView activities={activities} loading={loading}
+          groupKey={a => resolveImplementor(a)}
+          groupLabel={a => resolveImplementor(a)}
+          groupIcon={Users} />
+      )}
+      {viewMode === 'tarjetas'      && <TarjetasView {...commonProps} />}
+      {viewMode === 'resumen'       && <ResumenView activities={activities} loading={loading} />}
     </div>
   );
 }

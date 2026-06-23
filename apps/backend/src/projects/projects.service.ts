@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate, buildMeta } from '../common/dto/pagination.dto';
@@ -782,51 +783,53 @@ export class ProjectsService {
   }
 
   async getActivityClients(companyId: string, dateFrom?: string, dateTo?: string) {
-    const dateWhere: any = {};
-    if (dateFrom) dateWhere.gte = new Date(dateFrom);
-    if (dateTo) { const to = new Date(dateTo); to.setUTCHours(23, 59, 59, 999); dateWhere.lte = to; }
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to   = dateTo   ? (() => { const d = new Date(dateTo); d.setUTCHours(23, 59, 59, 999); return d; })() : null;
 
-    // Same WHERE used by getGlobalActivities — guaranteed to work
-    const where: any = {
-      NOT: { status: 'pendiente' },
-      phase: { projectModule: { project: { serviceOrder: { companyId } } } },
-    };
-    if (Object.keys(dateWhere).length) {
-      where.OR = [
-        { threads: { some: { createdAt: dateWhere } } },
-        { executionDate: dateWhere },
-      ];
-    }
+    /*
+      SELECT DISTINCT c.id, c.businessName
+      FROM Clientes c
+      INNER JOIN OrdenesServicio os ON os.clientId   = c.id
+      INNER JOIN Proyectos       p  ON p.serviceOrderId = os.id
+      INNER JOIN ModulosProyecto m  ON m.projectId   = p.id
+      INNER JOIN Fases           f  ON f.projectModuleId = m.id
+      INNER JOIN Actividades     a  ON a.phaseId     = f.id
+      WHERE os.companyId = @companyId
+        AND a.status    != 'pendiente'
+        [AND (
+          (a.executionDate >= @from AND a.executionDate <= @to)
+          OR EXISTS (
+            SELECT 1 FROM HilosActividad h
+            WHERE h.activityId = a.id
+              AND h.createdAt >= @from AND h.createdAt <= @to
+          )
+        )]
+      ORDER BY c.businessName
+    */
+    const dateFilter = (from && to)
+      ? Prisma.sql`AND (
+          (a.executionDate >= ${from} AND a.executionDate <= ${to})
+          OR EXISTS (
+            SELECT 1 FROM HilosActividad h
+            WHERE h.activityId = a.id
+              AND h.createdAt >= ${from} AND h.createdAt <= ${to}
+          )
+        )`
+      : Prisma.empty;
 
-    const activities = await this.prisma.activity.findMany({
-      where,
-      select: {
-        phase: {
-          select: {
-            projectModule: {
-              select: {
-                project: {
-                  select: {
-                    serviceOrder: {
-                      select: { client: { select: { id: true, businessName: true } } },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    const map = new Map<string, string>();
-    for (const a of activities) {
-      const c = a.phase.projectModule.project.serviceOrder.client;
-      map.set(c.id, c.businessName);
-    }
-    return [...map.entries()]
-      .map(([id, businessName]) => ({ id, businessName }))
-      .sort((a, b) => a.businessName.localeCompare(b.businessName, 'es'));
+    return this.prisma.$queryRaw<{ id: string; businessName: string }[]>`
+      SELECT DISTINCT c.id, c.businessName
+      FROM           Clientes        c
+      INNER JOIN     OrdenesServicio os ON os.clientId      = c.id
+      INNER JOIN     Proyectos       p  ON p.serviceOrderId = os.id
+      INNER JOIN     ModulosProyecto m  ON m.projectId      = p.id
+      INNER JOIN     Fases           f  ON f.projectModuleId = m.id
+      INNER JOIN     Actividades     a  ON a.phaseId        = f.id
+      WHERE  os.companyId = ${companyId}
+        AND  a.status    != 'pendiente'
+        ${dateFilter}
+      ORDER BY c.businessName
+    `;
   }
 
   async getGlobalActivities(companyId: string, dto: GlobalActivitiesFilterDto) {

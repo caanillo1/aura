@@ -1,9 +1,8 @@
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X, Send, Clock, Mail, Calendar, ToggleLeft, ToggleRight,
-  CheckCircle2, Activity, Ban, Loader2, Plus, Trash2, Users,
-  Search, ChevronDown, ChevronUp,
+  CheckCircle2, Activity, Ban, Loader2, Plus, Trash2, Users, Search,
 } from 'lucide-react';
 import { projectsApi, usersApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -60,17 +59,18 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
   const [schedMensaje, setSchedMensaje]             = useState('');
   const [savingSchedule, setSavingSchedule]         = useState(false);
   const [loadingSchedule, setLoadingSchedule]       = useState(false);
-  const [expandedIdx, setExpandedIdx]               = useState<number | null>(null);
   const [agentSearch, setAgentSearch]               = useState('');
+  const [loadingAgents, setLoadingAgents]           = useState(false);
 
   const [allAgents, setAllAgents] = useState<{ id: string; firstName: string; lastName: string; jobTitle?: string }[]>([]);
 
   useEffect(() => {
     if (!open) return;
+    setLoadingAgents(true);
     usersApi.listAgents({ limit: 200 }).then(res => {
       const list: any[] = Array.isArray(res) ? res : ((res as any).data ?? []);
       setAllAgents(list.map((u: any) => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, jobTitle: u.jobTitle })));
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setLoadingAgents(false));
 
     setLoadingSchedule(true);
     projectsApi.getActivityReportSchedule()
@@ -94,12 +94,6 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
       .finally(() => setLoadingSchedule(false));
   }, [open]);
 
-  const filteredAgents = useMemo(() => {
-    if (!agentSearch.trim()) return allAgents;
-    const q = normalize(agentSearch);
-    return allAgents.filter(a => normalize(`${a.firstName} ${a.lastName}`).includes(q));
-  }, [allAgents, agentSearch]);
-
   if (!open) return null;
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -117,17 +111,12 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
     const existing = new Set(schedDestinatarios.map(d => d.email));
     const newOnes = parts.filter(e => !existing.has(e)).map(email => ({ email, agentIds: [] }));
     if (!newOnes.length) return;
-    const updated = [...schedDestinatarios, ...newOnes];
-    setSchedDestinatarios(updated);
-    setExpandedIdx(updated.length - 1);
-    setAgentSearch('');
+    setSchedDestinatarios(prev => [...prev, ...newOnes]);
     setSchedEmailInput('');
   }
 
   function removeRecipient(idx: number) {
     setSchedDestinatarios(prev => prev.filter((_, i) => i !== idx));
-    if (expandedIdx === idx) setExpandedIdx(null);
-    else if (expandedIdx !== null && expandedIdx > idx) setExpandedIdx(expandedIdx - 1);
   }
 
   function toggleRecipientAgent(recipientIdx: number, agentId: string) {
@@ -150,11 +139,6 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
 
   function toggleSchedStatus(s: string) {
     setSchedStatus(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
-  }
-
-  function toggleExpand(idx: number) {
-    setExpandedIdx(prev => prev === idx ? null : idx);
-    setAgentSearch('');
   }
 
   // ── Send now ──────────────────────────────────────────────────────────────
@@ -373,12 +357,9 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
 
                 {/* Recipients — per-email agent filter */}
                 <div>
-                  <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
                     <Mail className="w-3.5 h-3.5 inline mr-1" />Destinatarios
                   </label>
-                  <p className="text-[10px] mb-1.5 opacity-60" style={{ color: 'var(--text-muted)' }}>
-                    Al agregar un correo puedes elegir qué agentes le llegan. Sin selección = todos.
-                  </p>
                   <div className="flex gap-2 mb-2">
                     <input type="email" placeholder="correo@ejemplo.com"
                       value={schedEmailInput} onChange={e => setSchedEmailInput(e.target.value)}
@@ -393,105 +374,112 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
                   </div>
 
                   {schedDestinatarios.length > 0 && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-3">
                       {schedDestinatarios.map((recipient, idx) => {
-                        const isExpanded  = expandedIdx === idx;
-                        const agentCount  = recipient.agentIds.length;
-                        const agentLabel  = agentCount === 0
-                          ? 'Todos los agentes'
-                          : `${agentCount} agente${agentCount !== 1 ? 's' : ''}`;
-                        const agentNames  = agentCount > 0
-                          ? recipient.agentIds
-                              .map(id => allAgents.find(a => a.id === id))
-                              .filter(Boolean)
-                              .map(a => `${a!.firstName} ${a!.lastName}`)
-                              .join(', ')
-                          : null;
+                        const agentCount = recipient.agentIds.length;
+                        const filtered   = agentSearch.trim()
+                          ? allAgents.filter(a => normalize(`${a.firstName} ${a.lastName}`).includes(normalize(agentSearch)))
+                          : allAgents;
 
                         return (
                           <div key={idx} className="rounded-xl overflow-hidden"
                             style={{ border: '1px solid var(--border-subtle)' }}>
 
-                            {/* Row header */}
-                            <div className="flex items-center gap-2 px-3 py-2.5"
-                              style={{ background: 'var(--surface-2)' }}>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                            {/* Header: email + delete */}
+                            <div className="flex items-center justify-between px-3 py-2.5"
+                              style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border-subtle)' }}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Mail className="w-3.5 h-3.5 shrink-0" style={{ color: '#818cf8' }} />
+                                <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
                                   {recipient.email}
-                                </p>
-                                {agentNames && (
-                                  <p className="text-[10px] truncate mt-0.5 opacity-60" style={{ color: 'var(--text-muted)' }}>
-                                    {agentNames}
-                                  </p>
-                                )}
+                                </span>
                               </div>
-
-                              {/* Agent filter badge */}
-                              <button onClick={() => toggleExpand(idx)}
-                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold shrink-0"
-                                style={agentCount > 0
-                                  ? { background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }
-                                  : { background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', border: '1px solid var(--border-subtle)' }}>
-                                <Users className="w-3 h-3" />
-                                {agentLabel}
-                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                              </button>
-
-                              <button onClick={() => removeRecipient(idx)}
-                                className="p-1 rounded-lg hover:bg-white/5 shrink-0">
-                                <Trash2 className="w-3.5 h-3.5" style={{ color: '#f87171' }} />
-                              </button>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {agentCount > 0 && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                                    style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}>
+                                    {agentCount} agente{agentCount !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                                <button onClick={() => removeRecipient(idx)}
+                                  className="p-1 rounded-lg hover:bg-white/5">
+                                  <Trash2 className="w-3.5 h-3.5" style={{ color: '#f87171' }} />
+                                </button>
+                              </div>
                             </div>
 
-                            {/* Inline agent picker */}
-                            {isExpanded && (
-                              <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
-                                <div className="flex items-center gap-2 px-3 py-2"
-                                  style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border-subtle)' }}>
-                                  <Search className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                                  <input placeholder="Buscar agente…" value={agentSearch}
-                                    onChange={e => setAgentSearch(e.target.value)}
-                                    className="flex-1 bg-transparent text-xs outline-none placeholder:opacity-50"
-                                    style={{ color: 'var(--text-primary)' }} />
+                            {/* Agent picker — always visible */}
+                            <div>
+                              <div className="flex items-center justify-between px-3 py-1.5"
+                                style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.01)' }}>
+                                <div className="flex items-center gap-1.5">
+                                  <Users className="w-3 h-3" style={{ color: 'var(--text-muted)' }} />
+                                  <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                                    Agentes que recibe este correo
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
                                   {agentCount > 0 && (
                                     <button onClick={() => clearRecipientAgents(idx)}
-                                      className="text-[10px] shrink-0 hover:opacity-80"
+                                      className="text-[10px] hover:opacity-80"
                                       style={{ color: 'var(--text-muted)' }}>
                                       Limpiar
                                     </button>
                                   )}
-                                </div>
-                                <div className="max-h-36 overflow-y-auto">
-                                  {filteredAgents.length === 0 ? (
-                                    <p className="text-xs text-center py-3" style={{ color: 'var(--text-muted)' }}>Sin agentes</p>
-                                  ) : filteredAgents.map(agent => {
-                                    const selected = recipient.agentIds.includes(agent.id);
-                                    return (
-                                      <button key={agent.id} onClick={() => toggleRecipientAgent(idx, agent.id)}
-                                        className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-white/5"
-                                        style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                        <div className="text-left">
-                                          <span style={{ color: 'var(--text-primary)', fontWeight: selected ? 600 : 400 }}>
-                                            {agent.firstName} {agent.lastName}
-                                          </span>
-                                          {agent.jobTitle && (
-                                            <span className="block" style={{ color: 'var(--text-muted)', fontSize: 10, opacity: 0.6 }}>
-                                              {agent.jobTitle}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-                                          style={selected
-                                            ? { background: '#34d399', border: '1px solid #34d399' }
-                                            : { border: '1px solid var(--border-subtle)' }}>
-                                          {selected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
+                                  <span className="text-[10px]" style={{ color: 'var(--text-muted)', opacity: 0.5 }}>
+                                    {agentCount === 0 ? 'Todos' : `${agentCount} seleccionados`}
+                                  </span>
                                 </div>
                               </div>
-                            )}
+
+                              {/* Search */}
+                              <div className="flex items-center gap-2 px-3 py-1.5"
+                                style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.01)' }}>
+                                <Search className="w-3 h-3 shrink-0" style={{ color: 'var(--text-muted)' }} />
+                                <input placeholder="Buscar agente…" value={agentSearch}
+                                  onChange={e => setAgentSearch(e.target.value)}
+                                  className="flex-1 bg-transparent text-xs outline-none placeholder:opacity-40"
+                                  style={{ color: 'var(--text-primary)' }} />
+                              </div>
+
+                              {/* Agent list */}
+                              <div className="max-h-40 overflow-y-auto">
+                                {loadingAgents ? (
+                                  <div className="flex items-center justify-center gap-2 py-4">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--text-muted)' }} />
+                                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Cargando agentes…</span>
+                                  </div>
+                                ) : filtered.length === 0 ? (
+                                  <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>
+                                    {allAgents.length === 0 ? 'No hay agentes disponibles' : 'Sin coincidencias'}
+                                  </p>
+                                ) : filtered.map(agent => {
+                                  const selected = recipient.agentIds.includes(agent.id);
+                                  return (
+                                    <button key={agent.id} onClick={() => toggleRecipientAgent(idx, agent.id)}
+                                      className="w-full flex items-center gap-3 px-3 py-2 text-xs hover:bg-white/5 text-left"
+                                      style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                                      <div className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                                        style={selected
+                                          ? { background: '#34d399', border: '1px solid #34d399' }
+                                          : { border: '1px solid var(--border-subtle)' }}>
+                                        {selected && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <span style={{ color: 'var(--text-primary)', fontWeight: selected ? 600 : 400 }}>
+                                          {agent.firstName} {agent.lastName}
+                                        </span>
+                                        {agent.jobTitle && (
+                                          <span className="block truncate" style={{ color: 'var(--text-muted)', fontSize: 10, opacity: 0.6 }}>
+                                            {agent.jobTitle}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           </div>
                         );
                       })}

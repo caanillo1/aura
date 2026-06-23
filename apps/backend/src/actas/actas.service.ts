@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { CreateActaDto, UpdateActaDto } from './dto/acta.dto';
@@ -45,6 +45,8 @@ const INCLUDE = {
 
 @Injectable()
 export class ActasService {
+  private readonly logger = new Logger(ActasService.name);
+
   constructor(
     private prisma: PrismaService,
     private mail: MailService,
@@ -96,14 +98,16 @@ export class ActasService {
   async create(companyId: string, userId: string, dto: CreateActaDto) {
     await this.assertProjectAccess(companyId, dto.projectId);
 
-    const numero = dto.numero ?? await this.generateNumero(dto.fecha);
+    const result = await this.withDeadlockRetry(() =>
+      this.prisma.$transaction(async (tx) => {
+        // Generate numero inside transaction so concurrent requests get sequential counts
+        const numero = dto.numero ?? await this.generateNumeroTx(tx, dto.fecha);
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const acta = await tx.acta.create({
-        data: {
-          projectId: dto.projectId,
-          type: dto.type,
-          numero,
+        const acta = await tx.acta.create({
+          data: {
+            projectId: dto.projectId,
+            type: dto.type,
+            numero,
           fecha: new Date(dto.fecha),
           ciudad: dto.ciudad,
           municipioId: dto.municipioId,
@@ -142,11 +146,13 @@ export class ActasService {
 
       await this.upsertSubEntities(tx, acta.id, dto);
       return tx.acta.findUnique({ where: { id: acta.id }, include: INCLUDE });
-    }, { timeout: 60000 });
+    }, { timeout: 60000 }),
+    );
 
-    await Promise.all([
-      dto.actaActividades?.length ? this.syncActivitiesFromActa(result!.id) : Promise.resolve(),
-      dto.compromisos?.length ? this.syncCompromisoPhases(result!.id) : Promise.resolve(),
+    // Post-transaction syncs: errors here must NOT fail the request (acta is already saved)
+    await Promise.allSettled([
+      dto.actaActividades?.length ? this.syncActivitiesFromActa(result!.id).catch(err => this.logger.error(`syncActivities error: ${err?.message}`)) : Promise.resolve(),
+      dto.compromisos?.length ? this.syncCompromisoPhases(result!.id).catch(err => this.logger.error(`syncCompromisos error: ${err?.message}`)) : Promise.resolve(),
     ]);
     this.sendFirmanteNotifications(result!.id, companyId); // fire-and-forget
 
@@ -185,9 +191,10 @@ export class ActasService {
       : [];
     const prevEmailMap = new Map(previousEmails.map(f => [f.id, f.email ?? '']));
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      await tx.acta.update({
-        where: { id },
+    const result = await this.withDeadlockRetry(() =>
+      this.prisma.$transaction(async (tx) => {
+        await tx.acta.update({
+          where: { id },
         data: {
           ...(dto.numero !== undefined && { numero: dto.numero }),
           ...(dto.fecha && { fecha: new Date(dto.fecha) }),
@@ -225,13 +232,14 @@ export class ActasService {
         },
       });
 
-      await this.upsertSubEntities(tx, id, dto);
-      return tx.acta.findUnique({ where: { id }, include: INCLUDE });
-    }, { timeout: 60000 });
+        await this.upsertSubEntities(tx, id, dto);
+        return tx.acta.findUnique({ where: { id }, include: INCLUDE });
+      }, { timeout: 60000 }),
+    );
 
-    await Promise.all([
-      dto.actaActividades?.length ? this.syncActivitiesFromActa(id) : Promise.resolve(),
-      dto.compromisos?.length ? this.syncCompromisoPhases(id) : Promise.resolve(),
+    await Promise.allSettled([
+      dto.actaActividades?.length ? this.syncActivitiesFromActa(id).catch(err => this.logger.error(`syncActivities error: ${err?.message}`)) : Promise.resolve(),
+      dto.compromisos?.length ? this.syncCompromisoPhases(id).catch(err => this.logger.error(`syncCompromisos error: ${err?.message}`)) : Promise.resolve(),
     ]);
     // Notifica: (1) firmantes nuevos sin id, (2) firmantes existentes que cambiaron de email
     const emailsToNotify: string[] = [];
@@ -868,17 +876,34 @@ export class ActasService {
     }
   }
 
-  private async generateNumero(fecha: string): Promise<string> {
+  private async generateNumeroTx(tx: any, fecha: string): Promise<string> {
     const d = new Date(fecha);
     const yyyy = d.getUTCFullYear();
     const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(d.getUTCDate()).padStart(2, '0');
     const startOfDay = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
     const endOfDay   = new Date(startOfDay.getTime() + 86_400_000);
-    const count = await this.prisma.acta.count({
+    const count = await tx.acta.count({
       where: { fecha: { gte: startOfDay, lt: endOfDay } },
     });
     return `${yyyy}${mm}${dd}${String(count + 1).padStart(2, '0')}`;
+  }
+
+  // Retries the given operation up to 3 times on SQL Server deadlock (P2034)
+  private async withDeadlockRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+    let lastError: any;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        const isDeadlock = err?.code === 'P2034' || err?.message?.includes('deadlock') || err?.message?.includes('write conflict');
+        if (!isDeadlock || attempt === maxRetries) throw err;
+        this.logger.warn(`Deadlock en intento ${attempt}/${maxRetries}, reintentando…`);
+        lastError = err;
+        await new Promise(r => setTimeout(r, 100 * attempt));
+      }
+    }
+    throw lastError;
   }
 
   private async assertProjectAccess(companyId: string, projectId: string) {

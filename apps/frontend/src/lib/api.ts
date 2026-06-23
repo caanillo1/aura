@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type {
   PaginatedResponse, Company, CompanyStats, Role, User, Client, ClientStaff,
-  ServiceOrder, TemplateFlow, TemplateModule, ActivityThread, Project, Municipio,
+  ServiceOrder, TemplateFlow, TemplateModule, ActivityThread, Project, Municipio, GlobalActivity,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
@@ -449,6 +449,13 @@ export const projectsApi = {
     api.delete(`/projects/activities/${activityId}`).then((r) => r.data),
   bulkUpdateActivities: (items: Array<{ activityId: string; status: string; nota?: string; blockedBy?: string }>) =>
     api.post(`/projects/activities/bulk-update`, { items }).then((r) => r.data),
+  getGlobalActivities: (params: { status?: string[]; clientId?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number }) =>
+    api.get('/projects/activities/global', { params }).then((r) => r.data) as Promise<{
+      data: GlobalActivity[];
+      total: number;
+      page: number;
+      limit: number;
+    }>,
   loadTemplate: (id: string, data: {
     templateFlowId: string;
     phaseDates?: { templatePhaseId: string; startDate?: string; endDate?: string }[];

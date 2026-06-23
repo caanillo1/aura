@@ -8,7 +8,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import type { JwtUser } from '../common/decorators/get-user.decorator';
 import { ProjectsService } from './projects.service';
-import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto } from './dto/project.dto';
+import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto } from './dto/project.dto';
 
 const IMPL_ROLES = ['admin', 'coordinator', 'implementer_clinical', 'implementer_financial', 'implementer_support'] as const;
 
@@ -80,6 +80,13 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Actualizar fase (estado, fechas)' })
   updatePhase(@GetUser() user: JwtUser, @Param('phaseId') phaseId: string, @Body() dto: UpdatePhaseDto) {
     return this.svc.updatePhase(user.companyId, phaseId, dto);
+  }
+
+  @Get('activities/global')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Listado global de actividades no pendientes' })
+  getGlobalActivities(@GetUser() user: JwtUser, @Query() dto: GlobalActivitiesFilterDto) {
+    return this.svc.getGlobalActivities(user.companyId, dto);
   }
 
   @Patch('activities/:activityId')

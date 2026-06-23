@@ -87,3 +87,13 @@ export class CreateProjectActivityDto {
   @ApiPropertyOptional() @IsOptional() @IsString() assignedToId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() clientStaffId?: string;
 }
+
+export class GlobalActivitiesFilterDto extends PaginationDto {
+  @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true })
+  @Type(() => String)
+  status?: string[];
+
+  @ApiPropertyOptional() @IsOptional() @IsString() clientId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() dateFrom?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() dateTo?: string;
+}

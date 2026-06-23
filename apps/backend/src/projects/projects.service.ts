@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate, buildMeta } from '../common/dto/pagination.dto';
-import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto } from './dto/project.dto';
+import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto } from './dto/project.dto';
 import { EventsGateway } from '../gateway/events.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -777,5 +777,68 @@ export class ProjectsService {
       where: { id: projectId },
       include: { serviceOrder: { select: { osNumber: true, product: true } }, _count: { select: { modules: true } } },
     });
+  }
+
+  async getGlobalActivities(companyId: string, dto: GlobalActivitiesFilterDto) {
+    const { take, skip } = paginate(dto.page, dto.limit ?? 100);
+
+    const dateWhere: any = {};
+    if (dto.dateFrom) dateWhere.gte = new Date(dto.dateFrom);
+    if (dto.dateTo) {
+      const to = new Date(dto.dateTo);
+      to.setUTCHours(23, 59, 59, 999);
+      dateWhere.lte = to;
+    }
+
+    const where: any = {
+      NOT: { status: 'pendiente' },
+      phase: {
+        projectModule: {
+          project: {
+            serviceOrder: {
+              companyId,
+              ...(dto.clientId ? { clientId: dto.clientId } : {}),
+            },
+          },
+        },
+      },
+    };
+
+    if (dto.status?.length) where.status = { in: dto.status };
+    if (Object.keys(dateWhere).length) where.updatedAt = dateWhere;
+
+    const SELECT = {
+      id: true, code: true, name: true, status: true, priority: true,
+      progressPercent: true, actualHours: true, updatedAt: true,
+      assignedTo: { select: { id: true, firstName: true, lastName: true } },
+      phase: {
+        select: {
+          id: true, name: true,
+          projectModule: {
+            select: {
+              id: true, name: true,
+              project: {
+                select: {
+                  id: true,
+                  serviceOrder: {
+                    select: {
+                      id: true, osNumber: true, product: true,
+                      client: { select: { id: true, businessName: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const [data, total] = await Promise.all([
+      this.prisma.activity.findMany({ where, take, skip, orderBy: { updatedAt: 'desc' }, select: SELECT }),
+      this.prisma.activity.count({ where }),
+    ]);
+
+    return { data, total, page: dto.page ?? 1, limit: take };
   }
 }

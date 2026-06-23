@@ -366,3 +366,32 @@ export interface Project {
   modules?: ProjectModule[];
   _count?: { modules: number };
 }
+
+export interface GlobalActivity {
+  id: string;
+  code: string | null;
+  name: string;
+  status: string;
+  priority: string;
+  progressPercent: number;
+  actualHours: number;
+  updatedAt: string;
+  assignedTo: { id: string; firstName: string; lastName: string } | null;
+  phase: {
+    id: string;
+    name: string;
+    projectModule: {
+      id: string;
+      name: string;
+      project: {
+        id: string;
+        serviceOrder: {
+          id: string;
+          osNumber: string;
+          product: string;
+          client: { id: string; businessName: string };
+        };
+      };
+    };
+  };
+}

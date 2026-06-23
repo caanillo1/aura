@@ -786,9 +786,13 @@ export class ProjectsService {
     if (dateFrom) dateWhere.gte = new Date(dateFrom);
     if (dateTo) { const to = new Date(dateTo); to.setUTCHours(23, 59, 59, 999); dateWhere.lte = to; }
 
-    const activityWhere: any = { status: { in: ['bloqueado', 'en_progreso', 'completado'] } };
+    // Same WHERE used by getGlobalActivities — guaranteed to work
+    const where: any = {
+      NOT: { status: 'pendiente' },
+      phase: { projectModule: { project: { serviceOrder: { companyId } } } },
+    };
     if (Object.keys(dateWhere).length) {
-      activityWhere.OR = [
+      where.OR = [
         { updatedAt:       dateWhere },
         { executionDate:   dateWhere },
         { actualStartDate: dateWhere },
@@ -796,16 +800,18 @@ export class ProjectsService {
       ];
     }
 
-    const clients = await this.prisma.client.findMany({
-      where: {
-        serviceOrders: {
-          some: {
-            companyId,
-            project: {
-              modules: {
-                some: {
-                  phases: {
-                    some: { activities: { some: activityWhere } },
+    const activities = await this.prisma.activity.findMany({
+      where,
+      select: {
+        phase: {
+          select: {
+            projectModule: {
+              select: {
+                project: {
+                  select: {
+                    serviceOrder: {
+                      select: { client: { select: { id: true, businessName: true } } },
+                    },
                   },
                 },
               },
@@ -813,10 +819,16 @@ export class ProjectsService {
           },
         },
       },
-      select: { id: true, businessName: true },
-      orderBy: { businessName: 'asc' },
     });
-    return clients;
+
+    const map = new Map<string, string>();
+    for (const a of activities) {
+      const c = a.phase.projectModule.project.serviceOrder.client;
+      map.set(c.id, c.businessName);
+    }
+    return [...map.entries()]
+      .map(([id, businessName]) => ({ id, businessName }))
+      .sort((a, b) => a.businessName.localeCompare(b.businessName, 'es'));
   }
 
   async getGlobalActivities(companyId: string, dto: GlobalActivitiesFilterDto) {

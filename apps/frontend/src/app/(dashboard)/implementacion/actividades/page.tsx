@@ -644,7 +644,7 @@ export default function ActividadesRealizadasPage() {
   const [exportingPDF, setExportingPDF]     = useState(false);
 
   // Filters
-  const [preset, setPreset]             = useState<DatePreset>('month');
+  const [preset, setPreset]             = useState<DatePreset>('today');
   const [customRange, setCustomRange]   = useState<DateRange>({ from: '', to: '' });
   const [statuses, setStatuses]         = useState<string[]>([...ALL_STATUSES]);
   const [clientSearch, setClientSearch] = useState('');

@@ -807,7 +807,12 @@ export class ProjectsService {
     };
 
     if (dto.status?.length) where.status = { in: dto.status };
-    if (Object.keys(dateWhere).length) where.updatedAt = dateWhere;
+    if (Object.keys(dateWhere).length) {
+      where.OR = [
+        { updatedAt: dateWhere },
+        { threads: { some: { createdAt: dateWhere } } },
+      ];
+    }
 
     const SELECT = {
       id: true, code: true, name: true, status: true, priority: true,
@@ -863,7 +868,12 @@ export class ProjectsService {
       phase: { projectModule: { project: { serviceOrder: { companyId, ...(dto.clientId ? { clientId: dto.clientId } : {}) } } } },
     };
     if (dto.status?.length) where.status = { in: dto.status };
-    if (Object.keys(dateWhere).length) where.updatedAt = dateWhere;
+    if (Object.keys(dateWhere).length) {
+      where.OR = [
+        { updatedAt: dateWhere },
+        { threads: { some: { createdAt: dateWhere } } },
+      ];
+    }
 
     const activities = await this.prisma.activity.findMany({
       where, orderBy: { updatedAt: 'desc' }, take: 1000,

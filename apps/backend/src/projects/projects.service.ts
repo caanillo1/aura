@@ -791,7 +791,7 @@ export class ProjectsService {
               modules: {
                 some: {
                   phases: {
-                    some: { activities: { some: {} } },
+                    some: { activities: { some: { status: { in: ['bloqueado', 'en_progreso', 'completado'] } } } },
                   },
                 },
               },

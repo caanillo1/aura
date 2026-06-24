@@ -1,13 +1,87 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import * as LucideIcons from 'lucide-react';
 import {
-  BookOpen, Plus, Search, Edit3, Trash2, Eye, Tag,
-  X, Loader2, Settings2, ChevronDown, ChevronRight,
-  BookMarked, Pencil, Save, ArrowLeft, Check,
+  BookOpen, Plus, Search, Edit3, Trash2, Eye,
+  X, Loader2, Settings2, BookMarked, Pencil,
+  Save, ArrowLeft, Check, Smile,
 } from 'lucide-react';
 import { faqApi, type FaqTipo, type FaqListItem, type FaqDetail } from '@/lib/api';
 import { toast } from 'sonner';
+
+// ── Icon picker ──────────────────────────────────────────────────────────────
+const ICON_LIST = [
+  'BookOpen','BookMarked','BookCopy','GraduationCap','Lightbulb','Sparkles',
+  'Star','Heart','Trophy','Medal','Award','Target',
+  'Wrench','Settings','Settings2','Tool','Hammer','Scissors',
+  'Bug','AlertTriangle','AlertCircle','Info','HelpCircle','CircleHelp',
+  'CheckCircle','CheckCircle2','XCircle','Shield','ShieldCheck','Lock',
+  'Users','User','UserCheck','Building','Building2','Briefcase',
+  'Laptop','Monitor','Smartphone','Tablet','Database','Server',
+  'FileText','File','Folder','FolderOpen','Clipboard','ClipboardList',
+  'Mail','MessageCircle','MessageSquare','Bell','Phone','PhoneCall',
+  'Globe','Link','ExternalLink','Code','Code2','Terminal',
+  'BarChart','BarChart3','LineChart','PieChart','TrendingUp','Activity',
+  'Calendar','Clock','Timer','Hourglass','RefreshCw','Repeat',
+  'Download','Upload','Share','Send','Printer','Save',
+  'Image','Camera','Video','Music','Mic','Headphones',
+  'Map','MapPin','Navigation','Compass','Home','Store',
+  'ShoppingCart','Package','Tag','Tags','Ticket','Receipt',
+  'DollarSign','CreditCard','Banknote','Coins','Wallet','PiggyBank',
+  'Zap','Battery','Wifi','Bluetooth','Radio','Antenna',
+] as const;
+
+function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ]       = useState('');
+  const filtered = ICON_LIST.filter(n => !q || n.toLowerCase().includes(q.toLowerCase()));
+  const Cur = value ? (LucideIcons as any)[value] : Smile;
+
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(p => !p)}
+        className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm w-full"
+        style={{ background: 'var(--surface-2)', border: `1px solid ${open ? '#818cf8' : 'var(--border-subtle)'}`, color: 'var(--text-primary)' }}>
+        {Cur && <Cur className="w-4 h-4 shrink-0" style={{ color: '#818cf8' }} />}
+        <span className="flex-1 text-left truncate" style={{ color: value ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+          {value || 'Seleccionar ícono'}
+        </span>
+        <X className="w-3.5 h-3.5 shrink-0 opacity-50" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-xl shadow-xl overflow-hidden"
+          style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)' }}>
+          <div className="p-2 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar ícono…"
+              className="w-full px-3 py-1.5 rounded-lg text-xs outline-none"
+              style={{ background: 'var(--surface-2)', color: 'var(--text-primary)' }} />
+          </div>
+          <div className="grid grid-cols-8 gap-1 p-2 max-h-52 overflow-y-auto">
+            <button type="button" onMouseDown={() => { onChange(''); setOpen(false); setQ(''); }}
+              title="Sin ícono"
+              className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/10"
+              style={{ border: !value ? '2px solid #818cf8' : '1px solid var(--border-subtle)' }}>
+              <X className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+            </button>
+            {filtered.map(name => {
+              const Icon = (LucideIcons as any)[name];
+              if (!Icon) return null;
+              return (
+                <button key={name} type="button" title={name}
+                  onMouseDown={() => { onChange(name); setOpen(false); setQ(''); }}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-white/10 transition-colors"
+                  style={{ border: value === name ? '2px solid #818cf8' : '1px solid transparent' }}>
+                  <Icon className="w-4 h-4" style={{ color: value === name ? '#818cf8' : 'var(--text-muted)' }} />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const RichEditor = dynamic(() => import('@/components/ui/RichEditor'), { ssr: false });
 
@@ -27,12 +101,14 @@ function parseTags(raw?: string): string[] {
 }
 
 // ── Type badge ───────────────────────────────────────────────────────────────
-function TypeBadge({ tipo }: { tipo?: { nombre: string; color?: string } | null }) {
+function TypeBadge({ tipo }: { tipo?: { nombre: string; color?: string; icono?: string } | null }) {
   if (!tipo) return null;
   const color = tipo.color ?? '#6366f1';
+  const Icon  = tipo.icono ? (LucideIcons as any)[tipo.icono] : null;
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
       style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}>
+      {Icon && <Icon className="w-3 h-3" />}
       {tipo.nombre}
     </span>
   );
@@ -101,13 +177,12 @@ function TypesModal({ onClose, tipos, onSaved }: { onClose: () => void; tipos: F
           {/* Form */}
           <div className="rounded-xl p-4 space-y-3" style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
             <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{editing ? 'Editar tipo' : 'Nuevo tipo'}</p>
-            <div className="flex gap-2">
-              <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre del tipo *"
-                className="flex-1 px-3 py-2 rounded-xl text-sm outline-none"
-                style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
-              <input value={icono} onChange={e => setIcono(e.target.value)} placeholder="Ícono"
-                className="w-28 px-3 py-2 rounded-xl text-sm outline-none"
-                style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
+            <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre del tipo *"
+              className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+              style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
+            <div>
+              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Ícono</p>
+              <IconPicker value={icono} onChange={setIcono} />
             </div>
             <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Descripción (opcional)"
               className="w-full px-3 py-2 rounded-xl text-sm outline-none"
@@ -140,7 +215,9 @@ function TypesModal({ onClose, tipos, onSaved }: { onClose: () => void; tipos: F
                 <div key={t.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl"
                   style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-3 h-3 rounded-full shrink-0" style={{ background: t.color ?? '#6366f1' }} />
+                    {(() => { const Icon = t.icono ? (LucideIcons as any)[t.icono] : null; return Icon
+                      ? <Icon className="w-4 h-4 shrink-0" style={{ color: t.color ?? '#6366f1' }} />
+                      : <div className="w-3 h-3 rounded-full shrink-0" style={{ background: t.color ?? '#6366f1' }} />; })()}
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{t.nombre}</p>
                       {t.descripcion && <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{t.descripcion}</p>}

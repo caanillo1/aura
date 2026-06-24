@@ -392,13 +392,10 @@ export default function FaqPage() {
   const loadFaqs = useCallback(async () => {
     setLoading(true);
     try {
-      const params: any = {};
-      if (search)     params.q      = search;
-      if (filterTipo) params.tipoId = filterTipo;
-      setFaqs(await faqApi.getFaqs(params));
+      setFaqs(await faqApi.getFaqs({}));
     } catch { toast.error('Error cargando FAQs'); }
     finally  { setLoading(false); }
-  }, [search, filterTipo]);
+  }, []);
 
   useEffect(() => { loadTipos(); }, [loadTipos]);
   useEffect(() => { loadFaqs(); }, [loadFaqs]);
@@ -465,11 +462,17 @@ export default function FaqPage() {
     setTagInput('');
   };
 
-  // ── Filtered FAQ list ──────────────────────────────────────────────────────
+  // ── Filtered FAQ list (client-side, instant) ─────────────────────────────
   const filtered = faqs.filter(f => {
-    const q = search.toLowerCase();
-    if (q && !f.titulo.toLowerCase().includes(q) && !(f.descripcion ?? '').toLowerCase().includes(q) && !(f.etiquetas ?? '').toLowerCase().includes(q)) return false;
     if (filterTipo && f.tipo?.id !== filterTipo) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const inTitulo      = f.titulo.toLowerCase().includes(q);
+      const inDescripcion = (f.descripcion ?? '').toLowerCase().includes(q);
+      const inEtiquetas   = parseTags(f.etiquetas).some(t => t.toLowerCase().includes(q));
+      const inTipo        = (f.tipo?.nombre ?? '').toLowerCase().includes(q);
+      if (!inTitulo && !inDescripcion && !inEtiquetas && !inTipo) return false;
+    }
     return true;
   });
 

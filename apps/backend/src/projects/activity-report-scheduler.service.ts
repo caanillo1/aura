@@ -65,7 +65,7 @@ export class ActivityReportSchedulerService implements OnModuleInit {
 
   private registerCron(companyId: string, cfg: ActivityScheduleConfig) {
     const expr = `0 ${cfg.minuto} ${cfg.hora} * * ${cfg.diasSemana.join(',')}`;
-    const tz   = process.env.TZ ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'America/Bogota';
+    const tz   = Intl.DateTimeFormat().resolvedOptions().timeZone;
     this.logger.log(`Cron actividades [${JOB_PREFIX}${companyId}]: "${expr}" timezone=${tz}`);
     // Timezone explícito para que la hora sea en Colombia, no UTC
     const job = new CronJob(expr, () => {
@@ -86,7 +86,7 @@ export class ActivityReportSchedulerService implements OnModuleInit {
   private async executeSend(companyId: string, cfg: ActivityScheduleConfig): Promise<{ enviados: number; destinatarios: number }> {
     if (!cfg.destinatarios.length) return { enviados: 0, destinatarios: 0 };
     const now = new Date();
-    const tz  = process.env.TZ ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'America/Bogota';
+    const tz  = Intl.DateTimeFormat().resolvedOptions().timeZone;
     // Fecha en hora local del servidor para que "hoy" sea correcto al momento del envío
     const todayLocal = now.toLocaleDateString('sv-SE', { timeZone: tz }); // YYYY-MM-DD
     const dayLocal   = new Date(now.toLocaleString('en-US', { timeZone: tz })).getDay();

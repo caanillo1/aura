@@ -88,6 +88,7 @@ const RichEditor = dynamic(() => import('@/components/ui/RichEditor'), { ssr: fa
 // ── Tipo select (custom — native <select> ignores dark-mode vars) ─────────────
 function TipoSelect({ value, onChange, tipos }: { value: string; onChange: (v: string) => void; tipos: FaqTipo[] }) {
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -97,9 +98,11 @@ function TipoSelect({ value, onChange, tipos }: { value: string; onChange: (v: s
   }, []);
 
   const selected = tipos.find(t => t.id === value);
+  const activeItems = tipos.filter(t => t.activo);
 
   return (
     <div ref={ref} className="relative">
+      {/* Trigger */}
       <button
         type="button"
         onClick={() => setOpen(p => !p)}
@@ -107,62 +110,92 @@ function TipoSelect({ value, onChange, tipos }: { value: string; onChange: (v: s
         style={{
           background: 'var(--surface-2)',
           border: `1px solid ${open ? '#818cf8' : 'var(--border-subtle)'}`,
-          color: selected ? 'var(--text-primary)' : 'var(--text-muted)',
+          color: 'var(--text-primary)',
         }}
       >
-        {selected?.icono && (() => { const I = (LucideIcons as any)[selected.icono]; return I ? <I className="w-3.5 h-3.5 shrink-0" style={{ color: selected.color ?? '#6366f1' }} /> : null; })()}
         {selected ? (
-          <span className="flex-1 truncate font-medium" style={{ color: selected.color ?? 'var(--text-primary)' }}>{selected.nombre}</span>
+          <>
+            {selected.icono && (() => { const I = (LucideIcons as any)[selected.icono]; return I ? <I className="w-3.5 h-3.5 shrink-0" style={{ color: selected.color ?? '#6366f1' }} /> : null; })()}
+            {!selected.icono && <div className="w-3 h-3 rounded-full shrink-0" style={{ background: selected.color ?? '#6366f1' }} />}
+            <span className="flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{selected.nombre}</span>
+          </>
         ) : (
           <span className="flex-1" style={{ color: 'var(--text-muted)' }}>Sin tipo</span>
         )}
-        <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-50" style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }} />
+        <ChevronDown
+          className="w-3.5 h-3.5 shrink-0"
+          style={{ color: 'var(--text-muted)', transform: open ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }}
+        />
       </button>
 
+      {/* Dropdown */}
       {open && (
         <div
-          className="absolute top-full left-0 right-0 z-50 mt-1 rounded-xl shadow-2xl overflow-hidden"
-          style={{ background: 'var(--card-bg)', border: '1px solid var(--border-subtle)', maxHeight: 220, overflowY: 'auto' }}
+          className="absolute top-full left-0 right-0 z-50 mt-1 rounded-xl shadow-2xl"
+          style={{
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border-subtle)',
+            maxHeight: 240,
+            overflowY: 'auto',
+          }}
         >
           {/* Sin tipo */}
-          <button
-            type="button"
-            onMouseDown={() => { onChange(''); setOpen(false); }}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors"
-            style={{
-              background: !value ? 'rgba(129,140,248,0.1)' : 'transparent',
-              color: !value ? '#818cf8' : 'var(--text-muted)',
-              borderBottom: '1px solid var(--border-subtle)',
-            }}
-          >
-            <span className="w-3.5 h-3.5 shrink-0" />
-            Sin tipo
-            {!value && <Check className="w-3.5 h-3.5 ml-auto" style={{ color: '#818cf8' }} />}
-          </button>
+          {([''] as const).map(() => {
+            const isActive = value === '';
+            const isHovered = hovered === '__none__';
+            return (
+              <button
+                key="none"
+                type="button"
+                onMouseDown={() => { onChange(''); setOpen(false); }}
+                onMouseEnter={() => setHovered('__none__')}
+                onMouseLeave={() => setHovered(null)}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left"
+                style={{
+                  background: isActive
+                    ? 'rgba(129,140,248,0.15)'
+                    : isHovered
+                    ? 'rgba(129,140,248,0.07)'
+                    : 'transparent',
+                  color: 'var(--text-primary)',
+                  borderBottom: '1px solid var(--border-subtle)',
+                }}
+              >
+                <span className="w-3.5 h-3.5 shrink-0" />
+                <span className="flex-1">Sin tipo</span>
+                {isActive && <Check className="w-3.5 h-3.5 shrink-0" style={{ color: '#818cf8' }} />}
+              </button>
+            );
+          })}
 
-          {tipos.filter(t => t.activo).map(t => {
+          {activeItems.map(t => {
             const Icon = t.icono ? (LucideIcons as any)[t.icono] : null;
-            const isSelected = value === t.id;
+            const isActive  = value === t.id;
+            const isHovered = hovered === t.id;
             return (
               <button
                 key={t.id}
                 type="button"
                 onMouseDown={() => { onChange(t.id); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors"
+                onMouseEnter={() => setHovered(t.id)}
+                onMouseLeave={() => setHovered(null)}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left"
                 style={{
-                  background: isSelected ? 'rgba(129,140,248,0.08)' : 'transparent',
+                  background: isActive
+                    ? 'rgba(129,140,248,0.15)'
+                    : isHovered
+                    ? 'rgba(129,140,248,0.07)'
+                    : 'transparent',
                   color: 'var(--text-primary)',
                   borderBottom: '1px solid var(--border-subtle)',
                 }}
-                onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(129,140,248,0.08)' : 'transparent'; }}
               >
                 {Icon
                   ? <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: t.color ?? '#6366f1' }} />
-                  : <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: t.color ?? '#6366f1' }} />
+                  : <div className="w-3 h-3 rounded-full shrink-0" style={{ background: t.color ?? '#6366f1' }} />
                 }
-                <span className="flex-1 truncate font-medium" style={{ color: t.color ?? 'var(--text-primary)' }}>{t.nombre}</span>
-                {isSelected && <Check className="w-3.5 h-3.5 shrink-0" style={{ color: '#818cf8' }} />}
+                <span className="flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{t.nombre}</span>
+                {isActive && <Check className="w-3.5 h-3.5 shrink-0" style={{ color: '#818cf8' }} />}
               </button>
             );
           })}

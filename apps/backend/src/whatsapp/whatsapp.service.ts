@@ -54,21 +54,27 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     this.reconnectTimer = setTimeout(() => this.connect(), 500);
   }
 
+  private normalizeJid(phone: string): string {
+    const digits = phone.replace(/\D/g, '');
+    // Remove leading 0057 / 00 prefix if present
+    const clean = digits.replace(/^0+/, '') || digits;
+    const withCountry = clean.startsWith('57') && clean.length >= 12 ? clean : `57${clean}`;
+    return `${withCountry}@s.whatsapp.net`;
+  }
+
   async sendMessage(phone: string, text: string): Promise<boolean> {
     if (!this.sock || this.status !== 'connected') {
       this.logger.warn(`WA sendMessage ignorado — status=${this.status}, sock=${!!this.sock}`);
       return false;
     }
     try {
-      const digits = phone.replace(/\D/g, '');
-      const normalized = digits.startsWith('57') && digits.length >= 12 ? digits : `57${digits}`;
-      const jid = `${normalized}@s.whatsapp.net`;
-      this.logger.log(`Enviando WA a ${jid}`);
+      const jid = this.normalizeJid(phone);
+      this.logger.log(`Enviando WA a ${jid} (input: "${phone}")`);
       await this.sock.sendMessage(jid, { text });
       this.logger.log(`WA enviado OK → ${jid}`);
       return true;
     } catch (err: any) {
-      this.logger.error(`Error enviando WA a ${phone}: ${err?.message}`);
+      this.logger.error(`Error enviando WA a "${phone}" → ${this.normalizeJid(phone)}: ${err?.message ?? JSON.stringify(err)}`);
       return false;
     }
   }
@@ -77,10 +83,28 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     if (this.status !== 'connected') {
       return { ok: false, message: `No hay sesión activa (estado: ${this.status}). Escanea el QR primero.` };
     }
+    if (!this.sock) {
+      return { ok: false, message: 'Socket no disponible. Espera a que reconecte.' };
+    }
+
+    const jid = this.normalizeJid(phone);
+    this.logger.log(`sendTest → JID resuelto: ${jid}`);
+
+    // Verificar que el número esté registrado en WhatsApp
+    try {
+      const [result] = await this.sock.onWhatsApp(jid);
+      if (!result?.exists) {
+        return { ok: false, message: `El número ${jid.split('@')[0]} no está registrado en WhatsApp.` };
+      }
+      this.logger.log(`onWhatsApp OK: ${result.jid}`);
+    } catch (e: any) {
+      this.logger.warn(`onWhatsApp falló (continuando): ${e?.message}`);
+    }
+
     const sent = await this.sendMessage(phone, '✅ *AURA ERP* — Mensaje de prueba. La conexión de WhatsApp funciona correctamente.');
     return sent
-      ? { ok: true,  message: `Mensaje enviado a ${phone}` }
-      : { ok: false, message: 'No se pudo enviar el mensaje. Revisa los logs del servidor.' };
+      ? { ok: true,  message: `Mensaje enviado a ${jid.split('@')[0]}` }
+      : { ok: false, message: `No se pudo enviar al número ${jid.split('@')[0]}. Revisa los logs del servidor.` };
   }
 
   private async connect() {

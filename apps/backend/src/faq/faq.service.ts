@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { randomUUID } from 'crypto';
 import { CreateFaqTipoDto, UpdateFaqTipoDto, CreateFaqDto, UpdateFaqDto, FaqFilterDto } from './dto/faq.dto';
 
 @Injectable()
@@ -9,109 +10,180 @@ export class FaqService {
   // ── Tipos ────────────────────────────────────────────────────────────────────
 
   async getTipos(companyId: string) {
-    return this.prisma.faqTipo.findMany({
-      where: { companyId },
-      orderBy: [{ orden: 'asc' }, { nombre: 'asc' }],
-      select: { id: true, nombre: true, color: true, icono: true, descripcion: true, orden: true, activo: true, _count: { select: { faqs: true } } },
-    });
+    const rows = await this.prisma.$queryRaw<any[]>`
+      SELECT t.id, t.nombre, t.color, t.icono, t.descripcion, t.orden, t.activo,
+             COUNT(f.id) AS faqCount
+      FROM   FaqTipos t
+      LEFT JOIN Faqs f ON f.tipoId = t.id
+      WHERE  t.companyId = ${companyId}
+      GROUP  BY t.id, t.nombre, t.color, t.icono, t.descripcion, t.orden, t.activo
+      ORDER  BY t.orden ASC, t.nombre ASC
+    `;
+    return rows.map(r => ({ ...r, activo: !!r.activo, _count: { faqs: Number(r.faqCount ?? 0) } }));
   }
 
   async createTipo(companyId: string, dto: CreateFaqTipoDto) {
-    return this.prisma.faqTipo.create({
-      data: { companyId, ...dto },
-    });
+    const id  = randomUUID();
+    const now = new Date();
+    await this.prisma.$executeRaw`
+      INSERT INTO FaqTipos (id, companyId, nombre, color, icono, descripcion, orden, activo, createdAt, updatedAt)
+      VALUES (${id}, ${companyId}, ${dto.nombre}, ${dto.color ?? null}, ${dto.icono ?? null},
+              ${dto.descripcion ?? null}, ${dto.orden ?? 0}, 1, ${now}, ${now})
+    `;
+    const [row] = await this.prisma.$queryRaw<any[]>`
+      SELECT * FROM FaqTipos WHERE id = ${id}
+    `;
+    return { ...row, activo: true };
   }
 
   async updateTipo(companyId: string, id: string, dto: UpdateFaqTipoDto) {
-    await this.ensureTipo(companyId, id);
-    return this.prisma.faqTipo.update({ where: { id }, data: dto });
+    const existing = await this.ensureTipo(companyId, id);
+    const now      = new Date();
+    const nombre      = dto.nombre      ?? existing.nombre;
+    const color       = dto.color       !== undefined ? dto.color       : existing.color;
+    const icono       = dto.icono       !== undefined ? dto.icono       : existing.icono;
+    const descripcion = dto.descripcion !== undefined ? dto.descripcion : existing.descripcion;
+    const orden       = dto.orden       ?? existing.orden;
+    const activo      = dto.activo      !== undefined ? (dto.activo ? 1 : 0) : (existing.activo ? 1 : 0);
+
+    await this.prisma.$executeRaw`
+      UPDATE FaqTipos SET
+        nombre = ${nombre}, color = ${color}, icono = ${icono},
+        descripcion = ${descripcion}, orden = ${orden}, activo = ${activo},
+        updatedAt = ${now}
+      WHERE id = ${id}
+    `;
+    const [updated] = await this.prisma.$queryRaw<any[]>`SELECT * FROM FaqTipos WHERE id = ${id}`;
+    return { ...updated, activo: !!updated.activo };
   }
 
   async deleteTipo(companyId: string, id: string) {
     await this.ensureTipo(companyId, id);
-    const count = await this.prisma.faq.count({ where: { tipoId: id } });
-    if (count > 0) throw new ForbiddenException(`El tipo tiene ${count} FAQ(s) asociados. Elimínalos o cámbiales el tipo primero.`);
-    await this.prisma.faqTipo.delete({ where: { id } });
+    const [{ cnt }] = await this.prisma.$queryRaw<{ cnt: number }[]>`
+      SELECT COUNT(*) AS cnt FROM Faqs WHERE tipoId = ${id}
+    `;
+    if (Number(cnt) > 0)
+      throw new ForbiddenException(`El tipo tiene ${cnt} FAQ(s) asociados. Elimínalos o cámbiales el tipo primero.`);
+    await this.prisma.$executeRaw`DELETE FROM FaqTipos WHERE id = ${id}`;
     return { message: 'Tipo eliminado' };
   }
 
   // ── FAQs ─────────────────────────────────────────────────────────────────────
 
   async getFaqs(companyId: string, filter: FaqFilterDto) {
-    const where: any = { companyId };
-    if (filter.soloActivos !== false) where.activo = true;
-    if (filter.tipoId)                where.tipoId = filter.tipoId;
+    // Build base query — extra filters appended via separate queries when needed
+    let rows: any[] = await this.prisma.$queryRaw`
+      SELECT f.id, f.titulo, f.descripcion, f.etiquetas, f.vistas, f.activo,
+             f.createdAt, f.updatedAt,
+             t.id AS tipoId, t.nombre AS tipoNombre, t.color AS tipoColor, t.icono AS tipoIcono,
+             u.id AS autorId, u.firstName, u.lastName
+      FROM   Faqs f
+      LEFT JOIN FaqTipos t ON t.id = f.tipoId
+      LEFT JOIN Usuarios u ON u.id = f.autorId
+      WHERE  f.companyId = ${companyId}
+      ORDER  BY f.updatedAt DESC
+    `;
+
+    // Apply JS-side filters (avoids dynamic SQL injection risk)
+    if (filter.soloActivos !== false) rows = rows.filter(r => r.activo);
+    if (filter.tipoId)                rows = rows.filter(r => r.tipoId === filter.tipoId);
     if (filter.q) {
-      where.OR = [
-        { titulo:      { contains: filter.q } },
-        { descripcion: { contains: filter.q } },
-        { etiquetas:   { contains: filter.q } },
-      ];
+      const q = filter.q.toLowerCase();
+      rows = rows.filter(r =>
+        (r.titulo       ?? '').toLowerCase().includes(q) ||
+        (r.descripcion  ?? '').toLowerCase().includes(q) ||
+        (r.etiquetas    ?? '').toLowerCase().includes(q),
+      );
     }
-    return this.prisma.faq.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      select: {
-        id: true, titulo: true, descripcion: true, etiquetas: true, vistas: true,
-        activo: true, createdAt: true, updatedAt: true,
-        tipo:  { select: { id: true, nombre: true, color: true, icono: true } },
-        autor: { select: { id: true, firstName: true, lastName: true } },
-      },
-    });
+
+    return rows.map(r => this.mapListItem(r));
   }
 
   async getFaq(companyId: string, id: string) {
-    const faq = await this.prisma.faq.findFirst({
-      where: { id, companyId },
-      include: {
-        tipo:  { select: { id: true, nombre: true, color: true, icono: true } },
-        autor: { select: { id: true, firstName: true, lastName: true } },
-      },
-    });
-    if (!faq) throw new NotFoundException('FAQ no encontrado');
-    // Incrementar vistas
-    await this.prisma.faq.update({ where: { id }, data: { vistas: { increment: 1 } } });
-    return faq;
+    const [row] = await this.prisma.$queryRaw<any[]>`
+      SELECT f.*,
+             t.id AS tipoId, t.nombre AS tipoNombre, t.color AS tipoColor, t.icono AS tipoIcono,
+             u.id AS autorId, u.firstName, u.lastName
+      FROM   Faqs f
+      LEFT JOIN FaqTipos t ON t.id = f.tipoId
+      LEFT JOIN Usuarios u ON u.id = f.autorId
+      WHERE  f.id = ${id} AND f.companyId = ${companyId}
+    `;
+    if (!row) throw new NotFoundException('FAQ no encontrado');
+    await this.prisma.$executeRaw`UPDATE Faqs SET vistas = vistas + 1 WHERE id = ${id}`;
+    return { ...this.mapListItem(row), contenido: row.contenido };
   }
 
   async createFaq(companyId: string, autorId: string, dto: CreateFaqDto) {
-    const { etiquetas, ...rest } = dto;
-    return this.prisma.faq.create({
-      data: {
-        companyId, autorId, ...rest,
-        etiquetas: etiquetas ? JSON.stringify(etiquetas) : null,
-      },
-      include: { tipo: true, autor: { select: { id: true, firstName: true, lastName: true } } },
-    });
+    const id  = randomUUID();
+    const now = new Date();
+    const etiquetas = dto.etiquetas?.length ? JSON.stringify(dto.etiquetas) : null;
+    await this.prisma.$executeRaw`
+      INSERT INTO Faqs (id, companyId, tipoId, titulo, descripcion, contenido, etiquetas, autorId, activo, vistas, createdAt, updatedAt)
+      VALUES (${id}, ${companyId}, ${dto.tipoId ?? null}, ${dto.titulo}, ${dto.descripcion ?? null},
+              ${dto.contenido}, ${etiquetas}, ${autorId}, 1, 0, ${now}, ${now})
+    `;
+    return this.getFaq(companyId, id);
   }
 
   async updateFaq(companyId: string, id: string, dto: UpdateFaqDto) {
-    await this.ensureFaq(companyId, id);
-    const { etiquetas, ...rest } = dto;
-    return this.prisma.faq.update({
-      where: { id },
-      data: { ...rest, ...(etiquetas !== undefined ? { etiquetas: JSON.stringify(etiquetas) } : {}) },
-      include: { tipo: true, autor: { select: { id: true, firstName: true, lastName: true } } },
-    });
+    const existing = await this.ensureFaq(companyId, id);
+    const now      = new Date();
+    const titulo      = dto.titulo      ?? existing.titulo;
+    const descripcion = dto.descripcion !== undefined ? dto.descripcion : existing.descripcion;
+    const contenido   = dto.contenido   ?? existing.contenido;
+    const tipoId      = dto.tipoId      !== undefined ? dto.tipoId     : existing.tipoId;
+    const etiquetas   = dto.etiquetas   !== undefined
+      ? (dto.etiquetas.length ? JSON.stringify(dto.etiquetas) : null)
+      : existing.etiquetas;
+    const activo      = dto.activo      !== undefined ? (dto.activo ? 1 : 0) : (existing.activo ? 1 : 0);
+
+    await this.prisma.$executeRaw`
+      UPDATE Faqs SET
+        titulo = ${titulo}, descripcion = ${descripcion}, contenido = ${contenido},
+        tipoId = ${tipoId ?? null}, etiquetas = ${etiquetas}, activo = ${activo},
+        updatedAt = ${now}
+      WHERE id = ${id}
+    `;
+    return this.getFaq(companyId, id);
   }
 
   async deleteFaq(companyId: string, id: string) {
     await this.ensureFaq(companyId, id);
-    await this.prisma.faq.delete({ where: { id } });
+    await this.prisma.$executeRaw`DELETE FROM Faqs WHERE id = ${id}`;
     return { message: 'FAQ eliminado' };
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   private async ensureTipo(companyId: string, id: string) {
-    const row = await this.prisma.faqTipo.findFirst({ where: { id, companyId } });
+    const [row] = await this.prisma.$queryRaw<any[]>`
+      SELECT * FROM FaqTipos WHERE id = ${id} AND companyId = ${companyId}
+    `;
     if (!row) throw new NotFoundException('Tipo FAQ no encontrado');
     return row;
   }
 
   private async ensureFaq(companyId: string, id: string) {
-    const row = await this.prisma.faq.findFirst({ where: { id, companyId } });
+    const [row] = await this.prisma.$queryRaw<any[]>`
+      SELECT * FROM Faqs WHERE id = ${id} AND companyId = ${companyId}
+    `;
     if (!row) throw new NotFoundException('FAQ no encontrado');
     return row;
+  }
+
+  private mapListItem(r: any) {
+    return {
+      id:          r.id,
+      titulo:      r.titulo,
+      descripcion: r.descripcion,
+      etiquetas:   r.etiquetas,
+      vistas:      Number(r.vistas ?? 0),
+      activo:      !!r.activo,
+      createdAt:   r.createdAt,
+      updatedAt:   r.updatedAt,
+      tipo:  r.tipoId ? { id: r.tipoId, nombre: r.tipoNombre, color: r.tipoColor, icono: r.tipoIcono } : null,
+      autor: r.autorId ? { id: r.autorId, firstName: r.firstName, lastName: r.lastName } : null,
+    };
   }
 }

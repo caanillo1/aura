@@ -633,6 +633,20 @@ export default function FaqPage() {
                 className="prose-faq"
                 dangerouslySetInnerHTML={{ __html: selected.contenido }}
                 style={{ color: 'var(--text-primary)', lineHeight: '1.7', fontSize: '15px' }}
+                onClick={async e => {
+                  const el = (e.target as HTMLElement).closest('[data-url]') as HTMLElement | null;
+                  if (!el) return;
+                  e.preventDefault();
+                  const filename = el.dataset.filename ?? '';
+                  const label    = el.querySelector('span[style*="font-weight"]')?.textContent ?? filename;
+                  try {
+                    const blob = await faqApi.downloadFile(filename);
+                    const url  = URL.createObjectURL(blob);
+                    const a    = document.createElement('a');
+                    a.href = url; a.download = label; a.click();
+                    URL.revokeObjectURL(url);
+                  } catch { toast.error('Error al descargar el archivo'); }
+                }}
               />
             </div>
           </div>
@@ -714,6 +728,7 @@ export default function FaqPage() {
                   onChange={setContenido}
                   placeholder="Documenta el caso, pasos de solución, capturas de pantalla, observaciones..."
                   minHeight={380}
+                  onUploadFile={faqApi.uploadFile}
                 />
               </div>
             </div>
@@ -736,6 +751,8 @@ export default function FaqPage() {
         .prose-faq ol  { list-style: decimal; padding-left: 1.5em; margin: 0.5em 0; }
         .prose-faq hr  { border-color: var(--border-subtle); margin: 1em 0; }
         .prose-faq p   { margin: 0.4em 0; }
+        .prose-faq .faq-attachment { cursor: pointer; transition: background 0.15s; }
+        .prose-faq .faq-attachment:hover { background: rgba(129,140,248,0.18) !important; }
       `}</style>
     </div>
   );

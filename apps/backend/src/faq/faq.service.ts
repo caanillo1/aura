@@ -1,4 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import type { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateFaqTipoDto, UpdateFaqTipoDto, CreateFaqDto, UpdateFaqDto, FaqFilterDto } from './dto/faq.dto';
 
@@ -178,6 +181,12 @@ export class FaqService {
     await this.ensureFaq(companyId, id);
     await this.prisma.$executeRaw`DELETE FROM Faqs WHERE id = CONVERT(uniqueidentifier, ${id})`;
     return { message: 'FAQ eliminado' };
+  }
+
+  streamFile(filename: string, res: Response) {
+    const filePath = join(process.cwd(), 'uploads', 'faq', filename);
+    if (!existsSync(filePath)) throw new NotFoundException('Archivo no encontrado');
+    res.download(filePath);
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────

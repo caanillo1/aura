@@ -3,7 +3,7 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import {
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
   AlignJustify, List, ListOrdered, Image, Minus, Eraser, Palette,
-  Type, ChevronDown,
+  Type, ChevronDown, Paperclip, Loader2,
 } from 'lucide-react';
 
 const FONTS = ['Arial', 'Georgia', 'Verdana', 'Courier New', 'Tahoma', 'Times New Roman', 'Trebuchet MS'];
@@ -18,11 +18,20 @@ const COLORS = [
   '#0e7490','#0891b2','#22d3ee','#67e8f9','#cffafe',
 ];
 
+const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 interface Props {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
   minHeight?: number;
+  onUploadFile?: (file: File) => Promise<{ filename: string; originalName: string; size: number; url: string }>;
 }
 
 function ToolBtn({ title, onClick, active, children }: { title: string; onClick: () => void; active?: boolean; children: React.ReactNode }) {
@@ -44,16 +53,17 @@ function Divider() {
   return <div className="w-px h-5 mx-1 self-center" style={{ background: 'var(--border-subtle)' }} />;
 }
 
-export default function RichEditor({ value, onChange, placeholder = 'Escribe el contenido aquí...', minHeight = 320 }: Props) {
-  const editorRef   = useRef<HTMLDivElement>(null);
-  const [imgModal, setImgModal] = useState(false);
-  const [imgUrl, setImgUrl]     = useState('');
+export default function RichEditor({ value, onChange, placeholder = 'Escribe el contenido aquí...', minHeight = 320, onUploadFile }: Props) {
+  const editorRef    = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imgModal, setImgModal]       = useState(false);
+  const [imgUrl, setImgUrl]           = useState('');
   const [colorPicker, setColorPicker] = useState<'text' | 'bg' | null>(null);
-  const [fontOpen, setFontOpen]  = useState(false);
-  const [sizeOpen, setSizeOpen]  = useState(false);
+  const [fontOpen, setFontOpen]       = useState(false);
+  const [sizeOpen, setSizeOpen]       = useState(false);
+  const [uploading, setUploading]     = useState(false);
   const savedRange = useRef<Range | null>(null);
 
-  // Initialize editor content
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== value) {
       editorRef.current.innerHTML = value;
@@ -100,7 +110,6 @@ export default function RichEditor({ value, onChange, placeholder = 'Escribe el 
 
   const setSize = (size: string) => {
     restoreRange();
-    // execCommand fontSize only supports 1-7, use inline style instead
     editorRef.current?.focus();
     document.execCommand('insertHTML', false,
       `<span style="font-size:${size}px">${window.getSelection()?.toString() || '​'}</span>`);
@@ -113,6 +122,35 @@ export default function RichEditor({ value, onChange, placeholder = 'Escribe el 
     if (colorPicker === 'text') exec('foreColor', color);
     else exec('hiliteColor', color);
     setColorPicker(null);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !onUploadFile) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      alert(`El archivo supera el límite de 30 MB (${formatBytes(file.size)})`);
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const result = await onUploadFile(file);
+      restoreRange();
+      editorRef.current?.focus();
+      const html = `<div class="faq-attachment" data-url="${result.url}" data-filename="${result.filename}" contenteditable="false" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;margin:4px 0;border-radius:10px;border:1px solid rgba(129,140,248,0.35);background:rgba(129,140,248,0.08);cursor:pointer;user-select:none;">` +
+        `<span style="font-size:18px;">📎</span>` +
+        `<span style="font-size:13px;font-weight:600;color:#818cf8;">${result.originalName}</span>` +
+        `<span style="font-size:11px;color:var(--text-muted);margin-left:4px;">${formatBytes(result.size)}</span>` +
+        `</div><br/>`;
+      document.execCommand('insertHTML', false, html);
+      if (editorRef.current) onChange(editorRef.current.innerHTML);
+    } catch {
+      alert('Error al subir el archivo. Intenta de nuevo.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -218,6 +256,31 @@ export default function RichEditor({ value, onChange, placeholder = 'Escribe el 
           <Image className="w-4 h-4" />
         </ToolBtn>
 
+        {/* File attach — only shown when upload handler provided */}
+        {onUploadFile && (
+          <>
+            <button
+              type="button"
+              title="Adjuntar archivo Excel / CSV (máx 30 MB)"
+              disabled={uploading}
+              onMouseDown={e => { e.preventDefault(); saveRange(); fileInputRef.current?.click(); }}
+              className="p-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs disabled:opacity-50"
+              style={{ color: uploading ? '#818cf8' : 'var(--text-muted)' }}>
+              {uploading
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <Paperclip className="w-4 h-4" />}
+              {uploading && <span>Subiendo…</span>}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </>
+        )}
+
         {/* Separator */}
         <ToolBtn title="Línea separadora" onClick={() => exec('insertHorizontalRule')}><Minus className="w-4 h-4" /></ToolBtn>
 
@@ -283,6 +346,7 @@ export default function RichEditor({ value, onChange, placeholder = 'Escribe el 
         .rich-editor-content ul { list-style: disc; padding-left: 1.5em; }
         .rich-editor-content ol { list-style: decimal; padding-left: 1.5em; }
         .rich-editor-content hr { border-color: var(--border-subtle); margin: 1em 0; }
+        .rich-editor-content .faq-attachment:hover { background: rgba(129,140,248,0.15) !important; }
       `}</style>
     </div>
   );

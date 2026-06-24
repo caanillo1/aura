@@ -303,6 +303,15 @@ export const faqApi = {
     api.patch(`/faq/${id}`, body).then(r => r.data),
   deleteFaq: (id: string) =>
     api.delete(`/faq/${id}`).then(r => r.data),
+
+  uploadFile: (file: File): Promise<{ filename: string; originalName: string; size: number; url: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post('/faq/upload-file', form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data);
+  },
+
+  downloadFile: (filename: string): Promise<Blob> =>
+    api.get(`/faq/files/${filename}`, { responseType: 'blob' }).then(r => r.data),
 };
 
 // ── Service Orders ────────────────────────────────────────────────────────────

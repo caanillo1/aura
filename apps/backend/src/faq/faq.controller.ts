@@ -1,8 +1,14 @@
 import {
   Controller, Get, Post, Patch, Delete,
   Param, Body, Query, UseGuards,
+  UseInterceptors, UploadedFile, Res, BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiConsumes } from '@nestjs/swagger';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { mkdirSync } from 'fs';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard }   from '../common/guards/roles.guard';
 import { Roles }        from '../common/decorators/roles.decorator';
@@ -13,6 +19,25 @@ import {
   CreateFaqTipoDto, UpdateFaqTipoDto,
   CreateFaqDto, UpdateFaqDto, FaqFilterDto,
 } from './dto/faq.dto';
+
+const ALLOWED_MIME = new Set([
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'application/csv',
+]);
+
+const faqFileStorage = diskStorage({
+  destination: (_req, _file, cb) => {
+    const dir = join(process.cwd(), 'uploads', 'faq');
+    mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    cb(null, `${unique}${extname(file.originalname)}`);
+  },
+});
 
 const IMPL_ROLES = ['admin','coordinator','implementer_clinical','implementer_financial','implementer_support'] as const;
 const ALL_ROLES  = [...IMPL_ROLES, 'support', 'client'] as const;
@@ -89,5 +114,41 @@ export class FaqController {
   @ApiOperation({ summary: 'Eliminar FAQ' })
   deleteFaq(@GetUser() user: JwtUser, @Param('id') id: string) {
     return this.svc.deleteFaq(user.companyId, id);
+  }
+
+  // ── Archivos adjuntos ─────────────────────────────────────────────────────
+
+  @Post('upload-file')
+  @Roles(...IMPL_ROLES)
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Subir archivo Excel/CSV para adjuntar en FAQ (máx 30 MB)' })
+  @UseInterceptors(FileInterceptor('file', {
+    storage: faqFileStorage,
+    limits: { fileSize: 30 * 1024 * 1024 },
+  }))
+  uploadFile(
+    @GetUser() _user: JwtUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+    if (!ALLOWED_MIME.has(file.mimetype) && !['.xlsx', '.xls', '.csv'].includes(extname(file.originalname).toLowerCase()))
+      throw new BadRequestException('Solo se permiten archivos Excel (.xlsx, .xls) o CSV');
+    return {
+      filename:     file.filename,
+      originalName: file.originalname,
+      size:         file.size,
+      url:          `/faq/files/${file.filename}`,
+    };
+  }
+
+  @Get('files/:filename')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Descargar archivo adjunto de FAQ' })
+  downloadFile(
+    @GetUser() _user: JwtUser,
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ) {
+    return this.svc.streamFile(filename, res);
   }
 }

@@ -92,7 +92,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
 
     // Verificar que el número esté registrado en WhatsApp
     try {
-      const [result] = await this.sock.onWhatsApp(jid);
+      const results = await this.sock.onWhatsApp(jid);
+      const result = results?.[0];
       if (!result?.exists) {
         return { ok: false, message: `El número ${jid.split('@')[0]} no está registrado en WhatsApp.` };
       }

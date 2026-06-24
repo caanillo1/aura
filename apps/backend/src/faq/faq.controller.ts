@@ -20,12 +20,6 @@ import {
   CreateFaqDto, UpdateFaqDto, FaqFilterDto,
 } from './dto/faq.dto';
 
-const ALLOWED_MIME = new Set([
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/csv',
-  'application/csv',
-]);
 
 const faqFileStorage = diskStorage({
   destination: (_req, _file, cb) => {
@@ -131,8 +125,6 @@ export class FaqController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException('No se recibió ningún archivo');
-    if (!ALLOWED_MIME.has(file.mimetype) && !['.xlsx', '.xls', '.csv'].includes(extname(file.originalname).toLowerCase()))
-      throw new BadRequestException('Solo se permiten archivos Excel (.xlsx, .xls) o CSV');
     return {
       filename:     file.filename,
       originalName: file.originalname,

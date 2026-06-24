@@ -261,7 +261,7 @@ export default function RichEditor({ value, onChange, placeholder = 'Escribe el 
           <>
             <button
               type="button"
-              title="Adjuntar archivo Excel / CSV (máx 30 MB)"
+              title="Adjuntar archivo (máx 30 MB)"
               disabled={uploading}
               onMouseDown={e => { e.preventDefault(); saveRange(); fileInputRef.current?.click(); }}
               className="p-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs disabled:opacity-50"
@@ -274,7 +274,7 @@ export default function RichEditor({ value, onChange, placeholder = 'Escribe el 
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+              accept="*/*"
               className="hidden"
               onChange={handleFileChange}
             />

@@ -466,13 +466,15 @@ export default function FaqPage() {
   const filtered = faqs.filter(f => {
     if (filterTipo && f.tipo?.id !== filterTipo) return false;
     if (search) {
-      const q = search.toLowerCase();
-      const inTitulo      = f.titulo.toLowerCase().includes(q);
-      const inDescripcion = (f.descripcion ?? '').toLowerCase().includes(q);
-      const inContenido   = (f.contenidoTexto ?? '').toLowerCase().includes(q);
-      const inEtiquetas   = parseTags(f.etiquetas).some(t => t.toLowerCase().includes(q));
-      const inTipo        = (f.tipo?.nombre ?? '').toLowerCase().includes(q);
-      if (!inTitulo && !inDescripcion && !inContenido && !inEtiquetas && !inTipo) return false;
+      const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+      const haystack = [
+        f.titulo,
+        f.descripcion ?? '',
+        f.contenidoTexto ?? '',
+        f.tipo?.nombre ?? '',
+        ...parseTags(f.etiquetas),
+      ].join(' ').toLowerCase();
+      if (!words.every(w => haystack.includes(w))) return false;
     }
     return true;
   });

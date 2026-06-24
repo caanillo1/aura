@@ -75,7 +75,7 @@ export class FaqService {
 
   async getFaqs(companyId: string, filter: FaqFilterDto) {
     let rows: any[] = await this.prisma.$queryRaw`
-      SELECT f.id, f.titulo, f.descripcion, f.etiquetas, f.vistas, f.activo,
+      SELECT f.id, f.titulo, f.descripcion, f.contenido, f.etiquetas, f.vistas, f.activo,
              f.createdAt, f.updatedAt,
              t.id AS tipoId, t.nombre AS tipoNombre, t.color AS tipoColor, t.icono AS tipoIcono,
              u.id AS autorId, u.firstName, u.lastName
@@ -89,14 +89,6 @@ export class FaqService {
     if (filter.soloActivos !== false) rows = rows.filter(r => r.activo);
     if (filter.tipoId) {
       rows = rows.filter(r => r.tipoId?.toString().toLowerCase() === filter.tipoId!.toLowerCase());
-    }
-    if (filter.q) {
-      const q = filter.q.toLowerCase();
-      rows = rows.filter(r =>
-        (r.titulo      ?? '').toLowerCase().includes(q) ||
-        (r.descripcion ?? '').toLowerCase().includes(q) ||
-        (r.etiquetas   ?? '').toLowerCase().includes(q),
-      );
     }
     return rows.map(r => this.mapListItem(r));
   }
@@ -210,17 +202,22 @@ export class FaqService {
     return row;
   }
 
+  private stripHtml(html: string): string {
+    return (html ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
   private mapListItem(r: any) {
     return {
-      id:          r.id?.toString(),
-      titulo:      r.titulo,
-      descripcion: r.descripcion,
-      etiquetas:   r.etiquetas,
-      vistas:      Number(r.vistas ?? 0),
-      activo:      !!r.activo,
-      createdAt:   r.createdAt,
-      updatedAt:   r.updatedAt,
-      tipo:  r.tipoId ? { id: r.tipoId.toString(), nombre: r.tipoNombre, color: r.tipoColor, icono: r.tipoIcono } : null,
+      id:              r.id?.toString(),
+      titulo:          r.titulo,
+      descripcion:     r.descripcion,
+      etiquetas:       r.etiquetas,
+      contenidoTexto:  this.stripHtml(r.contenido ?? ''),
+      vistas:          Number(r.vistas ?? 0),
+      activo:          !!r.activo,
+      createdAt:       r.createdAt,
+      updatedAt:       r.updatedAt,
+      tipo:  r.tipoId  ? { id: r.tipoId.toString(),  nombre: r.tipoNombre, color: r.tipoColor, icono: r.tipoIcono } : null,
       autor: r.autorId ? { id: r.autorId.toString(), firstName: r.firstName, lastName: r.lastName } : null,
     };
   }

@@ -275,6 +275,7 @@ export interface FaqTipo {
 
 export interface FaqListItem {
   id: string; titulo: string; descripcion?: string; etiquetas?: string;
+  contenidoTexto?: string;
   vistas: number; activo: boolean; createdAt: string; updatedAt: string;
   tipo?: { id: string; nombre: string; color?: string; icono?: string } | null;
   autor?: { id: string; firstName: string; lastName: string } | null;

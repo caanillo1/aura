@@ -469,9 +469,10 @@ export default function FaqPage() {
       const q = search.toLowerCase();
       const inTitulo      = f.titulo.toLowerCase().includes(q);
       const inDescripcion = (f.descripcion ?? '').toLowerCase().includes(q);
+      const inContenido   = (f.contenidoTexto ?? '').toLowerCase().includes(q);
       const inEtiquetas   = parseTags(f.etiquetas).some(t => t.toLowerCase().includes(q));
       const inTipo        = (f.tipo?.nombre ?? '').toLowerCase().includes(q);
-      if (!inTitulo && !inDescripcion && !inEtiquetas && !inTipo) return false;
+      if (!inTitulo && !inDescripcion && !inContenido && !inEtiquetas && !inTipo) return false;
     }
     return true;
   });

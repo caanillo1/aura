@@ -89,24 +89,31 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
     }
 
     const jid = this.normalizeJid(phone);
-    this.logger.log(`sendTest → JID resuelto: ${jid}`);
+    this.logger.log(`sendTest → JID construido: ${jid}`);
 
-    // Verificar que el número esté registrado en WhatsApp
+    // Obtener JID canónico de WhatsApp (puede diferir del construido)
+    let targetJid = jid;
     try {
       const results = await this.sock.onWhatsApp(jid);
       const result = results?.[0];
       if (!result?.exists) {
         return { ok: false, message: `El número ${jid.split('@')[0]} no está registrado en WhatsApp.` };
       }
-      this.logger.log(`onWhatsApp OK: ${result.jid}`);
+      targetJid = result.jid;
+      this.logger.log(`onWhatsApp OK: JID canónico = ${targetJid}`);
     } catch (e: any) {
-      this.logger.warn(`onWhatsApp falló (continuando): ${e?.message}`);
+      this.logger.warn(`onWhatsApp falló, usando JID construido: ${e?.message}`);
     }
 
-    const sent = await this.sendMessage(phone, '✅ *AURA ERP* — Mensaje de prueba. La conexión de WhatsApp funciona correctamente.');
-    return sent
-      ? { ok: true,  message: `Mensaje enviado a ${jid.split('@')[0]}` }
-      : { ok: false, message: `No se pudo enviar al número ${jid.split('@')[0]}. Revisa los logs del servidor.` };
+    // Enviar usando el JID canónico
+    try {
+      await this.sock.sendMessage(targetJid, { text: '✅ *AURA ERP* — Mensaje de prueba. La conexión de WhatsApp funciona correctamente.' });
+      this.logger.log(`WA enviado OK → ${targetJid}`);
+      return { ok: true, message: `Mensaje enviado a ${targetJid.split('@')[0]}` };
+    } catch (err: any) {
+      this.logger.error(`Error enviando WA a ${targetJid}: ${err?.message ?? JSON.stringify(err)}`);
+      return { ok: false, message: `No se pudo enviar al número ${targetJid.split('@')[0]}. Revisa los logs del servidor.` };
+    }
   }
 
   private async connect() {

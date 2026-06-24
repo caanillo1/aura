@@ -37,12 +37,6 @@ const slideVariants = {
   exit: (dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 }),
 };
 
-const steps: { key: Step; label: string }[] = [
-  { key: 'type', label: 'Tipo' },
-  { key: 'company', label: 'Empresa' },
-  { key: 'user', label: 'Datos' },
-];
-
 export default function RegisterPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
@@ -136,8 +130,6 @@ export default function RegisterPage() {
         ...(userType === 'agent' && { agentRegPassword: user.agentRegPassword }),
         ...(userType === 'client' && {
           companyNit: company.nit,
-          // Solo enviar razón social cuando se está creando empresa nueva
-          // Si companyMode === 'existing', no se envía → backend hace lookup por NIT
           ...(companyMode === 'new' && company.businessName && { companyBusinessName: company.businessName }),
           ...(companyMode === 'new' && company.commercialName && { companyCommercialName: company.commercialName }),
           ...(companyMode === 'new' && company.address && { companyAddress: company.address }),
@@ -161,11 +153,19 @@ export default function RegisterPage() {
     }
   };
 
-  // Índice del paso actual para el indicador
-  const stepOrder: Step[] = userType === 'client'
-    ? ['type', 'company', 'user']
-    : ['type', 'user'];
+  const stepOrder: Step[] = userType === 'client' ? ['type', 'company', 'user'] : ['type', 'user'];
   const currentIdx = stepOrder.indexOf(step);
+
+  // ── Shared error box ──────────────────────────────────────────────────────
+  const ErrorBox = ({ msg }: { msg: string }) => (
+    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="flex items-center gap-2 rounded-xl px-4 py-3 mb-4"
+      style={{ background: 'var(--accent-red-bg)', border: '1px solid rgba(248,113,113,0.28)' }}>
+      <AlertCircle className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-red)' }} />
+      <span className="text-sm" style={{ color: 'var(--accent-red)' }}>{msg}</span>
+    </motion.div>
+  );
 
   return (
     <div className="flex min-h-screen items-center justify-center py-8">
@@ -175,33 +175,56 @@ export default function RegisterPage() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        {/* Header */}
-        <div className="text-center mb-7">
+        {/* Cabecera */}
+        <div className="text-center mb-6">
           <div className="flex justify-center mb-3">
             <AuraLogo size={60} animate />
           </div>
           <AuraText />
-          <p className="text-slate-400 text-xs mt-1.5 tracking-widest uppercase">
-            Gestiones Inteligentes
-          </p>
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <div className="h-px w-10" style={{ background: 'var(--border-strong)' }} />
+            <span className="text-[11px] font-semibold tracking-[0.22em] uppercase"
+              style={{ color: 'var(--text-muted)' }}>
+              Crear cuenta
+            </span>
+            <div className="h-px w-10" style={{ background: 'var(--border-strong)' }} />
+          </div>
         </div>
 
         {/* Indicador de pasos */}
-        <div className="flex items-center justify-center gap-2 mb-6">
+        <div className="flex items-center justify-center gap-2 mb-5">
           {stepOrder.map((s, i) => {
             const done = i < currentIdx;
             const active = i === currentIdx;
             return (
               <div key={s} className="flex items-center gap-2">
-                <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all ${
-                  done ? 'bg-green-500 text-white' :
-                  active ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/30' :
-                  'bg-white/10 text-slate-500'
-                }`}>
+                <motion.div
+                  animate={{ scale: active ? 1.1 : 1 }}
+                  className="flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all"
+                  style={{
+                    background: done
+                      ? 'var(--accent-green-bg)'
+                      : active
+                      ? 'var(--accent-violet-bg)'
+                      : 'var(--surface-2)',
+                    border: done
+                      ? '1px solid rgba(52,211,153,0.4)'
+                      : active
+                      ? '1px solid var(--accent-violet-border)'
+                      : '1px solid var(--border-subtle)',
+                    color: done
+                      ? 'var(--accent-green)'
+                      : active
+                      ? 'var(--accent-violet)'
+                      : 'var(--text-muted)',
+                    boxShadow: active ? '0 0 12px var(--accent-violet-bg)' : 'none',
+                  }}
+                >
                   {done ? <Check className="w-3.5 h-3.5" /> : i + 1}
-                </div>
+                </motion.div>
                 {i < stepOrder.length - 1 && (
-                  <div className={`h-px w-8 transition-all ${done ? 'bg-green-500' : 'bg-white/10'}`} />
+                  <div className="h-px w-8 transition-all"
+                    style={{ background: done ? 'var(--accent-green)' : 'var(--border-subtle)' }} />
                 )}
               </div>
             );
@@ -211,83 +234,93 @@ export default function RegisterPage() {
         {/* Card */}
         <div className="glass-strong rounded-2xl overflow-hidden">
           <AnimatePresence mode="wait" custom={dir}>
-            {/* ── PASO 1: TIPO ──────────────────────────────────────────── */}
+
+            {/* ── PASO 1: TIPO ── */}
             {step === 'type' && (
               <motion.div key="type" custom={dir} variants={slideVariants}
                 initial="enter" animate="center" exit="exit"
                 transition={{ duration: 0.28, ease: 'easeInOut' }}
                 className="p-8"
               >
-                <h2 className="text-xl font-semibold text-white mb-1">Crear cuenta</h2>
-                <p className="text-slate-400 text-sm mb-6">¿Cómo vas a usar AURA?</p>
+                <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Crear cuenta
+                </h2>
+                <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+                  ¿Cómo vas a usar AURA?
+                </p>
 
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-2 gap-3 mb-6">
                   {[
                     {
                       type: 'client' as UserType,
                       label: 'Empresa / Cliente',
                       icon: Building2,
                       desc: 'Soy una empresa que contrata las implementaciones y quiero hacer seguimiento de mi proyecto.',
-                      color: 'emerald',
+                      accentBg: 'var(--accent-green-bg)',
+                      accentBorder: 'rgba(52,211,153,0.4)',
+                      accentColor: 'var(--accent-green)',
+                      accentIconBg: 'rgba(52,211,153,0.15)',
                     },
                     {
                       type: 'agent' as UserType,
                       label: 'Agente Infotec',
                       icon: Users,
                       desc: 'Soy coordinador o implementador de Sistemas Infotec.',
-                      color: 'violet',
+                      accentBg: 'var(--accent-violet-bg)',
+                      accentBorder: 'var(--accent-violet-border)',
+                      accentColor: 'var(--accent-violet)',
+                      accentIconBg: 'rgba(167,139,250,0.15)',
                     },
-                  ].map(({ type, label, icon: Icon, desc, color }) => (
-                    <motion.button key={type} type="button"
-                      onClick={() => setUserType(type)}
-                      whileTap={{ scale: 0.97 }}
-                      className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all text-center ${
-                        userType === type
-                          ? color === 'emerald'
-                            ? 'border-emerald-500/70 bg-emerald-500/10'
-                            : 'border-violet-500/70 bg-violet-500/10'
-                          : 'border-white/10 hover:border-white/20'
-                      }`}
-                    >
-                      <div className={`p-3 rounded-lg ${
-                        userType === type
-                          ? color === 'emerald' ? 'bg-emerald-500/20' : 'bg-violet-500/20'
-                          : 'bg-white/5'
-                      }`}>
-                        <Icon className={`w-6 h-6 ${
-                          userType === type
-                            ? color === 'emerald' ? 'text-emerald-400' : 'text-violet-400'
-                            : 'text-slate-400'
-                        }`} />
-                      </div>
-                      <span className={`text-sm font-bold leading-tight ${
-                        userType === type ? 'text-white' : 'text-slate-400'
-                      }`}>{label}</span>
-                      <span className="text-xs text-slate-500 leading-snug">{desc}</span>
-                    </motion.button>
-                  ))}
+                  ].map(({ type, label, icon: Icon, desc, accentBg, accentBorder, accentColor, accentIconBg }) => {
+                    const isActive = userType === type;
+                    return (
+                      <motion.button key={type} type="button"
+                        onClick={() => setUserType(type)}
+                        whileTap={{ scale: 0.97 }}
+                        className="flex flex-col items-center gap-3 p-5 rounded-xl text-center transition-all"
+                        style={{
+                          background: isActive ? accentBg : 'var(--surface-2)',
+                          border: `2px solid ${isActive ? accentBorder : 'var(--border-subtle)'}`,
+                          boxShadow: isActive ? `0 0 20px ${accentBg}` : 'none',
+                        }}
+                      >
+                        <div className="p-3 rounded-lg transition-all"
+                          style={{ background: isActive ? accentIconBg : 'var(--surface-2)' }}>
+                          <Icon className="w-6 h-6"
+                            style={{ color: isActive ? accentColor : 'var(--text-muted)' }} />
+                        </div>
+                        <span className="text-sm font-bold leading-tight"
+                          style={{ color: isActive ? accentColor : 'var(--text-secondary)' }}>
+                          {label}
+                        </span>
+                        <span className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
+                          {desc}
+                        </span>
+                      </motion.button>
+                    );
+                  })}
                 </div>
 
                 <motion.button onClick={nextFromType} whileTap={{ scale: 0.98 }}
-                  className="btn-primary w-full rounded-lg py-2.5 text-sm font-semibold text-white flex items-center justify-center gap-2">
+                  className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2">
                   Continuar <ChevronRight className="w-4 h-4" />
                 </motion.button>
 
                 <div className="flex items-center gap-3 mt-5 mb-4">
-                  <div className="flex-1 h-px bg-white/10" />
-                  <span className="text-slate-500 text-xs">¿Ya tienes cuenta?</span>
-                  <div className="flex-1 h-px bg-white/10" />
+                  <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>¿Ya tienes cuenta?</span>
+                  <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
                 </div>
                 <Link href="/login">
                   <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                    className="w-full rounded-lg py-2.5 text-sm font-medium text-center text-slate-300 hover:text-white border border-white/10 hover:border-white/20 transition-all cursor-pointer flex items-center justify-center gap-2">
-                    <ChevronLeft className="w-4 h-4" /> Iniciar Sesión
+                    className="btn-glass w-full rounded-xl py-3 text-sm font-medium text-center cursor-pointer flex items-center justify-center gap-2">
+                    <ChevronLeft className="w-4 h-4" /> Iniciar sesión
                   </motion.div>
                 </Link>
               </motion.div>
             )}
 
-            {/* ── PASO 2: EMPRESA (solo cliente) ───────────────────────── */}
+            {/* ── PASO 2: EMPRESA ── */}
             {step === 'company' && (
               <motion.div key="company" custom={dir} variants={slideVariants}
                 initial="enter" animate="center" exit="exit"
@@ -295,165 +328,155 @@ export default function RegisterPage() {
                 className="p-8"
               >
                 <button onClick={() => goTo('type', -1)}
-                  className="flex items-center gap-1 text-slate-400 hover:text-white text-sm mb-4 transition-colors">
+                  className="flex items-center gap-1 text-sm mb-4 transition-colors"
+                  style={{ color: 'var(--text-muted)' }}>
                   <ChevronLeft className="w-4 h-4" /> Volver
                 </button>
-                <h2 className="text-xl font-semibold text-white mb-1">Empresa cliente</h2>
-                <p className="text-slate-400 text-sm mb-5">¿La empresa ya está registrada en AURA?</p>
+                <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Empresa cliente
+                </h2>
+                <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
+                  ¿La empresa ya está registrada en AURA?
+                </p>
 
                 {/* Toggle nueva / existente */}
-                <div className="grid grid-cols-2 gap-2 mb-5 p-1 rounded-xl bg-white/5 border border-white/10">
+                <div className="grid grid-cols-2 gap-2 mb-5 p-1 rounded-xl"
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                   {[
-                    { key: 'existing', label: 'Ya está registrada', icon: Check },
-                    { key: 'new',      label: 'Registrar nueva',   icon: Building2 },
+                    { key: 'existing', label: 'Ya registrada', icon: Check },
+                    { key: 'new',      label: 'Registrar nueva', icon: Building2 },
                   ].map(({ key, label, icon: Icon }) => (
                     <button key={key} type="button"
                       onClick={() => { setCompanyMode(key as 'new' | 'existing'); setError(''); }}
-                      className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-                        companyMode === key
-                          ? 'bg-emerald-600 text-white shadow-md'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}>
-                      <Icon className="w-4 h-4" />
-                      {label}
+                      className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all"
+                      style={companyMode === key
+                        ? { background: 'var(--accent-green-bg)', color: 'var(--accent-green)', border: '1px solid rgba(52,211,153,0.3)' }
+                        : { color: 'var(--text-muted)', border: '1px solid transparent' }
+                      }>
+                      <Icon className="w-4 h-4" /> {label}
                     </button>
                   ))}
                 </div>
 
                 <AnimatePresence>
-                  {error && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 mb-4">
-                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                      <span className="text-red-400 text-sm">{error}</span>
-                    </motion.div>
-                  )}
+                  {error && <ErrorBox msg={error} />}
                 </AnimatePresence>
 
-                {/* ── EMPRESA YA REGISTRADA: solo NIT ── */}
+                {/* Empresa ya registrada */}
                 {companyMode === 'existing' && (
                   <motion.div key="existing-form"
                     initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="space-y-4"
-                  >
-                    <div className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4">
-                      <Check className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                      <p className="text-sm text-slate-300 leading-relaxed">
-                        Ingresa el <span className="text-white font-semibold">NIT</span> de tu empresa.
-                        Si ya está registrada, tu cuenta quedará asociada automáticamente.
+                    transition={{ duration: 0.2 }} className="space-y-4">
+                    <div className="flex items-start gap-3 rounded-xl p-4"
+                      style={{ background: 'var(--accent-green-bg)', border: '1px solid rgba(52,211,153,0.25)' }}>
+                      <Check className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--accent-green)' }} />
+                      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                        Ingresa el <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>NIT</span> de
+                        tu empresa. Si ya está registrada, tu cuenta quedará asociada automáticamente.
                       </p>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                        NIT de la empresa <span className="text-red-400">*</span>
+                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                        style={{ color: 'var(--text-secondary)' }}>
+                        NIT de la empresa <span style={{ color: 'var(--accent-red)' }}>*</span>
                       </label>
                       <div className="relative">
-                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                          style={{ color: 'var(--text-muted)' }} />
                         <input type="text" name="nit" value={company.nit} onChange={handleCompany}
                           placeholder="900123456-7"
-                          className="input-glass w-full rounded-lg pl-10 pr-4 py-3 text-sm" />
+                          className="input-glass w-full rounded-xl pl-10 pr-4 py-3 text-sm" />
                       </div>
-                      <p className="text-xs text-slate-500 mt-1.5">
-                        El NIT debe coincidir exactamente con el registrado por el administrador de AURA.
+                      <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                        El NIT debe coincidir exactamente con el registrado por el administrador.
                       </p>
                     </div>
                   </motion.div>
                 )}
 
-                {/* ── NUEVA EMPRESA: formulario completo ── */}
+                {/* Nueva empresa */}
                 {companyMode === 'new' && (
                   <motion.div key="new-form"
                     initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="space-y-3"
-                  >
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                        NIT <span className="text-red-400">*</span>
-                      </label>
-                      <div className="relative">
-                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input type="text" name="nit" value={company.nit} onChange={handleCompany}
-                          placeholder="900123456-7"
-                          className="input-glass w-full rounded-lg pl-10 pr-4 py-2.5 text-sm" />
+                    transition={{ duration: 0.2 }} className="space-y-3">
+                    {[
+                      { name: 'nit', label: 'NIT', icon: Hash, placeholder: '900123456-7', required: true },
+                      { name: 'businessName', label: 'Razón Social', icon: FileText, placeholder: 'Hospital San Jorge S.A.S', required: true },
+                      { name: 'commercialName', label: 'Nombre Comercial', icon: Building2, placeholder: 'Hospital San Jorge', required: false },
+                    ].map(({ name, label, icon: Icon, placeholder, required }) => (
+                      <div key={name}>
+                        <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                          style={{ color: 'var(--text-secondary)' }}>
+                          {label}{' '}
+                          {required
+                            ? <span style={{ color: 'var(--accent-red)' }}>*</span>
+                            : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span>
+                          }
+                        </label>
+                        <div className="relative">
+                          <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                            style={{ color: 'var(--text-muted)' }} />
+                          <input type="text" name={name}
+                            value={(company as any)[name]} onChange={handleCompany}
+                            placeholder={placeholder}
+                            className="input-glass w-full rounded-xl pl-10 pr-4 py-2.5 text-sm" />
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                        Razón Social <span className="text-red-400">*</span>
-                      </label>
-                      <div className="relative">
-                        <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input type="text" name="businessName" value={company.businessName} onChange={handleCompany}
-                          placeholder="Hospital San Jorge S.A.S"
-                          className="input-glass w-full rounded-lg pl-10 pr-4 py-2.5 text-sm" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                        Nombre Comercial <span className="text-slate-500 font-normal">(opcional)</span>
-                      </label>
-                      <div className="relative">
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input type="text" name="commercialName" value={company.commercialName} onChange={handleCompany}
-                          placeholder="Hospital San Jorge"
-                          className="input-glass w-full rounded-lg pl-10 pr-4 py-2.5 text-sm" />
-                      </div>
-                    </div>
+                    ))}
                     <div>
                       <MunicipioSearch
                         municipios={municipios}
                         value={company.city ? `${company.city}${company.department ? `, ${company.department}` : ''}` : ''}
                         onSelect={m => setCompany(p => ({
-                          ...p,
-                          city:       m?.nombreMunicipio ?? '',
-                          department: m?.nombreDepartamento ?? '',
+                          ...p, city: m?.nombreMunicipio ?? '', department: m?.nombreDepartamento ?? '',
                         }))}
-                        label="Municipio"
-                        required
+                        label="Municipio" required
                         placeholder="Buscar municipio o departamento..."
-                        inputClassName="input-glass rounded-lg pl-10 pr-8 py-2.5 text-sm"
+                        inputClassName="input-glass rounded-xl pl-10 pr-8 py-2.5 text-sm"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1.5">Correo empresa</label>
+                        <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                          style={{ color: 'var(--text-secondary)' }}>Correo empresa</label>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                            style={{ color: 'var(--text-muted)' }} />
                           <input type="email" name="email" value={company.email} onChange={handleCompany}
                             placeholder="info@empresa.com"
-                            className="input-glass w-full rounded-lg pl-10 pr-3 py-2.5 text-sm" />
+                            className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1.5">Teléfono</label>
+                        <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                          style={{ color: 'var(--text-secondary)' }}>Teléfono</label>
                         <div className="relative">
-                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                            style={{ color: 'var(--text-muted)' }} />
                           <input type="tel" name="phone" value={company.phone} onChange={handleCompany}
                             placeholder="3101234567"
-                            className="input-glass w-full rounded-lg pl-10 pr-3 py-2.5 text-sm" />
+                            className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
                         </div>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">Actividad económica</label>
-                      <input type="text" name="economicActivity" value={company.economicActivity} onChange={handleCompany}
-                        placeholder="Ej: Servicios de salud"
-                        className="input-glass w-full rounded-lg px-4 py-2.5 text-sm" />
+                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                        style={{ color: 'var(--text-secondary)' }}>Actividad económica</label>
+                      <input type="text" name="economicActivity" value={company.economicActivity}
+                        onChange={handleCompany} placeholder="Ej: Servicios de salud"
+                        className="input-glass w-full rounded-xl px-4 py-2.5 text-sm" />
                     </div>
                   </motion.div>
                 )}
 
                 <motion.button onClick={nextFromCompany} whileTap={{ scale: 0.98 }}
-                  className="btn-primary w-full rounded-lg py-2.5 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-5">
+                  className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-5">
                   Continuar <ChevronRight className="w-4 h-4" />
                 </motion.button>
               </motion.div>
             )}
 
-            {/* ── PASO 3: DATOS USUARIO ─────────────────────────────────── */}
+            {/* ── PASO 3: DATOS USUARIO ── */}
             {step === 'user' && (
               <motion.div key="user" custom={dir} variants={slideVariants}
                 initial="enter" animate="center" exit="exit"
@@ -461,104 +484,125 @@ export default function RegisterPage() {
                 className="p-8"
               >
                 <button onClick={() => goTo(userType === 'client' ? 'company' : 'type', -1)}
-                  className="flex items-center gap-1 text-slate-400 hover:text-white text-sm mb-4 transition-colors">
+                  className="flex items-center gap-1 text-sm mb-4 transition-colors"
+                  style={{ color: 'var(--text-muted)' }}>
                   <ChevronLeft className="w-4 h-4" /> Volver
                 </button>
-                <h2 className="text-xl font-semibold text-white mb-1">Datos personales</h2>
-                <p className="text-slate-400 text-sm mb-5">
+                <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Datos personales
+                </h2>
+                <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
                   {userType === 'client' ? 'Tu información como contacto principal' : 'Información del agente'}
                 </p>
 
                 <AnimatePresence>
-                  {error && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 mb-4">
-                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                      <span className="text-red-400 text-sm">{error}</span>
-                    </motion.div>
-                  )}
+                  {error && <ErrorBox msg={error} />}
                 </AnimatePresence>
 
                 <form onSubmit={handleSubmit} className="space-y-3">
                   {/* Documento */}
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                      Documento <span className="text-red-400">*</span>
+                    <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                      style={{ color: 'var(--text-secondary)' }}>
+                      Documento <span style={{ color: 'var(--accent-red)' }}>*</span>
                     </label>
                     <div className="relative">
-                      <IdCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <IdCard className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                        style={{ color: 'var(--text-muted)' }} />
                       <input type="text" name="document" value={user.document} onChange={handleUser}
                         placeholder="Número de documento"
-                        className="input-glass w-full rounded-lg pl-10 pr-4 py-2.5 text-sm" />
+                        className="input-glass w-full rounded-xl pl-10 pr-4 py-2.5 text-sm" />
                     </div>
                   </div>
 
                   {/* Nombre + Apellido */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">Nombre <span className="text-red-400">*</span></label>
+                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                        style={{ color: 'var(--text-secondary)' }}>
+                        Nombre <span style={{ color: 'var(--accent-red)' }}>*</span>
+                      </label>
                       <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                          style={{ color: 'var(--text-muted)' }} />
                         <input type="text" name="firstName" value={user.firstName} onChange={handleUser}
                           placeholder="Carlos"
-                          className="input-glass w-full rounded-lg pl-10 pr-3 py-2.5 text-sm" />
+                          className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">Apellido <span className="text-red-400">*</span></label>
+                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                        style={{ color: 'var(--text-secondary)' }}>
+                        Apellido <span style={{ color: 'var(--accent-red)' }}>*</span>
+                      </label>
                       <input type="text" name="lastName" value={user.lastName} onChange={handleUser}
                         placeholder="Anillo"
-                        className="input-glass w-full rounded-lg px-4 py-2.5 text-sm" />
+                        className="input-glass w-full rounded-xl px-4 py-2.5 text-sm" />
                     </div>
                   </div>
 
                   {/* Email */}
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">Correo <span className="text-red-400">*</span></label>
+                    <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                      style={{ color: 'var(--text-secondary)' }}>
+                      Correo <span style={{ color: 'var(--accent-red)' }}>*</span>
+                    </label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                        style={{ color: 'var(--text-muted)' }} />
                       <input type="email" name="email" value={user.email} onChange={handleUser}
                         placeholder="correo@empresa.com"
-                        className="input-glass w-full rounded-lg pl-10 pr-4 py-2.5 text-sm" />
+                        className="input-glass w-full rounded-xl pl-10 pr-4 py-2.5 text-sm" />
                     </div>
                   </div>
 
                   {/* Cargo */}
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                      Cargo <span className="text-slate-500 font-normal">(opcional)</span>
+                    <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                      style={{ color: 'var(--text-secondary)' }}>
+                      Cargo{' '}
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span>
                     </label>
                     <div className="relative">
-                      <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                        style={{ color: 'var(--text-muted)' }} />
                       <input type="text" name="jobTitle" value={user.jobTitle} onChange={handleUser}
                         placeholder="Líder de proyecto, Coordinador..."
-                        className="input-glass w-full rounded-lg pl-10 pr-4 py-2.5 text-sm" />
+                        className="input-glass w-full rounded-xl pl-10 pr-4 py-2.5 text-sm" />
                     </div>
                   </div>
 
-                  {/* Contraseña */}
+                  {/* Contraseñas */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">Contraseña <span className="text-red-400">*</span></label>
+                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                        style={{ color: 'var(--text-secondary)' }}>
+                        Contraseña <span style={{ color: 'var(--accent-red)' }}>*</span>
+                      </label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input type={showPass ? 'text' : 'password'} name="password" value={user.password} onChange={handleUser}
-                          placeholder="Mín. 8 caracteres"
-                          className="input-glass w-full rounded-lg pl-10 pr-10 py-2.5 text-sm" />
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                          style={{ color: 'var(--text-muted)' }} />
+                        <input type={showPass ? 'text' : 'password'} name="password"
+                          value={user.password} onChange={handleUser} placeholder="Mín. 8 car."
+                          className="input-glass w-full rounded-xl pl-10 pr-10 py-2.5 text-sm" />
                         <button type="button" onClick={() => setShowPass((p) => !p)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          style={{ color: 'var(--text-muted)' }}>
                           {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">Confirmar <span className="text-red-400">*</span></label>
+                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                        style={{ color: 'var(--text-secondary)' }}>
+                        Confirmar <span style={{ color: 'var(--accent-red)' }}>*</span>
+                      </label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input type={showPass ? 'text' : 'password'} name="confirmPassword" value={user.confirmPassword} onChange={handleUser}
-                          placeholder="Repite"
-                          className="input-glass w-full rounded-lg pl-10 pr-3 py-2.5 text-sm" />
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                          style={{ color: 'var(--text-muted)' }} />
+                        <input type={showPass ? 'text' : 'password'} name="confirmPassword"
+                          value={user.confirmPassword} onChange={handleUser} placeholder="Repite"
+                          className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
                       </div>
                     </div>
                   </div>
@@ -566,29 +610,35 @@ export default function RegisterPage() {
                   {/* Contraseña agente */}
                   {userType === 'agent' && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                        style={{ color: 'var(--text-secondary)' }}>
                         <span className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-3.5 h-3.5 text-violet-400" />
-                          Contraseña de registro agente <span className="text-red-400">*</span>
+                          <ShieldCheck className="w-3.5 h-3.5" style={{ color: 'var(--accent-violet)' }} />
+                          Contraseña de agente <span style={{ color: 'var(--accent-red)' }}>*</span>
                         </span>
                       </label>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
+                          style={{ color: 'var(--text-muted)' }} />
                         <input type={showAgentPass ? 'text' : 'password'} name="agentRegPassword"
                           value={user.agentRegPassword} onChange={handleUser}
                           placeholder="Solicitarla al administrador"
-                          className="input-glass w-full rounded-lg pl-10 pr-10 py-2.5 text-sm border-violet-400/30" />
+                          className="input-glass w-full rounded-xl pl-10 pr-10 py-2.5 text-sm"
+                          style={{ borderColor: 'var(--accent-violet-border)' }} />
                         <button type="button" onClick={() => setShowAgentPass((p) => !p)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200">
+                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          style={{ color: 'var(--text-muted)' }}>
                           {showAgentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
-                      <p className="text-xs text-slate-500 mt-1">Requerida para cuentas de agente. Solicítala al admin.</p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                        Requerida para cuentas de agente. Solicítala al administrador.
+                      </p>
                     </motion.div>
                   )}
 
                   <motion.button type="submit" disabled={loading} whileTap={{ scale: 0.98 }}
-                    className="btn-primary w-full rounded-lg py-2.5 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                    className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-1 disabled:opacity-50 disabled:cursor-not-allowed">
                     {loading
                       ? <><Loader2 className="w-4 h-4 animate-spin" /> Creando cuenta...</>
                       : <><Check className="w-4 h-4" /> Crear Cuenta</>
@@ -600,7 +650,7 @@ export default function RegisterPage() {
           </AnimatePresence>
         </div>
 
-        <p className="text-center text-slate-600 text-xs mt-5">
+        <p className="text-center text-xs mt-5" style={{ color: 'var(--text-muted)' }}>
           © 2024 Sistemas Infotec · AURA ERP v1.0.0
         </p>
       </motion.div>

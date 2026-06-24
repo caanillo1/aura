@@ -169,12 +169,13 @@ export class InformeSchedulerService implements OnModuleInit {
       expr = `0 ${cfg.minuto} ${cfg.hora} 1 * *`;
     }
     const jobName = `analysis_${osId}`;
-    this.logger.log(`Cron análisis [${jobName}]: ${expr}`);
+    const tz      = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    this.logger.log(`Cron análisis [${jobName}]: ${expr} timezone=${tz}`);
     const job = new CronJob(expr, () => {
       this.executeAnalysisSend(companyId, osId, cfg).catch(err =>
         this.logger.error(`Error cron análisis osId=${osId}: ${err?.message}`),
       );
-    });
+    }, null, false, tz);
     this.schedulerRegistry.addCronJob(jobName, job);
     job.start();
   }
@@ -202,40 +203,45 @@ export class InformeSchedulerService implements OnModuleInit {
     const dias    = (cfg.diasSemana?.length ? cfg.diasSemana : [cfg.diaSemana ?? 1]).join(',');
     const expr    = `0 ${cfg.minuto} ${cfg.hora} * * ${dias}`;
     const jobName = `weekly_${osId}`;
-    this.logger.log(`Cron semanal [${jobName}]: ${expr}`);
+    const tz      = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    this.logger.log(`Cron semanal [${jobName}]: ${expr} timezone=${tz}`);
     const job = new CronJob(expr, () => {
       this.executeWeeklySend(companyId, osId, cfg).catch(err =>
         this.logger.error(`Error cron semanal osId=${osId}: ${err?.message}`),
       );
-    });
+    }, null, false, tz);
     this.schedulerRegistry.addCronJob(jobName, job);
     job.start();
   }
 
   private registerBimensualCrons(companyId: string, osId: string, cfg: BimensualConfig) {
-    const m = cfg.minuto, h = cfg.hora;
+    const m  = cfg.minuto, h = cfg.hora;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     // 15th of every month → first-half report (days 1–15)
     const job15 = new CronJob(`0 ${m} ${h} 15 * *`, () => {
       this.executeBimensualSend(companyId, osId, cfg, 'quincenal').catch(err =>
         this.logger.error(`Error cron 15 osId=${osId}: ${err?.message}`),
       );
-    });
+    }, null, false, tz);
     this.schedulerRegistry.addCronJob(`bimensual_15_${osId}`, job15);
     job15.start();
 
     // Last day of month (fire on 28–31, check inside if truly last day)
     const jobLast = new CronJob(`0 ${m} ${h} 28-31 * *`, () => {
-      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-      if (tomorrow.getDate() !== 1) return; // not the last day
+      // Verificar que mañana es día 1 usando la hora local del servidor
+      const nowLocal      = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+      const tomorrowLocal = new Date(nowLocal);
+      tomorrowLocal.setDate(nowLocal.getDate() + 1);
+      if (tomorrowLocal.getDate() !== 1) return; // no es el último día del mes
       this.executeBimensualSend(companyId, osId, cfg, 'mensual').catch(err =>
         this.logger.error(`Error cron último día osId=${osId}: ${err?.message}`),
       );
-    });
+    }, null, false, tz);
     this.schedulerRegistry.addCronJob(`bimensual_lastday_${osId}`, jobLast);
     jobLast.start();
 
-    this.logger.log(`Crons bimensuales registrados para osId=${osId} a las ${h}:${String(m).padStart(2,'0')}`);
+    this.logger.log(`Crons bimensuales registrados para osId=${osId} a las ${h}:${String(m).padStart(2,'0')} timezone=${tz}`);
   }
 
   private removeCron(jobName: string) {

@@ -79,12 +79,13 @@ export class EmailSchedulerService implements OnModuleInit {
 
   private registerCron(companyId: string, cfg: EmailScheduleConfig) {
     const cronExpr = this.buildCronExpression(cfg);
-    this.logger.log(`Registrando cron [${JOB_PREFIX}${companyId}]: ${cronExpr}`);
+    const tz       = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    this.logger.log(`Registrando cron [${JOB_PREFIX}${companyId}]: ${cronExpr} timezone=${tz}`);
     const job = new CronJob(cronExpr, () => {
       this.executeScheduledSend(companyId, cfg).catch(err =>
         this.logger.error(`Error en envío automático company=${companyId}: ${err?.message}`),
       );
-    });
+    }, null, false, tz);
     this.schedulerRegistry.addCronJob(`${JOB_PREFIX}${companyId}`, job);
     job.start();
   }

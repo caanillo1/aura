@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import makeWASocket, {
+  Browsers,
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
@@ -127,7 +128,9 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         auth: state,
         printQRInTerminal: false,
         logger: { level: 'silent', trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, child: () => ({ level: 'silent', trace: () => {}, debug: () => {}, info: () => {}, warn: () => {}, error: () => {}, child: () => ({} as any) }) } as any,
-        browser: ['AURA', 'Chrome', '120.0'],
+        browser: Browsers.macOS('Desktop'),
+        keepAliveIntervalMs: 30_000,
+        retryRequestDelayMs: 2_000,
       });
 
       this.sock.ev.on('creds.update', saveCreds);
@@ -154,12 +157,13 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
           const code  = err?.output?.statusCode ?? err?.status;
           const shouldReconnect = code !== DisconnectReason.loggedOut;
 
+          this.logger.warn(`WA cierre — código: ${code}, mensaje: ${err?.message ?? 'sin mensaje'}, reconectar: ${shouldReconnect}`);
+
           this.sock = null;
           this.connectedPhone = null;
 
           if (shouldReconnect) {
             this.status = 'connecting';
-            this.logger.warn(`WA desconectado (${code}), reconectando en 5s…`);
             this.reconnectTimer = setTimeout(() => this.connect(), 5000);
           } else {
             // Sesión cerrada desde el celular — borrar archivos y reconectar con QR nuevo

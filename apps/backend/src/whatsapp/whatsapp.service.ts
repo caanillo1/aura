@@ -23,6 +23,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   private qrBase64: string | null = null;
   private connectedPhone: string | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private msgStore = new Map<string, any>();
 
   async onModuleInit() {
     await this.connect();
@@ -141,6 +142,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(`No se pudo obtener versión de WA, usando versión de respaldo ${version.join('.')}`);
       }
 
+      this.msgStore.clear();
+
       this.sock = makeWASocket({
         version,
         auth: state,
@@ -149,6 +152,16 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
         browser: Browsers.macOS('Desktop'),
         keepAliveIntervalMs: 30_000,
         retryRequestDelayMs: 2_000,
+        getMessage: async (key) => {
+          const stored = key.id ? this.msgStore.get(key.id) : undefined;
+          return stored ?? { conversation: '' };
+        },
+      });
+
+      this.sock.ev.on('messages.upsert', ({ messages }) => {
+        for (const m of messages) {
+          if (m.key.id && m.message) this.msgStore.set(m.key.id, m.message);
+        }
       });
 
       this.sock.ev.on('creds.update', saveCreds);

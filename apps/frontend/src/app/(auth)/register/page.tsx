@@ -31,10 +31,22 @@ interface UserForm {
   jobTitle: string; agentRegPassword: string;
 }
 
-const slideVariants = {
-  enter: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (dir: number) => ({ x: dir > 0 ? -60 : 60, opacity: 0 }),
+// ── Variantes ────────────────────────────────────────────────────────────
+const stepTransition = (dir: number) => ({
+  enter:  { x: dir > 0 ? 80 : -80, opacity: 0, scale: 0.96, filter: 'blur(4px)' },
+  center: { x: 0, opacity: 1, scale: 1, filter: 'blur(0px)',
+    transition: { type: 'spring' as const, stiffness: 280, damping: 28 } },
+  exit:   (d: number) => ({
+    x: d > 0 ? -80 : 80, opacity: 0, scale: 0.96, filter: 'blur(4px)',
+    transition: { duration: 0.22 } }),
+});
+
+const fieldVariants = {
+  hidden:  { opacity: 0, y: 14, filter: 'blur(3px)' },
+  visible: (i: number) => ({
+    opacity: 1, y: 0, filter: 'blur(0px)',
+    transition: { delay: 0.05 + i * 0.07, duration: 0.38, ease: [0.22, 1, 0.36, 1] },
+  }),
 };
 
 export default function RegisterPage() {
@@ -74,13 +86,7 @@ export default function RegisterPage() {
   };
 
   const goTo = (next: Step, direction = 1) => {
-    setDir(direction);
-    setError('');
-    setStep(next);
-  };
-
-  const nextFromType = () => {
-    goTo(userType === 'client' ? 'company' : 'user');
+    setDir(direction); setError(''); setStep(next);
   };
 
   const validateCompany = () => {
@@ -92,40 +98,22 @@ export default function RegisterPage() {
     return null;
   };
 
-  const nextFromCompany = () => {
-    const err = validateCompany();
-    if (err) { setError(err); return; }
-    goTo('user');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user.document || !user.firstName || !user.lastName || !user.email || !user.password) {
-      setError('Completa todos los campos obligatorios');
-      return;
+      setError('Completa todos los campos obligatorios'); return;
     }
-    if (user.password !== user.confirmPassword) {
-      setError('Las contraseñas no coinciden');
-      return;
-    }
-    if (user.password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres');
-      return;
-    }
+    if (user.password !== user.confirmPassword) { setError('Las contraseñas no coinciden'); return; }
+    if (user.password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres'); return; }
     if (userType === 'agent' && !user.agentRegPassword) {
-      setError('La contraseña de registro de agente es requerida');
-      return;
+      setError('La contraseña de registro de agente es requerida'); return;
     }
-
     setLoading(true);
     try {
       const payload: Record<string, string> = {
         userType,
-        document: user.document,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        password: user.password,
+        document: user.document, firstName: user.firstName, lastName: user.lastName,
+        email: user.email, password: user.password,
         ...(user.jobTitle && { jobTitle: user.jobTitle }),
         ...(userType === 'agent' && { agentRegPassword: user.agentRegPassword }),
         ...(userType === 'client' && {
@@ -140,7 +128,6 @@ export default function RegisterPage() {
           ...(companyMode === 'new' && company.economicActivity && { companyEconomicActivity: company.economicActivity }),
         }),
       };
-
       const data = await authApi.register(payload);
       setAuth(data.user, data.accessToken, data.refreshToken);
       toast.success(`¡Bienvenido, ${data.user.firstName}!`);
@@ -155,504 +142,550 @@ export default function RegisterPage() {
 
   const stepOrder: Step[] = userType === 'client' ? ['type', 'company', 'user'] : ['type', 'user'];
   const currentIdx = stepOrder.indexOf(step);
+  const variants = stepTransition(dir);
 
-  // ── Shared error box ──────────────────────────────────────────────────────
+  // ── Componentes auxiliares ────────────────────────────────────────────
+  const Field = ({ i, children }: { i: number; children: React.ReactNode }) => (
+    <motion.div custom={i} variants={fieldVariants} initial="hidden" animate="visible">
+      {children}
+    </motion.div>
+  );
+
   const ErrorBox = ({ msg }: { msg: string }) => (
-    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-      exit={{ opacity: 0, height: 0 }}
-      className="flex items-center gap-2 rounded-xl px-4 py-3 mb-4"
+    <motion.div initial={{ opacity: 0, height: 0, scale: 0.95 }}
+      animate={{ opacity: 1, height: 'auto', scale: 1 }}
+      exit={{ opacity: 0, height: 0, scale: 0.95 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="flex items-center gap-2 rounded-xl px-4 py-3 mb-4 overflow-hidden"
       style={{ background: 'var(--accent-red-bg)', border: '1px solid rgba(248,113,113,0.28)' }}>
       <AlertCircle className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-red)' }} />
       <span className="text-sm" style={{ color: 'var(--accent-red)' }}>{msg}</span>
     </motion.div>
   );
 
+  const InputIcon = ({ icon: Icon }: { icon: React.ElementType }) => (
+    <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+  );
+
   return (
     <div className="flex min-h-screen items-center justify-center py-8">
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
+        initial={{ opacity: 0, y: 28 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-md"
       >
-        {/* Cabecera */}
+        {/* ── Cabecera ─────────────────────────────────────────── */}
         <div className="text-center mb-6">
-          <div className="flex justify-center mb-3">
+          <motion.div className="flex justify-center mb-3"
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.7, ease: [0.34, 1.56, 0.64, 1] }}>
             <AuraLogo size={60} animate />
-          </div>
-          <AuraText />
-          <div className="flex items-center justify-center gap-2 mt-2">
+          </motion.div>
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}>
+            <AuraText />
+          </motion.div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
+            className="flex items-center justify-center gap-2 mt-2">
             <div className="h-px w-10" style={{ background: 'var(--border-strong)' }} />
             <span className="text-[11px] font-semibold tracking-[0.22em] uppercase"
-              style={{ color: 'var(--text-muted)' }}>
-              Crear cuenta
-            </span>
+              style={{ color: 'var(--text-muted)' }}>Crear cuenta</span>
             <div className="h-px w-10" style={{ background: 'var(--border-strong)' }} />
-          </div>
+          </motion.div>
         </div>
 
-        {/* Indicador de pasos */}
-        <div className="flex items-center justify-center gap-2 mb-5">
+        {/* ── Indicador de pasos ────────────────────────────────── */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="flex items-center justify-center gap-2 mb-5">
           {stepOrder.map((s, i) => {
             const done = i < currentIdx;
             const active = i === currentIdx;
             return (
               <div key={s} className="flex items-center gap-2">
                 <motion.div
-                  animate={{ scale: active ? 1.1 : 1 }}
-                  className="flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all"
+                  animate={{
+                    scale: active ? 1.15 : 1,
+                    boxShadow: active ? '0 0 16px var(--accent-violet-bg)' : '0 0 0 transparent',
+                  }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+                  className="flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold"
                   style={{
-                    background: done
-                      ? 'var(--accent-green-bg)'
-                      : active
-                      ? 'var(--accent-violet-bg)'
-                      : 'var(--surface-2)',
-                    border: done
-                      ? '1px solid rgba(52,211,153,0.4)'
-                      : active
-                      ? '1px solid var(--accent-violet-border)'
-                      : '1px solid var(--border-subtle)',
-                    color: done
-                      ? 'var(--accent-green)'
-                      : active
-                      ? 'var(--accent-violet)'
-                      : 'var(--text-muted)',
-                    boxShadow: active ? '0 0 12px var(--accent-violet-bg)' : 'none',
+                    background: done ? 'var(--accent-green-bg)' : active ? 'var(--accent-violet-bg)' : 'var(--surface-2)',
+                    border: done ? '1px solid rgba(52,211,153,0.4)' : active ? '1px solid var(--accent-violet-border)' : '1px solid var(--border-subtle)',
+                    color: done ? 'var(--accent-green)' : active ? 'var(--accent-violet)' : 'var(--text-muted)',
                   }}
                 >
-                  {done ? <Check className="w-3.5 h-3.5" /> : i + 1}
+                  <AnimatePresence mode="wait">
+                    {done ? (
+                      <motion.div key="check"
+                        initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }}
+                        transition={{ type: 'spring', stiffness: 500 }}>
+                        <Check className="w-3.5 h-3.5" />
+                      </motion.div>
+                    ) : (
+                      <motion.span key={`n${i}`} initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                        {i + 1}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
                 {i < stepOrder.length - 1 && (
-                  <div className="h-px w-8 transition-all"
-                    style={{ background: done ? 'var(--accent-green)' : 'var(--border-subtle)' }} />
+                  <div className="relative h-px w-8">
+                    <div className="absolute inset-0" style={{ background: 'var(--border-subtle)' }} />
+                    <motion.div className="absolute inset-0 origin-left"
+                      initial={{ scaleX: 0 }} animate={{ scaleX: done ? 1 : 0 }}
+                      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                      style={{ background: 'var(--accent-green)' }} />
+                  </div>
                 )}
               </div>
             );
           })}
-        </div>
+        </motion.div>
 
-        {/* Card */}
-        <div className="glass-strong rounded-2xl overflow-hidden">
+        {/* ── Card ─────────────────────────────────────────────── */}
+        <motion.div
+          initial={{ opacity: 0, y: 24, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: 0.15, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="glass-strong rounded-2xl overflow-hidden"
+        >
           <AnimatePresence mode="wait" custom={dir}>
 
             {/* ── PASO 1: TIPO ── */}
             {step === 'type' && (
-              <motion.div key="type" custom={dir} variants={slideVariants}
-                initial="enter" animate="center" exit="exit"
-                transition={{ duration: 0.28, ease: 'easeInOut' }}
-                className="p-8"
-              >
-                <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Crear cuenta
-                </h2>
-                <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-                  ¿Cómo vas a usar AURA?
-                </p>
+              <motion.div key="type" custom={dir}
+                variants={variants} initial="enter" animate="center" exit="exit"
+                className="p-8">
+                <Field i={0}>
+                  <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                    Crear cuenta
+                  </h2>
+                  <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+                    ¿Cómo vas a usar AURA?
+                  </p>
+                </Field>
 
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  {[
-                    {
-                      type: 'client' as UserType,
-                      label: 'Empresa / Cliente',
-                      icon: Building2,
-                      desc: 'Soy una empresa que contrata las implementaciones y quiero hacer seguimiento de mi proyecto.',
-                      accentBg: 'var(--accent-green-bg)',
-                      accentBorder: 'rgba(52,211,153,0.4)',
-                      accentColor: 'var(--accent-green)',
-                      accentIconBg: 'rgba(52,211,153,0.15)',
-                    },
-                    {
-                      type: 'agent' as UserType,
-                      label: 'Agente Infotec',
-                      icon: Users,
-                      desc: 'Soy coordinador o implementador de Sistemas Infotec.',
-                      accentBg: 'var(--accent-violet-bg)',
-                      accentBorder: 'var(--accent-violet-border)',
-                      accentColor: 'var(--accent-violet)',
-                      accentIconBg: 'rgba(167,139,250,0.15)',
-                    },
-                  ].map(({ type, label, icon: Icon, desc, accentBg, accentBorder, accentColor, accentIconBg }) => {
-                    const isActive = userType === type;
-                    return (
-                      <motion.button key={type} type="button"
-                        onClick={() => setUserType(type)}
-                        whileTap={{ scale: 0.97 }}
-                        className="flex flex-col items-center gap-3 p-5 rounded-xl text-center transition-all"
-                        style={{
-                          background: isActive ? accentBg : 'var(--surface-2)',
-                          border: `2px solid ${isActive ? accentBorder : 'var(--border-subtle)'}`,
-                          boxShadow: isActive ? `0 0 20px ${accentBg}` : 'none',
-                        }}
-                      >
-                        <div className="p-3 rounded-lg transition-all"
-                          style={{ background: isActive ? accentIconBg : 'var(--surface-2)' }}>
-                          <Icon className="w-6 h-6"
-                            style={{ color: isActive ? accentColor : 'var(--text-muted)' }} />
-                        </div>
-                        <span className="text-sm font-bold leading-tight"
-                          style={{ color: isActive ? accentColor : 'var(--text-secondary)' }}>
-                          {label}
-                        </span>
-                        <span className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
-                          {desc}
-                        </span>
-                      </motion.button>
-                    );
-                  })}
-                </div>
+                <Field i={1}>
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    {[
+                      {
+                        type: 'client' as UserType, label: 'Empresa / Cliente', icon: Building2,
+                        desc: 'Soy una empresa que contrata las implementaciones.',
+                        accentBg: 'var(--accent-green-bg)', accentBorder: 'rgba(52,211,153,0.4)',
+                        accentColor: 'var(--accent-green)', accentIconBg: 'rgba(52,211,153,0.15)',
+                      },
+                      {
+                        type: 'agent' as UserType, label: 'Agente Infotec', icon: Users,
+                        desc: 'Soy coordinador o implementador de Sistemas Infotec.',
+                        accentBg: 'var(--accent-violet-bg)', accentBorder: 'var(--accent-violet-border)',
+                        accentColor: 'var(--accent-violet)', accentIconBg: 'rgba(167,139,250,0.15)',
+                      },
+                    ].map(({ type, label, icon: Icon, desc, accentBg, accentBorder, accentColor, accentIconBg }) => {
+                      const isActive = userType === type;
+                      return (
+                        <motion.button key={type} type="button"
+                          onClick={() => setUserType(type)}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.96 }}
+                          animate={{
+                            background: isActive ? accentBg : 'var(--surface-2)',
+                            borderColor: isActive ? accentBorder : 'var(--border-subtle)',
+                            boxShadow: isActive ? `0 0 20px ${accentBg}` : '0 0 0 transparent',
+                          }}
+                          transition={{ duration: 0.25 }}
+                          className="flex flex-col items-center gap-3 p-5 rounded-xl text-center border-2"
+                          style={{ borderStyle: 'solid' }}
+                        >
+                          <motion.div className="p-3 rounded-lg transition-all"
+                            animate={{ background: isActive ? accentIconBg : 'var(--surface-2)' }}>
+                            <Icon className="w-6 h-6"
+                              style={{ color: isActive ? accentColor : 'var(--text-muted)' }} />
+                          </motion.div>
+                          <span className="text-sm font-bold leading-tight"
+                            style={{ color: isActive ? accentColor : 'var(--text-secondary)' }}>
+                            {label}
+                          </span>
+                          <span className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
+                            {desc}
+                          </span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </Field>
 
-                <motion.button onClick={nextFromType} whileTap={{ scale: 0.98 }}
-                  className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2">
-                  Continuar <ChevronRight className="w-4 h-4" />
-                </motion.button>
+                <Field i={2}>
+                  <motion.button onClick={() => goTo(userType === 'client' ? 'company' : 'user')}
+                    whileHover={{ scale: 1.015, boxShadow: '0 8px 30px rgba(59,130,246,0.35)' }}
+                    whileTap={{ scale: 0.97 }}
+                    className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2">
+                    Continuar <ChevronRight className="w-4 h-4" />
+                  </motion.button>
+                </Field>
 
-                <div className="flex items-center gap-3 mt-5 mb-4">
-                  <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>¿Ya tienes cuenta?</span>
-                  <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
-                </div>
-                <Link href="/login">
-                  <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                    className="btn-glass w-full rounded-xl py-3 text-sm font-medium text-center cursor-pointer flex items-center justify-center gap-2">
-                    <ChevronLeft className="w-4 h-4" /> Iniciar sesión
-                  </motion.div>
-                </Link>
+                <Field i={3}>
+                  <div className="flex items-center gap-3 mt-5 mb-4">
+                    <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>¿Ya tienes cuenta?</span>
+                    <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
+                  </div>
+                  <Link href="/login">
+                    <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+                      className="btn-glass w-full rounded-xl py-3 text-sm font-medium text-center cursor-pointer flex items-center justify-center gap-2">
+                      <ChevronLeft className="w-4 h-4" /> Iniciar sesión
+                    </motion.div>
+                  </Link>
+                </Field>
               </motion.div>
             )}
 
             {/* ── PASO 2: EMPRESA ── */}
             {step === 'company' && (
-              <motion.div key="company" custom={dir} variants={slideVariants}
-                initial="enter" animate="center" exit="exit"
-                transition={{ duration: 0.28, ease: 'easeInOut' }}
-                className="p-8"
-              >
-                <button onClick={() => goTo('type', -1)}
-                  className="flex items-center gap-1 text-sm mb-4 transition-colors"
-                  style={{ color: 'var(--text-muted)' }}>
-                  <ChevronLeft className="w-4 h-4" /> Volver
-                </button>
-                <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Empresa cliente
-                </h2>
-                <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
-                  ¿La empresa ya está registrada en AURA?
-                </p>
+              <motion.div key="company" custom={dir}
+                variants={variants} initial="enter" animate="center" exit="exit"
+                className="p-8">
+                <Field i={0}>
+                  <button onClick={() => goTo('type', -1)}
+                    className="flex items-center gap-1 text-sm mb-4 transition-colors hover:opacity-80"
+                    style={{ color: 'var(--text-muted)' }}>
+                    <ChevronLeft className="w-4 h-4" /> Volver
+                  </button>
+                  <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                    Empresa cliente
+                  </h2>
+                  <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
+                    ¿La empresa ya está registrada en AURA?
+                  </p>
+                </Field>
 
-                {/* Toggle nueva / existente */}
-                <div className="grid grid-cols-2 gap-2 mb-5 p-1 rounded-xl"
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
-                  {[
-                    { key: 'existing', label: 'Ya registrada', icon: Check },
-                    { key: 'new',      label: 'Registrar nueva', icon: Building2 },
-                  ].map(({ key, label, icon: Icon }) => (
-                    <button key={key} type="button"
-                      onClick={() => { setCompanyMode(key as 'new' | 'existing'); setError(''); }}
-                      className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all"
-                      style={companyMode === key
-                        ? { background: 'var(--accent-green-bg)', color: 'var(--accent-green)', border: '1px solid rgba(52,211,153,0.3)' }
-                        : { color: 'var(--text-muted)', border: '1px solid transparent' }
-                      }>
-                      <Icon className="w-4 h-4" /> {label}
-                    </button>
-                  ))}
-                </div>
-
-                <AnimatePresence>
-                  {error && <ErrorBox msg={error} />}
-                </AnimatePresence>
-
-                {/* Empresa ya registrada */}
-                {companyMode === 'existing' && (
-                  <motion.div key="existing-form"
-                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }} className="space-y-4">
-                    <div className="flex items-start gap-3 rounded-xl p-4"
-                      style={{ background: 'var(--accent-green-bg)', border: '1px solid rgba(52,211,153,0.25)' }}>
-                      <Check className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--accent-green)' }} />
-                      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                        Ingresa el <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>NIT</span> de
-                        tu empresa. Si ya está registrada, tu cuenta quedará asociada automáticamente.
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
-                        style={{ color: 'var(--text-secondary)' }}>
-                        NIT de la empresa <span style={{ color: 'var(--accent-red)' }}>*</span>
-                      </label>
-                      <div className="relative">
-                        <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                          style={{ color: 'var(--text-muted)' }} />
-                        <input type="text" name="nit" value={company.nit} onChange={handleCompany}
-                          placeholder="900123456-7"
-                          className="input-glass w-full rounded-xl pl-10 pr-4 py-3 text-sm" />
-                      </div>
-                      <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
-                        El NIT debe coincidir exactamente con el registrado por el administrador.
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Nueva empresa */}
-                {companyMode === 'new' && (
-                  <motion.div key="new-form"
-                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2 }} className="space-y-3">
+                <Field i={1}>
+                  <div className="grid grid-cols-2 gap-2 mb-5 p-1 rounded-xl"
+                    style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
                     {[
-                      { name: 'nit', label: 'NIT', icon: Hash, placeholder: '900123456-7', required: true },
-                      { name: 'businessName', label: 'Razón Social', icon: FileText, placeholder: 'Hospital San Jorge S.A.S', required: true },
-                      { name: 'commercialName', label: 'Nombre Comercial', icon: Building2, placeholder: 'Hospital San Jorge', required: false },
-                    ].map(({ name, label, icon: Icon, placeholder, required }) => (
-                      <div key={name}>
+                      { key: 'existing', label: 'Ya registrada', icon: Check },
+                      { key: 'new',      label: 'Registrar nueva', icon: Building2 },
+                    ].map(({ key, label, icon: Icon }) => (
+                      <motion.button key={key} type="button"
+                        onClick={() => { setCompanyMode(key as 'new' | 'existing'); setError(''); }}
+                        whileTap={{ scale: 0.96 }}
+                        className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all"
+                        animate={companyMode === key
+                          ? { background: 'var(--accent-green-bg)', color: 'var(--accent-green)' }
+                          : { background: 'transparent', color: 'var(--text-muted)' }
+                        }
+                        style={{ border: companyMode === key ? '1px solid rgba(52,211,153,0.3)' : '1px solid transparent' }}>
+                        <Icon className="w-4 h-4" /> {label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </Field>
+
+                <AnimatePresence>{error && <ErrorBox msg={error} />}</AnimatePresence>
+
+                <AnimatePresence mode="wait">
+                  {companyMode === 'existing' ? (
+                    <motion.div key="existing"
+                      initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                      className="space-y-4">
+                      <Field i={0}>
+                        <div className="flex items-start gap-3 rounded-xl p-4"
+                          style={{ background: 'var(--accent-green-bg)', border: '1px solid rgba(52,211,153,0.25)' }}>
+                          <Check className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--accent-green)' }} />
+                          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                            Ingresa el <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>NIT</span> de
+                            tu empresa para asociar tu cuenta automáticamente.
+                          </p>
+                        </div>
+                      </Field>
+                      <Field i={1}>
                         <label className="block text-xs font-semibold tracking-wide mb-1.5"
                           style={{ color: 'var(--text-secondary)' }}>
-                          {label}{' '}
-                          {required
-                            ? <span style={{ color: 'var(--accent-red)' }}>*</span>
-                            : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span>
-                          }
+                          NIT de la empresa <span style={{ color: 'var(--accent-red)' }}>*</span>
                         </label>
                         <div className="relative">
-                          <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                            style={{ color: 'var(--text-muted)' }} />
-                          <input type="text" name={name}
-                            value={(company as any)[name]} onChange={handleCompany}
-                            placeholder={placeholder}
-                            className="input-glass w-full rounded-xl pl-10 pr-4 py-2.5 text-sm" />
+                          <InputIcon icon={Hash} />
+                          <input type="text" name="nit" value={company.nit} onChange={handleCompany}
+                            placeholder="900123456-7"
+                            className="input-glass w-full rounded-xl pl-10 pr-4 py-3 text-sm" />
                         </div>
-                      </div>
-                    ))}
-                    <div>
-                      <MunicipioSearch
-                        municipios={municipios}
-                        value={company.city ? `${company.city}${company.department ? `, ${company.department}` : ''}` : ''}
-                        onSelect={m => setCompany(p => ({
-                          ...p, city: m?.nombreMunicipio ?? '', department: m?.nombreDepartamento ?? '',
-                        }))}
-                        label="Municipio" required
-                        placeholder="Buscar municipio o departamento..."
-                        inputClassName="input-glass rounded-xl pl-10 pr-8 py-2.5 text-sm"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                        <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                          Debe coincidir exactamente con el registrado por el administrador.
+                        </p>
+                      </Field>
+                    </motion.div>
+                  ) : (
+                    <motion.div key="new"
+                      initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                      className="space-y-3">
+                      {[
+                        { i: 0, name: 'nit', label: 'NIT', icon: Hash, placeholder: '900123456-7', required: true },
+                        { i: 1, name: 'businessName', label: 'Razón Social', icon: FileText, placeholder: 'Hospital San Jorge S.A.S', required: true },
+                        { i: 2, name: 'commercialName', label: 'Nombre Comercial', icon: Building2, placeholder: 'Hospital San Jorge', required: false },
+                      ].map(({ i, name, label, icon, placeholder, required }) => (
+                        <Field key={name} i={i}>
+                          <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                            style={{ color: 'var(--text-secondary)' }}>
+                            {label}{' '}
+                            {required
+                              ? <span style={{ color: 'var(--accent-red)' }}>*</span>
+                              : <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span>}
+                          </label>
+                          <div className="relative">
+                            <InputIcon icon={icon} />
+                            <input type="text" name={name}
+                              value={(company as any)[name]} onChange={handleCompany}
+                              placeholder={placeholder}
+                              className="input-glass w-full rounded-xl pl-10 pr-4 py-2.5 text-sm" />
+                          </div>
+                        </Field>
+                      ))}
+                      <Field i={3}>
+                        <MunicipioSearch municipios={municipios}
+                          value={company.city ? `${company.city}${company.department ? `, ${company.department}` : ''}` : ''}
+                          onSelect={m => setCompany(p => ({ ...p, city: m?.nombreMunicipio ?? '', department: m?.nombreDepartamento ?? '' }))}
+                          label="Municipio" required placeholder="Buscar municipio..."
+                          inputClassName="input-glass rounded-xl pl-10 pr-8 py-2.5 text-sm" />
+                      </Field>
+                      <Field i={4}>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                              style={{ color: 'var(--text-secondary)' }}>Correo empresa</label>
+                            <div className="relative">
+                              <InputIcon icon={Mail} />
+                              <input type="email" name="email" value={company.email} onChange={handleCompany}
+                                placeholder="info@empresa.com"
+                                className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                              style={{ color: 'var(--text-secondary)' }}>Teléfono</label>
+                            <div className="relative">
+                              <InputIcon icon={Phone} />
+                              <input type="tel" name="phone" value={company.phone} onChange={handleCompany}
+                                placeholder="3101234567"
+                                className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
+                            </div>
+                          </div>
+                        </div>
+                      </Field>
+                      <Field i={5}>
                         <label className="block text-xs font-semibold tracking-wide mb-1.5"
-                          style={{ color: 'var(--text-secondary)' }}>Correo empresa</label>
-                        <div className="relative">
-                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                            style={{ color: 'var(--text-muted)' }} />
-                          <input type="email" name="email" value={company.email} onChange={handleCompany}
-                            placeholder="info@empresa.com"
-                            className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold tracking-wide mb-1.5"
-                          style={{ color: 'var(--text-secondary)' }}>Teléfono</label>
-                        <div className="relative">
-                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                            style={{ color: 'var(--text-muted)' }} />
-                          <input type="tel" name="phone" value={company.phone} onChange={handleCompany}
-                            placeholder="3101234567"
-                            className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
-                        style={{ color: 'var(--text-secondary)' }}>Actividad económica</label>
-                      <input type="text" name="economicActivity" value={company.economicActivity}
-                        onChange={handleCompany} placeholder="Ej: Servicios de salud"
-                        className="input-glass w-full rounded-xl px-4 py-2.5 text-sm" />
-                    </div>
-                  </motion.div>
-                )}
+                          style={{ color: 'var(--text-secondary)' }}>Actividad económica</label>
+                        <input type="text" name="economicActivity" value={company.economicActivity}
+                          onChange={handleCompany} placeholder="Ej: Servicios de salud"
+                          className="input-glass w-full rounded-xl px-4 py-2.5 text-sm" />
+                      </Field>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-                <motion.button onClick={nextFromCompany} whileTap={{ scale: 0.98 }}
-                  className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-5">
-                  Continuar <ChevronRight className="w-4 h-4" />
-                </motion.button>
+                <Field i={6}>
+                  <motion.button onClick={() => { const err = validateCompany(); if (err) { setError(err); return; } goTo('user'); }}
+                    whileHover={{ scale: 1.015, boxShadow: '0 8px 30px rgba(59,130,246,0.35)' }}
+                    whileTap={{ scale: 0.97 }}
+                    className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-5">
+                    Continuar <ChevronRight className="w-4 h-4" />
+                  </motion.button>
+                </Field>
               </motion.div>
             )}
 
-            {/* ── PASO 3: DATOS USUARIO ── */}
+            {/* ── PASO 3: USUARIO ── */}
             {step === 'user' && (
-              <motion.div key="user" custom={dir} variants={slideVariants}
-                initial="enter" animate="center" exit="exit"
-                transition={{ duration: 0.28, ease: 'easeInOut' }}
-                className="p-8"
-              >
-                <button onClick={() => goTo(userType === 'client' ? 'company' : 'type', -1)}
-                  className="flex items-center gap-1 text-sm mb-4 transition-colors"
-                  style={{ color: 'var(--text-muted)' }}>
-                  <ChevronLeft className="w-4 h-4" /> Volver
-                </button>
-                <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Datos personales
-                </h2>
-                <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
-                  {userType === 'client' ? 'Tu información como contacto principal' : 'Información del agente'}
-                </p>
+              <motion.div key="user" custom={dir}
+                variants={variants} initial="enter" animate="center" exit="exit"
+                className="p-8">
+                <Field i={0}>
+                  <button onClick={() => goTo(userType === 'client' ? 'company' : 'type', -1)}
+                    className="flex items-center gap-1 text-sm mb-4 transition-colors hover:opacity-80"
+                    style={{ color: 'var(--text-muted)' }}>
+                    <ChevronLeft className="w-4 h-4" /> Volver
+                  </button>
+                  <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                    Datos personales
+                  </h2>
+                  <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
+                    {userType === 'client' ? 'Tu información como contacto principal' : 'Información del agente'}
+                  </p>
+                </Field>
 
-                <AnimatePresence>
-                  {error && <ErrorBox msg={error} />}
-                </AnimatePresence>
+                <AnimatePresence>{error && <ErrorBox msg={error} />}</AnimatePresence>
 
                 <form onSubmit={handleSubmit} className="space-y-3">
-                  {/* Documento */}
-                  <div>
+                  <Field i={1}>
                     <label className="block text-xs font-semibold tracking-wide mb-1.5"
                       style={{ color: 'var(--text-secondary)' }}>
                       Documento <span style={{ color: 'var(--accent-red)' }}>*</span>
                     </label>
                     <div className="relative">
-                      <IdCard className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                        style={{ color: 'var(--text-muted)' }} />
+                      <InputIcon icon={IdCard} />
                       <input type="text" name="document" value={user.document} onChange={handleUser}
                         placeholder="Número de documento"
                         className="input-glass w-full rounded-xl pl-10 pr-4 py-2.5 text-sm" />
                     </div>
-                  </div>
+                  </Field>
 
-                  {/* Nombre + Apellido */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
-                        style={{ color: 'var(--text-secondary)' }}>
-                        Nombre <span style={{ color: 'var(--accent-red)' }}>*</span>
-                      </label>
-                      <div className="relative">
-                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                          style={{ color: 'var(--text-muted)' }} />
-                        <input type="text" name="firstName" value={user.firstName} onChange={handleUser}
-                          placeholder="Carlos"
-                          className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
+                  <Field i={2}>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                          style={{ color: 'var(--text-secondary)' }}>
+                          Nombre <span style={{ color: 'var(--accent-red)' }}>*</span>
+                        </label>
+                        <div className="relative">
+                          <InputIcon icon={User} />
+                          <input type="text" name="firstName" value={user.firstName} onChange={handleUser}
+                            placeholder="Carlos"
+                            className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                          style={{ color: 'var(--text-secondary)' }}>
+                          Apellido <span style={{ color: 'var(--accent-red)' }}>*</span>
+                        </label>
+                        <input type="text" name="lastName" value={user.lastName} onChange={handleUser}
+                          placeholder="Anillo"
+                          className="input-glass w-full rounded-xl px-4 py-2.5 text-sm" />
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
-                        style={{ color: 'var(--text-secondary)' }}>
-                        Apellido <span style={{ color: 'var(--accent-red)' }}>*</span>
-                      </label>
-                      <input type="text" name="lastName" value={user.lastName} onChange={handleUser}
-                        placeholder="Anillo"
-                        className="input-glass w-full rounded-xl px-4 py-2.5 text-sm" />
-                    </div>
-                  </div>
+                  </Field>
 
-                  {/* Email */}
-                  <div>
+                  <Field i={3}>
                     <label className="block text-xs font-semibold tracking-wide mb-1.5"
                       style={{ color: 'var(--text-secondary)' }}>
                       Correo <span style={{ color: 'var(--accent-red)' }}>*</span>
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                        style={{ color: 'var(--text-muted)' }} />
+                      <InputIcon icon={Mail} />
                       <input type="email" name="email" value={user.email} onChange={handleUser}
                         placeholder="correo@empresa.com"
                         className="input-glass w-full rounded-xl pl-10 pr-4 py-2.5 text-sm" />
                     </div>
-                  </div>
+                  </Field>
 
-                  {/* Cargo */}
-                  <div>
+                  <Field i={4}>
                     <label className="block text-xs font-semibold tracking-wide mb-1.5"
                       style={{ color: 'var(--text-secondary)' }}>
                       Cargo{' '}
                       <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span>
                     </label>
                     <div className="relative">
-                      <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                        style={{ color: 'var(--text-muted)' }} />
+                      <InputIcon icon={Briefcase} />
                       <input type="text" name="jobTitle" value={user.jobTitle} onChange={handleUser}
                         placeholder="Líder de proyecto, Coordinador..."
                         className="input-glass w-full rounded-xl pl-10 pr-4 py-2.5 text-sm" />
                     </div>
-                  </div>
+                  </Field>
 
-                  {/* Contraseñas */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
-                        style={{ color: 'var(--text-secondary)' }}>
-                        Contraseña <span style={{ color: 'var(--accent-red)' }}>*</span>
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                          style={{ color: 'var(--text-muted)' }} />
-                        <input type={showPass ? 'text' : 'password'} name="password"
-                          value={user.password} onChange={handleUser} placeholder="Mín. 8 car."
-                          className="input-glass w-full rounded-xl pl-10 pr-10 py-2.5 text-sm" />
-                        <button type="button" onClick={() => setShowPass((p) => !p)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2"
-                          style={{ color: 'var(--text-muted)' }}>
-                          {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                  <Field i={5}>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                          style={{ color: 'var(--text-secondary)' }}>
+                          Contraseña <span style={{ color: 'var(--accent-red)' }}>*</span>
+                        </label>
+                        <div className="relative">
+                          <InputIcon icon={Lock} />
+                          <input type={showPass ? 'text' : 'password'} name="password"
+                            value={user.password} onChange={handleUser} placeholder="Mín. 8 car."
+                            className="input-glass w-full rounded-xl pl-10 pr-10 py-2.5 text-sm" />
+                          <button type="button" onClick={() => setShowPass(p => !p)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2"
+                            style={{ color: 'var(--text-muted)' }}>
+                            <motion.div key={showPass ? 'off' : 'on'}
+                              initial={{ rotate: -15, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}
+                              transition={{ duration: 0.2 }}>
+                              {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </motion.div>
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                          style={{ color: 'var(--text-secondary)' }}>
+                          Confirmar <span style={{ color: 'var(--accent-red)' }}>*</span>
+                        </label>
+                        <div className="relative">
+                          <InputIcon icon={Lock} />
+                          <input type={showPass ? 'text' : 'password'} name="confirmPassword"
+                            value={user.confirmPassword} onChange={handleUser} placeholder="Repite"
+                            className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
-                        style={{ color: 'var(--text-secondary)' }}>
-                        Confirmar <span style={{ color: 'var(--accent-red)' }}>*</span>
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                          style={{ color: 'var(--text-muted)' }} />
-                        <input type={showPass ? 'text' : 'password'} name="confirmPassword"
-                          value={user.confirmPassword} onChange={handleUser} placeholder="Repite"
-                          className="input-glass w-full rounded-xl pl-10 pr-3 py-2.5 text-sm" />
-                      </div>
-                    </div>
-                  </div>
+                  </Field>
 
-                  {/* Contraseña agente */}
                   {userType === 'agent' && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                      <label className="block text-xs font-semibold tracking-wide mb-1.5"
-                        style={{ color: 'var(--text-secondary)' }}>
-                        <span className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-3.5 h-3.5" style={{ color: 'var(--accent-violet)' }} />
-                          Contraseña de agente <span style={{ color: 'var(--accent-red)' }}>*</span>
-                        </span>
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4"
-                          style={{ color: 'var(--text-muted)' }} />
-                        <input type={showAgentPass ? 'text' : 'password'} name="agentRegPassword"
-                          value={user.agentRegPassword} onChange={handleUser}
-                          placeholder="Solicitarla al administrador"
-                          className="input-glass w-full rounded-xl pl-10 pr-10 py-2.5 text-sm"
-                          style={{ borderColor: 'var(--accent-violet-border)' }} />
-                        <button type="button" onClick={() => setShowAgentPass((p) => !p)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2"
-                          style={{ color: 'var(--text-muted)' }}>
-                          {showAgentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                        Requerida para cuentas de agente. Solicítala al administrador.
-                      </p>
-                    </motion.div>
+                    <Field i={6}>
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
+                        <label className="block text-xs font-semibold tracking-wide mb-1.5"
+                          style={{ color: 'var(--text-secondary)' }}>
+                          <span className="flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5" style={{ color: 'var(--accent-violet)' }} />
+                            Contraseña de agente <span style={{ color: 'var(--accent-red)' }}>*</span>
+                          </span>
+                        </label>
+                        <div className="relative">
+                          <InputIcon icon={Lock} />
+                          <input type={showAgentPass ? 'text' : 'password'} name="agentRegPassword"
+                            value={user.agentRegPassword} onChange={handleUser}
+                            placeholder="Solicitarla al administrador"
+                            className="input-glass w-full rounded-xl pl-10 pr-10 py-2.5 text-sm"
+                            style={{ borderColor: 'var(--accent-violet-border)' }} />
+                          <button type="button" onClick={() => setShowAgentPass(p => !p)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2"
+                            style={{ color: 'var(--text-muted)' }}>
+                            {showAgentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                          Requerida para cuentas de agente. Solicítala al administrador.
+                        </p>
+                      </motion.div>
+                    </Field>
                   )}
 
-                  <motion.button type="submit" disabled={loading} whileTap={{ scale: 0.98 }}
-                    className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-1 disabled:opacity-50 disabled:cursor-not-allowed">
-                    {loading
-                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Creando cuenta...</>
-                      : <><Check className="w-4 h-4" /> Crear Cuenta</>
-                    }
-                  </motion.button>
+                  <Field i={7}>
+                    <motion.button type="submit" disabled={loading}
+                      whileHover={{ scale: 1.015, boxShadow: '0 8px 30px rgba(59,130,246,0.35)' }}
+                      whileTap={{ scale: 0.97 }}
+                      className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                      <AnimatePresence mode="wait">
+                        {loading ? (
+                          <motion.span key="loading" className="flex items-center gap-2"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                            <Loader2 className="w-4 h-4 animate-spin" /> Creando cuenta...
+                          </motion.span>
+                        ) : (
+                          <motion.span key="idle" className="flex items-center gap-2"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                            <Check className="w-4 h-4" /> Crear Cuenta
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </motion.button>
+                  </Field>
                 </form>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
-        <p className="text-center text-xs mt-5" style={{ color: 'var(--text-muted)' }}>
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
+          className="text-center text-xs mt-5" style={{ color: 'var(--text-muted)' }}>
           © 2024 Sistemas Infotec · AURA ERP v1.0.0
-        </p>
+        </motion.p>
       </motion.div>
     </div>
   );

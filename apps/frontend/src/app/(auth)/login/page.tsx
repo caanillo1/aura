@@ -2,13 +2,28 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle, UserPlus, PenLine } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { AuraLogo } from '@/components/ui/AuraLogo';
 import { AuraText } from '@/components/ui/AuraText';
+
+// ── Variantes de animación ────────────────────────────────────────────────
+const fieldVariants = {
+  hidden: { opacity: 0, y: 16, filter: 'blur(4px)' },
+  visible: (i: number) => ({
+    opacity: 1, y: 0, filter: 'blur(0px)',
+    transition: { delay: i * 0.09, duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
+
+const cardVariants = {
+  hidden:   { opacity: 0, y: 32, scale: 0.97 },
+  visible:  { opacity: 1, y: 0,  scale: 1, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } },
+  exit:     { opacity: 0, y: -20, scale: 0.96, transition: { duration: 0.3 } },
+};
 
 function LoginContent() {
   const router = useRouter();
@@ -33,10 +48,7 @@ function LoginContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.email || !form.password) {
-      setError('Por favor completa todos los campos');
-      return;
-    }
+    if (!form.email || !form.password) { setError('Por favor completa todos los campos'); return; }
     setLoading(true);
     try {
       const data = await authApi.login(form);
@@ -53,66 +65,82 @@ function LoginContent() {
 
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="w-full max-w-md"
-      >
-        {/* Cabecera */}
+      <div className="w-full max-w-md">
+
+        {/* ── Cabecera ─────────────────────────────────────────── */}
         <motion.div
-          initial={{ opacity: 0, y: -16 }}
+          initial={{ opacity: 0, y: -24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           className="text-center mb-8"
         >
-          <div className="flex justify-center mb-4">
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.7, ease: [0.34, 1.56, 0.64, 1] }}
+            className="flex justify-center mb-4"
+          >
             <AuraLogo size={72} animate />
-          </div>
-          <AuraText />
-          <div className="flex items-center justify-center gap-2 mt-3">
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            <AuraText />
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.35 }}
+            className="flex items-center justify-center gap-2 mt-3"
+          >
             <div className="h-px w-12" style={{ background: 'var(--border-strong)' }} />
             <span className="text-[11px] font-semibold tracking-[0.22em] uppercase"
               style={{ color: 'var(--text-muted)' }}>
               Gestiones Inteligentes
             </span>
             <div className="h-px w-12" style={{ background: 'var(--border-strong)' }} />
-          </div>
+          </motion.div>
         </motion.div>
 
-        {/* Card */}
+        {/* ── Card ─────────────────────────────────────────────── */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
           className="glass-strong rounded-2xl p-8"
         >
-          <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-            Iniciar sesión
-          </h2>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-            Ingresa tus credenciales para continuar
-          </p>
+          <motion.div custom={0} variants={fieldVariants} initial="hidden" animate="visible">
+            <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+              Iniciar sesión
+            </h2>
+            <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+              Ingresa tus credenciales para continuar
+            </p>
+          </motion.div>
 
           {/* Error */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="flex items-center gap-2 rounded-xl px-4 py-3 mb-5"
-              style={{
-                background: 'var(--accent-red-bg)',
-                border: '1px solid rgba(248,113,113,0.28)',
-              }}
-            >
-              <AlertCircle className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-red)' }} />
-              <span className="text-sm" style={{ color: 'var(--accent-red)' }}>{error}</span>
-            </motion.div>
-          )}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                className="flex items-center gap-2 rounded-xl px-4 py-3 mb-5 overflow-hidden"
+                style={{ background: 'var(--accent-red-bg)', border: '1px solid rgba(248,113,113,0.28)' }}
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-red)' }} />
+                <span className="text-sm" style={{ color: 'var(--accent-red)' }}>{error}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
-            <div>
+            <motion.div custom={1} variants={fieldVariants} initial="hidden" animate="visible">
               <label className="block text-xs font-semibold tracking-wide mb-1.5"
                 style={{ color: 'var(--text-secondary)' }}>
                 Correo electrónico
@@ -126,10 +154,10 @@ function LoginContent() {
                   className="input-glass w-full rounded-xl pl-10 pr-4 py-3 text-sm"
                 />
               </div>
-            </div>
+            </motion.div>
 
             {/* Contraseña */}
-            <div>
+            <motion.div custom={2} variants={fieldVariants} initial="hidden" animate="visible">
               <label className="block text-xs font-semibold tracking-wide mb-1.5"
                 style={{ color: 'var(--text-secondary)' }}>
                 Contraseña
@@ -146,76 +174,103 @@ function LoginContent() {
                 <button type="button" onClick={() => setShowPass((p) => !p)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
                   style={{ color: 'var(--text-muted)' }}>
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <motion.div
+                    key={showPass ? 'off' : 'on'}
+                    initial={{ rotate: -15, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </motion.div>
                 </button>
               </div>
-            </div>
+            </motion.div>
 
             {/* Botón principal */}
-            <motion.button
-              type="submit" disabled={loading} whileTap={{ scale: 0.98 }}
-              className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading
-                ? <><Loader2 className="w-4 h-4 animate-spin" /> Verificando...</>
-                : 'Iniciar sesión'
-              }
-            </motion.button>
+            <motion.div custom={3} variants={fieldVariants} initial="hidden" animate="visible">
+              <motion.button
+                type="submit" disabled={loading}
+                whileHover={{ scale: 1.015, boxShadow: '0 8px 30px rgba(59,130,246,0.35)' }}
+                whileTap={{ scale: 0.97 }}
+                className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <AnimatePresence mode="wait">
+                  {loading ? (
+                    <motion.span key="loading" className="flex items-center gap-2"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Verificando...
+                    </motion.span>
+                  ) : (
+                    <motion.span key="idle"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      Iniciar sesión
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+            </motion.div>
           </form>
 
           {/* Separador — nueva cuenta */}
-          <div className="flex items-center gap-3 my-5">
+          <motion.div custom={4} variants={fieldVariants} initial="hidden" animate="visible"
+            className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>¿Nuevo en AURA?</span>
             <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
-          </div>
+          </motion.div>
 
           {/* Crear cuenta */}
-          <Link href="/register">
-            <motion.div
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              className="w-full rounded-xl py-3 text-sm font-semibold text-center text-white cursor-pointer flex items-center justify-center gap-2 transition-all"
-              style={{
-                background: 'linear-gradient(135deg, #5b21b6 0%, #7c3aed 50%, #8b5cf6 100%)',
-                border: '1px solid var(--accent-violet-border)',
-                boxShadow: '0 2px 12px var(--accent-violet-bg)',
-              }}
-            >
-              <UserPlus className="w-4 h-4" />
-              Crear Cuenta
-            </motion.div>
-          </Link>
+          <motion.div custom={5} variants={fieldVariants} initial="hidden" animate="visible">
+            <Link href="/register">
+              <motion.div
+                whileHover={{ scale: 1.015, boxShadow: '0 6px 24px rgba(139,92,246,0.35)' }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full rounded-xl py-3 text-sm font-semibold text-center text-white cursor-pointer flex items-center justify-center gap-2 transition-all"
+                style={{
+                  background: 'linear-gradient(135deg, #5b21b6 0%, #7c3aed 50%, #8b5cf6 100%)',
+                  border: '1px solid var(--accent-violet-border)',
+                }}
+              >
+                <UserPlus className="w-4 h-4" />
+                Crear Cuenta
+              </motion.div>
+            </Link>
+          </motion.div>
 
           {/* Separador — clientes */}
-          <div className="flex items-center gap-3 mt-4 mb-3">
+          <motion.div custom={6} variants={fieldVariants} initial="hidden" animate="visible"
+            className="flex items-center gap-3 mt-4 mb-3">
             <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>¿Cliente?</span>
             <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
-          </div>
+          </motion.div>
 
           {/* Firmar documentos */}
-          <Link href="/buscar-firmas">
-            <motion.div
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-              className="w-full rounded-xl py-3 text-sm font-semibold text-center cursor-pointer flex items-center justify-center gap-2 transition-all"
-              style={{
-                background: 'var(--accent-green-bg)',
-                border: '1px solid rgba(52,211,153,0.28)',
-                color: 'var(--accent-green)',
-              }}
-            >
-              <PenLine className="w-4 h-4" />
-              Firmar documentos pendientes
-            </motion.div>
-          </Link>
+          <motion.div custom={7} variants={fieldVariants} initial="hidden" animate="visible">
+            <Link href="/buscar-firmas">
+              <motion.div
+                whileHover={{ scale: 1.015, boxShadow: '0 6px 24px rgba(52,211,153,0.2)' }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full rounded-xl py-3 text-sm font-semibold text-center cursor-pointer flex items-center justify-center gap-2 transition-all"
+                style={{
+                  background: 'var(--accent-green-bg)',
+                  border: '1px solid rgba(52,211,153,0.28)',
+                  color: 'var(--accent-green)',
+                }}
+              >
+                <PenLine className="w-4 h-4" />
+                Firmar documentos pendientes
+              </motion.div>
+            </Link>
+          </motion.div>
         </motion.div>
 
-        <p className="text-center text-xs mt-6" style={{ color: 'var(--text-muted)' }}>
+        <motion.p
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}
+          className="text-center text-xs mt-6" style={{ color: 'var(--text-muted)' }}>
           © 2024 Sistemas Infotec · AURA ERP v1.0.0
-        </p>
-      </motion.div>
+        </motion.p>
+      </div>
     </div>
   );
 }

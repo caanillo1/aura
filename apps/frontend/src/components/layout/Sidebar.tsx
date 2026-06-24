@@ -10,7 +10,7 @@ import {
   ClipboardPlus, ListOrdered, MessageSquarePlus,
   Briefcase, LayoutTemplate, Layers, X,
   CalendarDays, TrendingUp, FileSpreadsheet,
-  MapPin, Activity, Sparkles, CheckSquare,
+  MapPin, Activity, Sparkles, CheckSquare, BookOpen,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useAuthStore } from '@/store/auth.store';
@@ -50,6 +50,7 @@ const NAV_ITEMS: NavItem[] = [
       { href: '/implementacion/seguimientos', label: 'Seguimientos',        icon: Activity,       permission: 'orders.buscar'   },
       { href: '/implementacion/analisis',     label: 'Análisis',            icon: Sparkles,       permission: 'orders.buscar'   },
       { href: '/implementacion/actividades',  label: 'Actividades Realizadas', icon: CheckSquare, permission: 'orders.buscar'   },
+      { href: '/implementacion/faq',          label: 'FAQ',                    icon: BookOpen,    permission: 'orders.buscar'   },
     ],
   },
   { label: 'Requerimientos', icon: MessageSquarePlus,

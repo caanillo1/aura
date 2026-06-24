@@ -51,6 +51,8 @@ model Company {
   roles             Role[]
   tiposDocumento    TipoDocumento[]
   users             User[]
+  faqTipos          FaqTipo[]
+  faqs              Faq[]
 
   @@map("Empresas")
 }
@@ -141,6 +143,7 @@ model User {
   company                Company                   @relation(fields: [companyId], references: [id], onUpdate: NoAction)
   role                   Role                      @relation(fields: [roleId], references: [id], onUpdate: NoAction)
   visitsCreated          Visit[]                   @relation("VisitCreatedBy")
+  faqsCreados            Faq[]                     @relation("FaqAutor")
 
   @@map("Usuarios")
 }
@@ -1149,4 +1152,46 @@ model CotizacionItem {
   cotizacion    Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
 
   @@map("CotizacionItems")
+}
+
+// ── FAQ ──────────────────────────────────────────────────────────────────────
+
+model FaqTipo {
+  id          String   @id @default(uuid()) @db.UniqueIdentifier
+  companyId   String   @db.UniqueIdentifier
+  nombre      String   @db.NVarChar(100)
+  color       String?  @db.NVarChar(7)
+  icono       String?  @db.NVarChar(50)
+  descripcion String?  @db.NVarChar(300)
+  orden       Int      @default(0)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  faqs    Faq[]
+
+  @@unique([companyId, nombre])
+  @@map("FaqTipos")
+}
+
+model Faq {
+  id          String   @id @default(uuid()) @db.UniqueIdentifier
+  companyId   String   @db.UniqueIdentifier
+  tipoId      String?  @db.UniqueIdentifier
+  titulo      String   @db.NVarChar(300)
+  descripcion String?  @db.NVarChar(500)
+  contenido   String   @db.NVarChar(Max)
+  etiquetas   String?  @db.NVarChar(Max)
+  autorId     String?  @db.UniqueIdentifier
+  activo      Boolean  @default(true)
+  vistas      Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tipo    FaqTipo? @relation(fields: [tipoId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  autor   User?    @relation("FaqAutor", fields: [autorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("Faqs")
 }

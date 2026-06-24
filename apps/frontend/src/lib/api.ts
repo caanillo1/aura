@@ -265,6 +265,45 @@ export const whatsappApi = {
     api.post('/whatsapp/send-test', { phone }).then(r => r.data),
 };
 
+// ── FAQ ───────────────────────────────────────────────────────────────────────
+
+export interface FaqTipo {
+  id: string; nombre: string; color?: string; icono?: string;
+  descripcion?: string; orden: number; activo: boolean;
+  _count?: { faqs: number };
+}
+
+export interface FaqListItem {
+  id: string; titulo: string; descripcion?: string; etiquetas?: string;
+  vistas: number; activo: boolean; createdAt: string; updatedAt: string;
+  tipo?: { id: string; nombre: string; color?: string; icono?: string } | null;
+  autor?: { id: string; firstName: string; lastName: string } | null;
+}
+
+export interface FaqDetail extends FaqListItem { contenido: string; }
+
+export const faqApi = {
+  getTipos: (): Promise<FaqTipo[]> =>
+    api.get('/faq/tipos').then(r => r.data),
+  createTipo: (body: { nombre: string; color?: string; icono?: string; descripcion?: string; orden?: number }) =>
+    api.post('/faq/tipos', body).then(r => r.data) as Promise<FaqTipo>,
+  updateTipo: (id: string, body: Partial<{ nombre: string; color: string; icono: string; descripcion: string; orden: number; activo: boolean }>) =>
+    api.patch(`/faq/tipos/${id}`, body).then(r => r.data) as Promise<FaqTipo>,
+  deleteTipo: (id: string) =>
+    api.delete(`/faq/tipos/${id}`).then(r => r.data),
+
+  getFaqs: (params?: { q?: string; tipoId?: string; soloActivos?: boolean }): Promise<FaqListItem[]> =>
+    api.get('/faq', { params }).then(r => r.data),
+  getFaq: (id: string): Promise<FaqDetail> =>
+    api.get(`/faq/${id}`).then(r => r.data),
+  createFaq: (body: { titulo: string; contenido: string; descripcion?: string; tipoId?: string; etiquetas?: string[] }): Promise<FaqDetail> =>
+    api.post('/faq', body).then(r => r.data),
+  updateFaq: (id: string, body: Partial<{ titulo: string; contenido: string; descripcion: string; tipoId: string; etiquetas: string[]; activo: boolean }>): Promise<FaqDetail> =>
+    api.patch(`/faq/${id}`, body).then(r => r.data),
+  deleteFaq: (id: string) =>
+    api.delete(`/faq/${id}`).then(r => r.data),
+};
+
 // ── Service Orders ────────────────────────────────────────────────────────────
 export const serviceOrdersApi = {
   list: (params?: { page?: number; limit?: number; search?: string; status?: string; clientId?: string }): Promise<PaginatedResponse<ServiceOrder>> =>

@@ -22,6 +22,7 @@ export default function WhatsAppConfigPage() {
   const [loading, setLoading]     = useState(false);
   const [testPhone, setTestPhone] = useState('');
   const [testing, setTesting]     = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; debug: Record<string, string> } | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -48,11 +49,14 @@ export default function WhatsAppConfigPage() {
   const handleSendTest = async () => {
     if (!testPhone.trim()) { toast.error('Ingresa un número de teléfono'); return; }
     setTesting(true);
+    setTestResult(null);
     try {
       const r = await whatsappApi.sendTest(testPhone.trim());
+      setTestResult(r);
       if (r.ok) toast.success(r.message);
       else toast.error(r.message);
-    } catch {
+    } catch (e: any) {
+      setTestResult({ ok: false, message: e?.message ?? 'Error al conectar con el servidor', debug: {} });
       toast.error('Error al conectar con el servidor');
     } finally {
       setTesting(false);
@@ -191,6 +195,23 @@ export default function WhatsAppConfigPage() {
               {testing ? 'Enviando…' : 'Enviar'}
             </button>
           </div>
+
+          {testResult && (
+            <div className="rounded-xl p-3 space-y-1.5"
+              style={{ background: testResult.ok ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.08)', border: `1px solid ${testResult.ok ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'}` }}>
+              <p className="text-xs font-semibold" style={{ color: testResult.ok ? '#34d399' : '#f87171' }}>
+                {testResult.ok ? '✓ Enviado' : '✗ Error'}: {testResult.message}
+              </p>
+              {Object.keys(testResult.debug).length > 0 && (
+                <div className="rounded-lg p-2 font-mono text-[11px] space-y-0.5"
+                  style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                  {Object.entries(testResult.debug).map(([k, v]) => (
+                    <div key={k}><span style={{ color: 'var(--text-secondary)' }}>{k}:</span> {v}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </motion.div>
       )}
 

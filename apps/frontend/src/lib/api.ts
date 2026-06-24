@@ -261,7 +261,7 @@ export const whatsappApi = {
     api.get('/whatsapp/status').then(r => r.data),
   disconnect: (): Promise<{ ok: boolean }> =>
     api.post('/whatsapp/disconnect').then(r => r.data),
-  sendTest: (phone: string): Promise<{ ok: boolean; message: string }> =>
+  sendTest: (phone: string): Promise<{ ok: boolean; message: string; debug: Record<string, string> }> =>
     api.post('/whatsapp/send-test', { phone }).then(r => r.data),
 };
 
@@ -476,6 +476,8 @@ export const projectsApi = {
     api.get('/projects/activities/report-schedule').then((r) => r.data),
   saveActivityReportSchedule: (body: { enabled: boolean; diasSemana: number[]; hora: number; minuto: number; status: string[]; destinatarios: { email: string; agentIds?: string[] }[]; asunto?: string; mensaje?: string }) =>
     api.patch('/projects/activities/report-schedule', body).then((r) => r.data),
+  runActivityReportNow: () =>
+    api.post('/projects/activities/report-schedule/run-now').then((r) => r.data) as Promise<{ enviados: number; destinatarios: number }>,
   loadTemplate: (id: string, data: {
     templateFlowId: string;
     phaseDates?: { templatePhaseId: string; startDate?: string; endDate?: string }[];

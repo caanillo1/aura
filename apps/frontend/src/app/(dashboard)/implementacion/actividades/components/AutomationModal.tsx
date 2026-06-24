@@ -58,6 +58,7 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
   const [schedMensaje, setSchedMensaje]             = useState('');
   const [savingSchedule, setSavingSchedule]         = useState(false);
   const [loadingSchedule, setLoadingSchedule]       = useState(false);
+  const [runningNow, setRunningNow]                 = useState(false);
 
   // Pending agent selection (for next recipient to add)
   const [pendingAgentIds, setPendingAgentIds] = useState<string[]>([]);
@@ -160,6 +161,20 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
       toast.error(e?.response?.data?.message ?? 'Error al enviar el reporte');
     } finally {
       setSending(false);
+    }
+  }
+
+  // ── Run now (con config programada) ──────────────────────────────────────
+
+  async function handleRunNow() {
+    setRunningNow(true);
+    try {
+      const res = await projectsApi.runActivityReportNow();
+      toast.success(`Reporte enviado · ${res.enviados} actividades a ${res.destinatarios} destinatario${res.destinatarios !== 1 ? 's' : ''}`);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al enviar el reporte');
+    } finally {
+      setRunningNow(false);
     }
   }
 
@@ -498,12 +513,21 @@ export default function AutomationModal({ open, onClose, activeFilters }: Props)
                     style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }} />
                 </div>
 
-                <button onClick={handleSaveSchedule} disabled={savingSchedule}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50"
-                  style={{ background: '#818cf8', color: '#fff' }}>
-                  {savingSchedule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
-                  {savingSchedule ? 'Guardando…' : 'Guardar configuración'}
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={handleSaveSchedule} disabled={savingSchedule}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50"
+                    style={{ background: '#818cf8', color: '#fff' }}>
+                    {savingSchedule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+                    {savingSchedule ? 'Guardando…' : 'Guardar'}
+                  </button>
+                  <button onClick={handleRunNow} disabled={runningNow || !schedDestinatarios.length}
+                    title={!schedDestinatarios.length ? 'Agrega destinatarios primero' : 'Enviar el reporte ahora con la configuración guardada'}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40"
+                    style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }}>
+                    {runningNow ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {runningNow ? 'Enviando…' : 'Probar'}
+                  </button>
+                </div>
               </>
             )
           )}

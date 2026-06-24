@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Eye, EyeOff, Mail, Lock, User, IdCard, Briefcase,
   ShieldCheck, Loader2, AlertCircle, ChevronLeft,
@@ -41,11 +41,11 @@ const stepTransition = (dir: number) => ({
     transition: { duration: 0.22 } }),
 });
 
-const fieldVariants = {
+const fieldVariants: Variants = {
   hidden:  { opacity: 0, y: 14, filter: 'blur(3px)' },
   visible: (i: number) => ({
     opacity: 1, y: 0, filter: 'blur(0px)',
-    transition: { delay: 0.05 + i * 0.07, duration: 0.38, ease: [0.22, 1, 0.36, 1] },
+    transition: { delay: 0.05 + i * 0.07, duration: 0.38, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
   }),
 };
 

@@ -65,14 +65,18 @@ export class ActivityReportSchedulerService implements OnModuleInit {
 
   private registerCron(companyId: string, cfg: ActivityScheduleConfig) {
     const expr = `0 ${cfg.minuto} ${cfg.hora} * * ${cfg.diasSemana.join(',')}`;
-    this.logger.log(`Cron actividades [${JOB_PREFIX}${companyId}]: ${expr}`);
+    const tz   = 'America/Bogota';
+    this.logger.log(`Cron actividades [${JOB_PREFIX}${companyId}]: "${expr}" timezone=${tz}`);
+    // Timezone explícito para que la hora sea en Colombia, no UTC
     const job = new CronJob(expr, () => {
+      this.logger.log(`Disparando envío automático actividades company=${companyId}`);
       this.executeSend(companyId, cfg).catch(err =>
         this.logger.error(`Error envío automático actividades company=${companyId}: ${err?.message}`),
       );
-    });
+    }, null, false, tz);
     this.schedulerRegistry.addCronJob(`${JOB_PREFIX}${companyId}`, job);
     job.start();
+    this.logger.log(`Próximo disparo: ${job.nextDate().toISO()}`);
   }
 
   private removeCron(companyId: string) {
@@ -81,19 +85,23 @@ export class ActivityReportSchedulerService implements OnModuleInit {
 
   private async executeSend(companyId: string, cfg: ActivityScheduleConfig): Promise<{ enviados: number; destinatarios: number }> {
     if (!cfg.destinatarios.length) return { enviados: 0, destinatarios: 0 };
-    const now   = new Date();
-    const today = now.toISOString().slice(0, 10);
-    const isSaturday = now.getDay() === 6;
+    const now = new Date();
+    // Fecha en Colombia (no UTC) para que "hoy" sea correcto a las 21:xx hora local
+    const todayBogota = now.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' }); // YYYY-MM-DD
+    const dayInBogota = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' })).getDay();
+    const isSaturday  = dayInBogota === 6;
 
-    let dateFrom = today;
-    let dateTo   = today;
+    let dateFrom = todayBogota;
+    let dateTo   = todayBogota;
 
     if (isSaturday) {
       // Lunes de la semana actual → sábado (hoy)
-      const monday = new Date(now);
-      monday.setDate(now.getDate() - 5); // Saturday - 5 = Monday
-      dateFrom = monday.toISOString().slice(0, 10);
+      const bogotaMs  = new Date(now.toLocaleString('en-US', { timeZone: 'America/Bogota' })).getTime();
+      const mondayMs  = bogotaMs - 5 * 24 * 60 * 60 * 1000;
+      dateFrom = new Date(mondayMs).toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
     }
+
+    this.logger.log(`executeSend company=${companyId} dateFrom=${dateFrom} dateTo=${dateTo} destinatarios=${cfg.destinatarios.length}`);
 
     return this.projectsService.sendActivitiesReport(companyId, {
       recipients: cfg.destinatarios,

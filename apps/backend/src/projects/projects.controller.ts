@@ -133,6 +133,13 @@ export class ProjectsController {
     return this.scheduler.saveSchedule(user.companyId, dto);
   }
 
+  @Post('activities/report-schedule/run-now')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Disparar envío de reporte de actividades inmediatamente' })
+  runNow(@GetUser() user: JwtUser) {
+    return this.scheduler.runNow(user.companyId);
+  }
+
   @Patch('activities/:activityId')
   @Roles(...IMPL_ROLES)
   @ApiOperation({ summary: 'Actualizar actividad (estado, progreso, horas, novedades)' })

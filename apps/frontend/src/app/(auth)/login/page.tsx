@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, Loader2, AlertCircle, UserPlus, PenLine } from 'lucide-react';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/api';
@@ -10,11 +10,11 @@ import { useAuthStore } from '@/store/auth.store';
 import { AuraLogo } from '@/components/ui/AuraLogo';
 import { AuraText } from '@/components/ui/AuraText';
 
-const fieldVar = {
+const fieldVar: Variants = {
   hidden:  { opacity: 0, y: 18, filter: 'blur(6px)' },
   visible: (i: number) => ({
     opacity: 1, y: 0, filter: 'blur(0px)',
-    transition: { delay: 0.3 + i * 0.1, duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+    transition: { delay: 0.3 + i * 0.1, duration: 0.45, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
   }),
 };
 

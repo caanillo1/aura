@@ -287,24 +287,20 @@ export default function RegisterPage() {
                     ].map(({ type, label, icon: Icon, desc, accentBg, accentBorder, accentColor, accentIconBg }) => {
                       const isActive = userType === type;
                       return (
-                        <motion.button key={type} type="button"
+                        <button key={type} type="button"
                           onClick={() => setUserType(type)}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.96 }}
-                          animate={{
-                            background: isActive ? accentBg : 'var(--surface-2)',
-                            borderColor: isActive ? accentBorder : 'var(--border-subtle)',
-                            boxShadow: isActive ? `0 0 20px ${accentBg}` : '0 0 0 transparent',
+                          className="flex flex-col items-center gap-3 p-5 rounded-xl text-center border-2 transition-all duration-200 active:scale-95"
+                          style={{
+                            background:   isActive ? accentBg        : 'var(--surface-2)',
+                            borderColor:  isActive ? accentBorder     : 'var(--border-subtle)',
+                            borderStyle:  'solid',
                           }}
-                          transition={{ duration: 0.25 }}
-                          className="flex flex-col items-center gap-3 p-5 rounded-xl text-center border-2"
-                          style={{ borderStyle: 'solid' }}
                         >
-                          <motion.div className="p-3 rounded-lg transition-all"
-                            animate={{ background: isActive ? accentIconBg : 'var(--surface-2)' }}>
+                          <div className="p-3 rounded-lg transition-colors duration-200"
+                            style={{ background: isActive ? accentIconBg : 'var(--surface-2)' }}>
                             <Icon className="w-6 h-6"
                               style={{ color: isActive ? accentColor : 'var(--text-muted)' }} />
-                          </motion.div>
+                          </div>
                           <span className="text-sm font-bold leading-tight"
                             style={{ color: isActive ? accentColor : 'var(--text-secondary)' }}>
                             {label}
@@ -312,7 +308,7 @@ export default function RegisterPage() {
                           <span className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
                             {desc}
                           </span>
-                        </motion.button>
+                        </button>
                       );
                     })}
                   </div>
@@ -320,7 +316,7 @@ export default function RegisterPage() {
 
                 <Field i={2}>
                   <motion.button onClick={() => goTo(userType === 'client' ? 'company' : 'user')}
-                    whileHover={{ scale: 1.015, boxShadow: '0 8px 30px rgba(59,130,246,0.35)' }}
+                    whileTap={{ scale: 0.97 }}
                     whileTap={{ scale: 0.97 }}
                     className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2">
                     Continuar <ChevronRight className="w-4 h-4" />
@@ -334,10 +330,9 @@ export default function RegisterPage() {
                     <div className="flex-1 h-px" style={{ background: 'var(--border-subtle)' }} />
                   </div>
                   <Link href="/login">
-                    <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-                      className="btn-glass w-full rounded-xl py-3 text-sm font-medium text-center cursor-pointer flex items-center justify-center gap-2">
+                    <div className="btn-glass w-full rounded-xl py-3 text-sm font-medium text-center cursor-pointer flex items-center justify-center gap-2">
                       <ChevronLeft className="w-4 h-4" /> Iniciar sesión
-                    </motion.div>
+                    </div>
                   </Link>
                 </Field>
               </motion.div>
@@ -369,17 +364,16 @@ export default function RegisterPage() {
                       { key: 'existing', label: 'Ya registrada', icon: Check },
                       { key: 'new',      label: 'Registrar nueva', icon: Building2 },
                     ].map(({ key, label, icon: Icon }) => (
-                      <motion.button key={key} type="button"
+                      <button key={key} type="button"
                         onClick={() => { setCompanyMode(key as 'new' | 'existing'); setError(''); }}
-                        whileTap={{ scale: 0.96 }}
-                        className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all"
-                        animate={companyMode === key
-                          ? { background: 'var(--accent-green-bg)', color: 'var(--accent-green)' }
-                          : { background: 'transparent', color: 'var(--text-muted)' }
-                        }
-                        style={{ border: companyMode === key ? '1px solid rgba(52,211,153,0.3)' : '1px solid transparent' }}>
+                        className="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all duration-200 active:scale-95"
+                        style={{
+                          background: companyMode === key ? 'var(--accent-green-bg)' : 'transparent',
+                          color:      companyMode === key ? 'var(--accent-green)'    : 'var(--text-muted)',
+                          border:     companyMode === key ? '1px solid rgba(52,211,153,0.3)' : '1px solid transparent',
+                        }}>
                         <Icon className="w-4 h-4" /> {label}
-                      </motion.button>
+                      </button>
                     ))}
                   </div>
                 </Field>
@@ -491,7 +485,7 @@ export default function RegisterPage() {
 
                 <Field i={6}>
                   <motion.button onClick={() => { const err = validateCompany(); if (err) { setError(err); return; } goTo('user'); }}
-                    whileHover={{ scale: 1.015, boxShadow: '0 8px 30px rgba(59,130,246,0.35)' }}
+                    whileTap={{ scale: 0.97 }}
                     whileTap={{ scale: 0.97 }}
                     className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-5">
                     Continuar <ChevronRight className="w-4 h-4" />
@@ -658,7 +652,7 @@ export default function RegisterPage() {
 
                   <Field i={7}>
                     <motion.button type="submit" disabled={loading}
-                      whileHover={{ scale: 1.015, boxShadow: '0 8px 30px rgba(59,130,246,0.35)' }}
+                      whileTap={{ scale: 0.97 }}
                       whileTap={{ scale: 0.97 }}
                       className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-1 disabled:opacity-50 disabled:cursor-not-allowed">
                       <AnimatePresence mode="wait">

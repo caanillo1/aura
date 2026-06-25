@@ -33,18 +33,18 @@ interface UserForm {
 
 // ── Variantes ────────────────────────────────────────────────────────────
 const stepTransition = (dir: number) => ({
-  enter:  { x: dir > 0 ? 80 : -80, opacity: 0, scale: 0.96, filter: 'blur(4px)' },
-  center: { x: 0, opacity: 1, scale: 1, filter: 'blur(0px)',
+  enter:  { x: dir > 0 ? 80 : -80, opacity: 0, scale: 0.96 },
+  center: { x: 0, opacity: 1, scale: 1,
     transition: { type: 'spring' as const, stiffness: 280, damping: 28 } },
   exit:   (d: number) => ({
-    x: d > 0 ? -80 : 80, opacity: 0, scale: 0.96, filter: 'blur(4px)',
+    x: d > 0 ? -80 : 80, opacity: 0, scale: 0.96,
     transition: { duration: 0.22 } }),
 });
 
 const fieldVariants: Variants = {
-  hidden:  { opacity: 0, y: 14, filter: 'blur(3px)' },
+  hidden:  { opacity: 0, y: 14 },
   visible: (i: number) => ({
-    opacity: 1, y: 0, filter: 'blur(0px)',
+    opacity: 1, y: 0,
     transition: { delay: 0.05 + i * 0.07, duration: 0.38, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
   }),
 };

@@ -11,9 +11,9 @@ import { AuraLogo } from '@/components/ui/AuraLogo';
 import { AuraText } from '@/components/ui/AuraText';
 
 const fieldVar: Variants = {
-  hidden:  { opacity: 0, y: 18, filter: 'blur(6px)' },
+  hidden:  { opacity: 0, y: 18 },
   visible: (i: number) => ({
-    opacity: 1, y: 0, filter: 'blur(0px)',
+    opacity: 1, y: 0,
     transition: { delay: 0.3 + i * 0.1, duration: 0.45, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
   }),
 };
@@ -67,9 +67,9 @@ function LoginContent() {
         >
           <div className="flex justify-center mb-4">
             <div className="relative">
-              {/* Anillos expansivos */}
+              {/* Anillos expansivos — ocultos en móvil para evitar sobrecarga de GPU */}
               {[0, 1, 2].map(i => (
-                <motion.div key={i} className="absolute rounded-full pointer-events-none"
+                <motion.div key={i} className="absolute rounded-full pointer-events-none hidden sm:block"
                   style={{ inset: -16 - i * 14, border: '1px solid rgba(96,165,250,0.4)' }}
                   animate={{ scale: [1, 1.8], opacity: [0.5, 0] }}
                   transition={{ duration: 2.5, delay: i * 0.75, repeat: Infinity, ease: 'easeOut' }}
@@ -113,8 +113,8 @@ function LoginContent() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ delay: 0.15, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* Halo exterior */}
-          <motion.div className="absolute inset-0 rounded-2xl pointer-events-none"
+          {/* Halo exterior — solo desktop */}
+          <motion.div className="absolute inset-0 rounded-2xl pointer-events-none hidden sm:block"
             animate={{
               boxShadow: [
                 '0 0 40px rgba(59,130,246,0.25), 0 0 80px rgba(139,92,246,0.12)',

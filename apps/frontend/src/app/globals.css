@@ -446,6 +446,26 @@ input[type="search"], input[type="date"], textarea, select { min-width: unset; }
   }
 }
 
+/* ── Mobile: disable backdrop-filter (crashes Safari/Chrome on low-end devices) ── */
+@media (max-width: 768px) {
+  .glass-strong {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .glass {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .input-glass {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .btn-glass {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
 @media (forced-colors: active) {
   .glass, .glass-strong { border: 2px solid ButtonText; background: Canvas; }
   .btn-primary          { border: 2px solid ButtonText; background: ButtonFace; color: ButtonText; }

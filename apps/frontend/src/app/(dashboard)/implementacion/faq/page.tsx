@@ -483,7 +483,10 @@ export default function FaqPage() {
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">
       {/* ── Left panel: list ── */}
-      <div className="w-80 shrink-0 flex flex-col" style={{ borderRight: '1px solid var(--border-subtle)', background: 'var(--bg-base)' }}>
+      <div
+        className={`shrink-0 flex-col w-full lg:w-80 ${mode !== 'list' ? 'hidden lg:flex' : 'flex'}`}
+        style={{ borderRight: '1px solid var(--border-subtle)', background: 'var(--bg-base)' }}
+      >
         {/* Header */}
         <div className="px-4 pt-4 pb-3 space-y-3" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <div className="flex items-center justify-between">
@@ -570,7 +573,10 @@ export default function FaqPage() {
       </div>
 
       {/* ── Right panel ── */}
-      <div className="flex-1 flex flex-col overflow-hidden" style={{ background: 'var(--bg-base)' }}>
+      <div
+        className={`flex-1 flex-col overflow-hidden ${mode === 'list' ? 'hidden lg:flex' : 'flex'}`}
+        style={{ background: 'var(--bg-base)' }}
+      >
 
         {/* Empty state */}
         {mode === 'list' && (
@@ -591,38 +597,38 @@ export default function FaqPage() {
         {mode === 'view' && selected && (
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Toolbar */}
-            <div className="flex items-center justify-between px-6 py-3 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-              <div className="flex items-center gap-3">
-                <button onClick={() => setMode('list')} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: 'var(--text-muted)' }}>
+            <div className="flex items-center justify-between px-3 sm:px-6 py-3 shrink-0 gap-2" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <button onClick={() => setMode('list')} className="p-1.5 rounded-lg hover:bg-white/5 shrink-0" style={{ color: 'var(--text-muted)' }}>
                   <ArrowLeft className="w-4 h-4" />
                 </button>
                 {selected.tipo && <TypeBadge tipo={selected.tipo} />}
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-wrap min-w-0">
                   {parseTags(selected.etiquetas).map(tag => (
                     <span key={tag} className="px-2 py-0.5 rounded-full text-xs" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>#{tag}</span>
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5 shrink-0">
                 <button onClick={startEdit}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-sm font-medium"
                   style={{ background: 'rgba(129,140,248,0.1)', color: '#818cf8', border: '1px solid rgba(129,140,248,0.3)' }}>
-                  <Edit3 className="w-3.5 h-3.5" />Editar
+                  <Edit3 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Editar</span>
                 </button>
                 <button onClick={handleDelete} disabled={deleting}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-sm font-medium"
                   style={{ background: 'rgba(248,113,113,0.08)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }}>
                   {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  Eliminar
+                  <span className="hidden sm:inline">Eliminar</span>
                 </button>
               </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-8 py-6 max-w-4xl w-full mx-auto">
-              <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{selected.titulo}</h1>
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-8 sm:py-6 max-w-4xl w-full mx-auto">
+              <h1 className="text-xl sm:text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{selected.titulo}</h1>
               {selected.descripcion && <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>{selected.descripcion}</p>}
-              <div className="flex items-center gap-3 text-xs mb-6" style={{ color: 'var(--text-muted)' }}>
+              <div className="flex flex-wrap items-center gap-2 text-xs mb-6" style={{ color: 'var(--text-muted)' }}>
                 {selected.autor && <span>{selected.autor.firstName} {selected.autor.lastName}</span>}
                 <span>·</span>
                 <span>Actualizado {formatDate(selected.updatedAt)}</span>
@@ -656,7 +662,7 @@ export default function FaqPage() {
         {(mode === 'new' || mode === 'edit') && (
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Toolbar */}
-            <div className="flex items-center justify-between px-6 py-3 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+            <div className="flex items-center justify-between px-3 sm:px-6 py-3 shrink-0" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
               <div className="flex items-center gap-2">
                 <button onClick={() => mode === 'new' ? setMode('list') : setMode('view')} className="p-1.5 rounded-lg hover:bg-white/5" style={{ color: 'var(--text-muted)' }}>
                   <ArrowLeft className="w-4 h-4" />
@@ -672,7 +678,7 @@ export default function FaqPage() {
             </div>
 
             {/* Form */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 max-w-4xl w-full mx-auto">
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 space-y-4 max-w-4xl w-full mx-auto">
               {/* Título */}
               <div>
                 <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Título *</label>
@@ -690,7 +696,7 @@ export default function FaqPage() {
               </div>
 
               {/* Tipo + Tags row */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Tipo</label>
                   <TipoSelect value={tipoId} onChange={setTipoId} tipos={tipos} />
@@ -727,7 +733,7 @@ export default function FaqPage() {
                   value={contenido}
                   onChange={setContenido}
                   placeholder="Documenta el caso, pasos de solución, capturas de pantalla, observaciones..."
-                  minHeight={380}
+                  minHeight={typeof window !== 'undefined' && window.innerWidth < 640 ? 200 : 380}
                   onUploadFile={faqApi.uploadFile}
                 />
               </div>

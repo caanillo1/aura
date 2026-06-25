@@ -768,3 +768,72 @@ export const publicActasApi = {
       body: JSON.stringify({ signatureData, ...(comprendio !== undefined && { comprendio }) }),
     }).then(r => r.json()),
 };
+
+// ── Sesiones de Capacitación ──────────────────────────────────────────────────
+
+export interface SesionInvitadoPayload {
+  nombre: string;
+  email: string;
+  cargo?: string;
+  clientStaffId?: string;
+}
+
+export interface CreateSesionPayload {
+  projectId: string;
+  companyId: string;
+  titulo: string;
+  fecha: string;
+  moduloId?: string;
+  expositor?: string;
+  temas?: string;
+  lugar?: string;
+  teamsLink?: string;
+  invitados?: SesionInvitadoPayload[];
+}
+
+export interface UpdateSesionPayload {
+  titulo?: string;
+  fecha?: string;
+  moduloId?: string;
+  expositor?: string;
+  temas?: string;
+  lugar?: string;
+  teamsLink?: string;
+  estado?: string;
+}
+
+export const sesionesApi = {
+  create: (data: CreateSesionPayload) =>
+    api.post('/sesiones', data).then(r => r.data),
+  list: (projectId: string) =>
+    api.get('/sesiones', { params: { projectId } }).then(r => r.data),
+  get: (id: string) =>
+    api.get(`/sesiones/${id}`).then(r => r.data),
+  update: (id: string, data: UpdateSesionPayload) =>
+    api.patch(`/sesiones/${id}`, data).then(r => r.data),
+  remove: (id: string) =>
+    api.delete(`/sesiones/${id}`).then(r => r.data),
+  addInvitado: (sesionId: string, data: SesionInvitadoPayload) =>
+    api.post(`/sesiones/${sesionId}/invitados`, data).then(r => r.data),
+  removeInvitado: (sesionId: string, invitadoId: string) =>
+    api.delete(`/sesiones/${sesionId}/invitados/${invitadoId}`).then(r => r.data),
+  generarActa: (id: string) =>
+    api.post(`/sesiones/${id}/generar-acta`).then(r => r.data),
+};
+
+export const publicSesionesApi = {
+  getRsvp: (token: string) =>
+    fetch(`${PUBLIC_API}/public/sesiones/rsvp/${token}`).then(r => r.json()),
+  confirmar: (token: string) =>
+    fetch(`${PUBLIC_API}/public/sesiones/rsvp/${token}/confirmar`, { method: 'POST' }).then(r => r.json()),
+  cancelar: (token: string) =>
+    fetch(`${PUBLIC_API}/public/sesiones/rsvp/${token}/cancelar`, { method: 'POST' }).then(r => r.json()),
+  getSala: (token: string) =>
+    fetch(`${PUBLIC_API}/public/sesiones/sala/${token}`).then(r => r.json()),
+  entrar: (token: string, data: { nombre: string; email?: string; documento?: string; cargo?: string }) =>
+    fetch(`${PUBLIC_API}/public/sesiones/sala/${token}/entrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then(r => r.json()),
+};

@@ -22,7 +22,8 @@ import { WhatsAppModule } from './whatsapp/whatsapp.module';
 import { CronogramaModule } from './cronograma/cronograma.module';
 import { ComercialModule } from './comercial/comercial.module';
 import { VisitsModule } from './visits/visits.module';
-import { FaqModule }    from './faq/faq.module';
+import { FaqModule }       from './faq/faq.module';
+import { SesionesModule }  from './sesiones/sesiones.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './health/health.module';
@@ -51,6 +52,7 @@ import { HealthModule } from './health/health.module';
     ComercialModule,
     VisitsModule,
     FaqModule,
+    SesionesModule,
     HealthModule,
   ],
   controllers: [AppController],

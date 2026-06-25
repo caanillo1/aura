@@ -53,6 +53,7 @@ model Company {
   users             User[]
   faqTipos          FaqTipo[]
   faqs              Faq[]
+  sesiones          SesionCapacitacion[]
 
   @@map("Empresas")
 }
@@ -112,6 +113,7 @@ model User {
   updatedAt              DateTime                  @updatedAt
   actaCompromisosAgent   ActaCompromiso[]          @relation("ActaCompromisoAgent")
   actasCreated           Acta[]                    @relation("ActaCreatedBy")
+  sesionesCreadas        SesionCapacitacion[]      @relation("SesionCreatedBy")
   actaActividadesAgent   ActaActividad[]           @relation("ActaActividadAgent")
   activitiesAssigned     Activity[]                @relation("ActivityAssignedTo")
   archivosSubidos        Archivo[]                 @relation("ArchivoSubidoPor")
@@ -422,6 +424,7 @@ model Project {
   templateFlow     TemplateFlow?     @relation(fields: [templateFlowId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   risks            Risk[]
   visits           Visit[]
+  sesiones         SesionCapacitacion[]
 
   @@map("Proyectos")
 }
@@ -435,11 +438,12 @@ model ProjectModule {
   isActive        Boolean          @default(true)
   startDate       DateTime?        @db.DateTime
   endDate         DateTime?        @db.DateTime
-  actaCompromisos ActaCompromiso[] @relation("ActaCompromisoModule")
-  actas           Acta[]           @relation("ActaModulo")
-  trainings       Training[]       @relation("TrainingModule")
+  actaCompromisos ActaCompromiso[]     @relation("ActaCompromisoModule")
+  actas           Acta[]               @relation("ActaModulo")
+  trainings       Training[]           @relation("TrainingModule")
   phases          Phase[]
-  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sesiones        SesionCapacitacion[]
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("ModulosProyecto")
 }
@@ -1195,4 +1199,51 @@ model Faq {
   autor   User?    @relation("FaqAutor", fields: [autorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("Faqs")
+}
+
+model SesionCapacitacion {
+  id                String           @id @default(uuid()) @db.UniqueIdentifier
+  projectId         String           @db.UniqueIdentifier
+  companyId         String           @db.UniqueIdentifier
+  titulo            String           @db.NVarChar(300)
+  fecha             DateTime         @db.DateTime
+  moduloId          String?          @db.UniqueIdentifier
+  expositor         String?          @db.NVarChar(200)
+  temas             String?          @db.NVarChar(Max)
+  lugar             String?          @db.NVarChar(300)
+  teamsLink         String?          @db.NVarChar(500)
+  salaToken         String           @unique @db.NVarChar(100)
+  estado            String           @default("programada") @db.NVarChar(30)
+  actaId            String?          @db.UniqueIdentifier
+  recordatorio24hAt DateTime?
+  recordatorio1hAt  DateTime?
+  createdById       String           @db.UniqueIdentifier
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  invitados         SesionInvitado[]
+  project           Project          @relation(fields: [projectId], references: [id], onUpdate: NoAction)
+  modulo            ProjectModule?   @relation(fields: [moduloId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company           Company          @relation(fields: [companyId], references: [id], onUpdate: NoAction)
+  createdBy         User             @relation("SesionCreatedBy", fields: [createdById], references: [id], onUpdate: NoAction)
+
+  @@index([projectId])
+  @@map("SesionesCapacitacion")
+}
+
+model SesionInvitado {
+  id            String             @id @default(uuid()) @db.UniqueIdentifier
+  sesionId      String             @db.UniqueIdentifier
+  nombre        String             @db.NVarChar(200)
+  email         String             @db.NVarChar(200)
+  cargo         String?            @db.NVarChar(150)
+  clientStaffId String?            @db.UniqueIdentifier
+  rsvpToken     String             @unique @db.NVarChar(100)
+  respuesta     String             @default("pendiente") @db.NVarChar(20)
+  confirmadoAt  DateTime?
+  entroSalaAt   DateTime?
+  createdAt     DateTime           @default(now())
+  sesion        SesionCapacitacion @relation(fields: [sesionId], references: [id], onDelete: Cascade)
+
+  @@index([sesionId])
+  @@map("SesionesInvitados")
 }

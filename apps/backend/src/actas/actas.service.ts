@@ -394,8 +394,8 @@ export class ActasService {
       const toUpdate: Array<{ existing: { id: string }; p: typeof canSign[0] }> = [];
       const toCreate: typeof canSign = [];
       for (const p of canSign) {
-        const existing = (p.documento ? byDoc.get(p.documento) : undefined)
-          ?? (p.email && !p.documento ? byEmail.get(p.email) : undefined);
+        const existing = ((p.documento ? byDoc.get(p.documento) : undefined)
+          ?? (p.email && !p.documento ? byEmail.get(p.email) : undefined)) as { id: string } | undefined;
         if (existing) {
           matchedIds.add(existing.id);
           toUpdate.push({ existing, p });

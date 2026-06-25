@@ -357,27 +357,74 @@ export class ActasService {
       ]);
     }
 
-    // ── Participantes: createMany + firmantes en batch ─────────────────────
+    // ── Participantes: recreate table + smart upsert firmantes ─────────────
+    // actaParticipante se recrea libremente (sus IDs no son externos).
+    // actaFirmante con signerType='participante' se hace UPSERT por documento/email
+    // para preservar los IDs y mantener válidos los links de firma ya enviados.
     if (dto.participantes !== undefined) {
       await tx.actaParticipante.deleteMany({ where: { actaId } });
       if (dto.participantes.length > 0) {
         await tx.actaParticipante.createMany({ data: dto.participantes.map((p, i) => ({ actaId, numero: p.numero ?? i + 1, nombre: p.nombre, cargo: p.cargo, documento: p.documento, email: p.email ?? null, horaEntrada: p.horaEntrada, horaSalida: p.horaSalida, comprendio: p.comprendio })) });
       }
 
-      await tx.actaFirmante.deleteMany({ where: { actaId, signerType: 'participante', signedAt: null } });
-
-      const [signedFirmantes, startCount] = await Promise.all([
-        tx.actaFirmante.findMany({ where: { actaId, signerType: 'participante', signedAt: { not: null } }, select: { documento: true } }),
-        tx.actaFirmante.count({ where: { actaId } }),
+      // Fetch estado actual de firmantes-participante
+      const [existingUnsigned, signedFirmantes] = await Promise.all([
+        tx.actaFirmante.findMany({
+          where: { actaId, signerType: 'participante', signedAt: null },
+          select: { id: true, documento: true, email: true },
+        }),
+        tx.actaFirmante.findMany({
+          where: { actaId, signerType: 'participante', signedAt: { not: null } },
+          select: { documento: true },
+        }),
       ]);
-      const alreadySigned = new Set(signedFirmantes.map((f: any) => f.documento).filter(Boolean));
-      // Participantes que pueden firmar: tienen documento (buscar-firmas) o email (link por correo)
+      const signedDocs = new Set(signedFirmantes.map((f: any) => f.documento).filter(Boolean));
+
+      // Índices para buscar existentes por documento o email
+      const byDoc   = new Map(existingUnsigned.filter(f => f.documento).map(f => [f.documento!, f]));
+      const byEmail = new Map(existingUnsigned.filter(f => f.email && !f.documento).map(f => [f.email!, f]));
+
+      // Participantes que necesitan firmante: tienen documento o email y no están ya firmados
       const canSign = dto.participantes.filter(p =>
-        (p.documento || p.email) && (!p.documento || !alreadySigned.has(p.documento))
+        (p.documento || p.email) && (!p.documento || !signedDocs.has(p.documento))
       );
-      if (canSign.length > 0) {
-        await tx.actaFirmante.createMany({ data: canSign.map((p, i) => ({ actaId, nombre: p.nombre, cargo: p.cargo ?? '', empresa: '', documento: p.documento ?? null, email: p.email ?? null, signerType: 'participante', orden: startCount + i, fecha: new Date() })) });
+
+      // Separar en: actualizar existentes vs crear nuevos
+      const matchedIds = new Set<string>();
+      const toUpdate: Array<{ existing: { id: string }; p: typeof canSign[0] }> = [];
+      const toCreate: typeof canSign = [];
+      for (const p of canSign) {
+        const existing = (p.documento ? byDoc.get(p.documento) : undefined)
+          ?? (p.email && !p.documento ? byEmail.get(p.email) : undefined);
+        if (existing) {
+          matchedIds.add(existing.id);
+          toUpdate.push({ existing, p });
+        } else {
+          toCreate.push(p);
+        }
       }
+
+      // Eliminar solo los que ya no están en la lista de participantes
+      const orphanIds = existingUnsigned.filter(f => !matchedIds.has(f.id)).map(f => f.id);
+      if (orphanIds.length > 0) {
+        await tx.actaFirmante.deleteMany({ where: { id: { in: orphanIds } } });
+      }
+
+      // Actualizar existentes (preserva el ID → el link de firma sigue siendo válido)
+      const currentCount = await tx.actaFirmante.count({ where: { actaId } });
+      await Promise.all([
+        ...toUpdate.map(({ existing, p }) =>
+          tx.actaFirmante.update({
+            where: { id: existing.id },
+            data: { nombre: p.nombre, cargo: p.cargo ?? '', email: p.email ?? null, documento: p.documento ?? null },
+          })
+        ),
+        ...toCreate.map((p, i) =>
+          tx.actaFirmante.create({
+            data: { actaId, nombre: p.nombre, cargo: p.cargo ?? '', empresa: '', documento: p.documento ?? null, email: p.email ?? null, signerType: 'participante', orden: currentCount + i, fecha: new Date() },
+          })
+        ),
+      ]);
     }
 
     // ── Compromisos: pre-fetch paralelo → updates paralelo → creates secuencial → bulk insert ──

@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes';
 import {
   ArrowLeft, RefreshCw, CheckCircle2, Circle, Clock, AlertCircle,
   ChevronDown, Layers, Calendar, ClipboardList, Pencil, Check,
-  MessageSquare, Send, Trash2, Upload, Plus, User, FileText, CheckSquare,
+  MessageSquare, Send, Trash2, Upload, Plus, User, FileText, CheckSquare, BookOpen,
 } from 'lucide-react';
 import Link from 'next/link';
 import { projectsApi, templatesApi, usersApi, clientsApi, actasApi } from '@/lib/api';
@@ -1338,6 +1338,11 @@ export default function ProjectDetailPage() {
               className="p-2 rounded-xl transition-colors flex items-center"
               style={{ background: 'rgba(167,139,250,0.10)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.20)' }}>
               <FileText className="w-4 h-4" />
+            </Link>
+            <Link href={`/implementacion/proyectos/${project.id}/sesiones`} title="Sesiones de capacitación"
+              className="p-2 rounded-xl transition-colors flex items-center"
+              style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.20)' }}>
+              <BookOpen className="w-4 h-4" />
             </Link>
             {can('projects.editar') && (
               <button onClick={openAddModModal} title="Agregar módulos desde plantilla"

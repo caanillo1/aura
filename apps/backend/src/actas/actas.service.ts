@@ -191,6 +191,16 @@ export class ActasService {
       : [];
     const prevEmailMap = new Map(previousEmails.map(f => [f.id, f.email ?? '']));
 
+    // Pre-fetch emails de participantes-firmantes actuales para detectar nuevos
+    const existingParticipantEmails = dto.participantes?.some(p => p.email)
+      ? new Set<string>(
+          (await this.prisma.actaFirmante.findMany({
+            where: { actaId: id, signerType: 'participante', signedAt: null, email: { not: null } },
+            select: { email: true },
+          })).map((f: any) => f.email as string)
+        )
+      : new Set<string>();
+
     const result = await this.withDeadlockRetry(() =>
       this.prisma.$transaction(async (tx) => {
         await tx.acta.update({
@@ -249,6 +259,12 @@ export class ActasService {
         emailsToNotify.push(f.email);                            // nuevo firmante
       } else if (prevEmailMap.has(f.id) && prevEmailMap.get(f.id) !== f.email) {
         emailsToNotify.push(f.email);                            // email actualizado
+      }
+    }
+    // (3) participantes con email nuevo (no estaban antes)
+    for (const p of dto.participantes ?? []) {
+      if (p.email && !existingParticipantEmails.has(p.email)) {
+        emailsToNotify.push(p.email);
       }
     }
     if (emailsToNotify.length) this.sendFirmanteNotifications(id, companyId, emailsToNotify);
@@ -345,7 +361,7 @@ export class ActasService {
     if (dto.participantes !== undefined) {
       await tx.actaParticipante.deleteMany({ where: { actaId } });
       if (dto.participantes.length > 0) {
-        await tx.actaParticipante.createMany({ data: dto.participantes.map((p, i) => ({ actaId, numero: p.numero ?? i + 1, nombre: p.nombre, cargo: p.cargo, documento: p.documento, horaEntrada: p.horaEntrada, horaSalida: p.horaSalida, comprendio: p.comprendio })) });
+        await tx.actaParticipante.createMany({ data: dto.participantes.map((p, i) => ({ actaId, numero: p.numero ?? i + 1, nombre: p.nombre, cargo: p.cargo, documento: p.documento, email: p.email ?? null, horaEntrada: p.horaEntrada, horaSalida: p.horaSalida, comprendio: p.comprendio })) });
       }
 
       await tx.actaFirmante.deleteMany({ where: { actaId, signerType: 'participante', signedAt: null } });
@@ -355,9 +371,12 @@ export class ActasService {
         tx.actaFirmante.count({ where: { actaId } }),
       ]);
       const alreadySigned = new Set(signedFirmantes.map((f: any) => f.documento).filter(Boolean));
-      const withDoc = dto.participantes.filter(p => p.documento && !alreadySigned.has(p.documento));
-      if (withDoc.length > 0) {
-        await tx.actaFirmante.createMany({ data: withDoc.map((p, i) => ({ actaId, nombre: p.nombre, cargo: p.cargo ?? '', empresa: '', documento: p.documento!, signerType: 'participante', orden: startCount + i, fecha: new Date() })) });
+      // Participantes que pueden firmar: tienen documento (buscar-firmas) o email (link por correo)
+      const canSign = dto.participantes.filter(p =>
+        (p.documento || p.email) && (!p.documento || !alreadySigned.has(p.documento))
+      );
+      if (canSign.length > 0) {
+        await tx.actaFirmante.createMany({ data: canSign.map((p, i) => ({ actaId, nombre: p.nombre, cargo: p.cargo ?? '', empresa: '', documento: p.documento ?? null, email: p.email ?? null, signerType: 'participante', orden: startCount + i, fecha: new Date() })) });
       }
     }
 

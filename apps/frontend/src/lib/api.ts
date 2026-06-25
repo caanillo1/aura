@@ -549,7 +549,7 @@ export const projectsApi = {
 export interface ActaFirmantePayload { id?: string; nombre?: string; cargo?: string; empresa?: string; email?: string; fecha?: string; orden?: number; documento?: string; signatureData?: string; signedAt?: string; signerType?: string; }
 export interface ActaFechaVisitaPayload { fecha: string; horaInicio?: string; horaFin?: string; }
 export interface ActaCompromisoPayload { numero?: number; compromiso: string; responsable?: string; estado?: string; assignedToId?: string; clientStaffId?: string; moduleId?: string; phaseId?: string; activityId?: string; }
-export interface ActaParticipantePayload { numero?: number; nombre: string; horaEntrada?: string; horaSalida?: string; comprendio?: boolean; }
+export interface ActaParticipantePayload { numero?: number; nombre: string; cargo?: string; documento?: string; email?: string; horaEntrada?: string; horaSalida?: string; comprendio?: boolean; }
 export interface ActaAccionPayload { accion: string; responsable?: string; fechaLimite?: string; }
 export interface ActaContactoPayload { nombre?: string; telefono?: string; area?: string; }
 export interface ActaActividadPayload { activityId: string; assignedToId?: string; clientStaffId?: string; status?: string; }

@@ -45,6 +45,7 @@ export class ActaParticipanteDto {
   @ApiProperty() @IsString() nombre: string;
   @ApiPropertyOptional() @IsOptional() @IsString() cargo?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() documento?: string;
+  @ApiPropertyOptional() @IsOptional() @IsEmail() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() horaEntrada?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() horaSalida?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() comprendio?: boolean;

@@ -917,6 +917,7 @@ model ActaParticipante {
   nombre      String   @db.NVarChar(200)
   cargo       String?  @db.NVarChar(150)
   documento   String?  @db.NVarChar(30)
+  email       String?  @db.NVarChar(200)
   horaEntrada String?  @db.NVarChar(10)
   horaSalida  String?  @db.NVarChar(10)
   comprendio  Boolean?

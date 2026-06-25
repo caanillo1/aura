@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURA ERP — Guía del Usuario</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0f1e;
+    --bg2:       #0f172a;
+    --card:      #1e293b;
+    --card2:     #243044;
+    --border:    rgba(99,102,241,0.18);
+    --border2:   rgba(255,255,255,0.07);
+    --primary:   #6366f1;
+    --primary2:  #818cf8;
+    --success:   #10b981;
+    --warn:      #f59e0b;
+    --danger:    #ef4444;
+    --info:      #60a5fa;
+    --purple:    #a78bfa;
+    --orange:    #fb923c;
+    --t1:        #f1f5f9;
+    --t2:        #cbd5e1;
+    --t3:        #94a3b8;
+    --t4:        #64748b;
+    --sidebar-w: 260px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--t2);
+    line-height: 1.65;
+    font-size: 15px;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ── SIDEBAR ── */
+  nav#sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
+    background: var(--bg2);
+    border-right: 1px solid var(--border2);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 100;
+  }
+  .nav-brand {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border2);
+  }
+  .nav-brand h1 {
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #818cf8, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
+  }
+  .nav-brand p { font-size: 11px; color: var(--t4); margin-top: 2px; letter-spacing: 0.5px; }
+
+  .nav-section { padding: 16px 12px 4px; font-size: 10px; font-weight: 700; color: var(--t4); text-transform: uppercase; letter-spacing: 1.2px; }
+  nav#sidebar a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px; margin: 1px 4px;
+    border-radius: 10px;
+    font-size: 13px; color: var(--t3);
+    text-decoration: none; transition: all .15s;
+  }
+  nav#sidebar a:hover { background: rgba(99,102,241,0.1); color: var(--t1); }
+  nav#sidebar a.active { background: rgba(99,102,241,0.15); color: var(--primary2); font-weight: 600; }
+  .nav-icon { width: 18px; height: 18px; flex-shrink: 0; opacity: .7; }
+
+  /* ── MAIN ── */
+  main {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    max-width: calc(100% - var(--sidebar-w));
+  }
+
+  /* ── HERO ── */
+  .hero {
+    background: linear-gradient(135deg, #0a0f1e 0%, #1a1040 50%, #0a1628 100%);
+    padding: 72px 60px 80px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 60% at 70% 50%, rgba(99,102,241,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.3);
+    color: var(--primary2);
+    font-size: 11px; font-weight: 600;
+    padding: 5px 12px; border-radius: 100px;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: 48px; font-weight: 900;
+    letter-spacing: -1.5px; line-height: 1.1;
+    color: var(--t1);
+    margin-bottom: 16px;
+  }
+  .hero h1 span { background: linear-gradient(135deg, #818cf8, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .hero p { font-size: 17px; color: var(--t3); max-width: 560px; line-height: 1.7; }
+  .hero-meta { display: flex; gap: 32px; margin-top: 36px; }
+  .hero-stat { }
+  .hero-stat .num { font-size: 28px; font-weight: 800; color: var(--t1); }
+  .hero-stat .lbl { font-size: 12px; color: var(--t4); margin-top: 2px; }
+
+  /* ── CONTENT SECTIONS ── */
+  section { padding: 60px 60px 40px; border-bottom: 1px solid var(--border2); }
+  section:last-child { border-bottom: none; }
+
+  h2.sec-title {
+    font-size: 28px; font-weight: 800;
+    color: var(--t1); letter-spacing: -0.5px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  h2.sec-title .sec-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .sec-desc { color: var(--t3); font-size: 15px; margin-bottom: 36px; max-width: 640px; }
+
+  h3.sub-title {
+    font-size: 17px; font-weight: 700; color: var(--t1);
+    margin: 32px 0 14px; letter-spacing: -0.2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  h3.sub-title::before { content: ''; width: 3px; height: 18px; background: var(--primary); border-radius: 2px; }
+
+  p { margin-bottom: 12px; color: var(--t2); }
+  ul, ol { padding-left: 22px; margin-bottom: 16px; }
+  li { margin-bottom: 6px; color: var(--t2); }
+  strong { color: var(--t1); font-weight: 600; }
+  code {
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.2);
+    color: var(--primary2);
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 12px;
+    padding: 2px 7px; border-radius: 5px;
+  }
+
+  /* ── CARDS ── */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin: 20px 0; }
+  .card-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+  .card-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 20px 0; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 20px;
+  }
+  .card-accent { border-top: 2px solid var(--primary); }
+  .card h4 { font-size: 14px; font-weight: 700; color: var(--t1); margin-bottom: 8px; }
+  .card p { font-size: 13px; color: var(--t3); margin-bottom: 0; }
+
+  /* ── CALLOUTS ── */
+  .callout {
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    display: flex; gap: 12px; align-items: flex-start;
+    font-size: 14px;
+  }
+  .callout-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .callout p { margin: 0; line-height: 1.6; }
+  .callout.tip    { background: rgba(16,185,129,0.07);  border: 1px solid rgba(16,185,129,0.2);  color: #6ee7b7; }
+  .callout.warn   { background: rgba(245,158,11,0.07);  border: 1px solid rgba(245,158,11,0.2);  color: #fcd34d; }
+  .callout.info   { background: rgba(96,165,250,0.07);  border: 1px solid rgba(96,165,250,0.2);  color: #93c5fd; }
+  .callout.danger { background: rgba(239,68,68,0.07);   border: 1px solid rgba(239,68,68,0.2);   color: #fca5a5; }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px; border-radius: 100px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .b-blue   { background: rgba(96,165,250,0.15);  color: #93c5fd; border: 1px solid rgba(96,165,250,0.3); }
+  .b-green  { background: rgba(16,185,129,0.15);  color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+  .b-yellow { background: rgba(245,158,11,0.15);  color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+  .b-red    { background: rgba(239,68,68,0.15);   color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+  .b-purple { background: rgba(167,139,250,0.15); color: #c4b5fd; border: 1px solid rgba(167,139,250,0.3); }
+  .b-orange { background: rgba(251,146,60,0.15);  color: #fdba74; border: 1px solid rgba(251,146,60,0.3); }
+  .b-indigo { background: rgba(99,102,241,0.15);  color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+
+  /* ── STEPS ── */
+  .steps { margin: 24px 0; }
+  .step  { display: flex; gap: 16px; margin-bottom: 24px; }
+  .step-num {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--primary); color: #fff;
+    font-size: 13px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .step-body h4 { font-size: 14px; font-weight: 700; color: var(--t1); margin-bottom: 4px; }
+  .step-body p  { font-size: 13px; color: var(--t3); margin: 0; }
+
+  /* ── MOCKUP SCREEN ── */
+  .mockup {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    overflow: hidden;
+    margin: 24px 0;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .mockup-bar {
+    background: var(--card);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border2);
+  }
+  .mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .mockup-url {
+    flex: 1; background: var(--bg); border-radius: 6px;
+    padding: 4px 12px; font-size: 11px; color: var(--t4);
+    margin: 0 8px;
+  }
+  .mockup-body { padding: 20px; }
+
+  /* ── KPI MOCKUP ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+  .kpi-card {
+    background: var(--card2);
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .kpi-card .kpi-label { font-size: 10px; color: var(--t4); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .kpi-card .kpi-val   { font-size: 24px; font-weight: 800; margin: 4px 0 2px; }
+  .kpi-card .kpi-sub   { font-size: 11px; color: var(--t4); }
+
+  /* ── SIDEBAR MOCKUP ── */
+  .mock-layout { display: flex; height: 320px; }
+  .mock-sidebar {
+    width: 160px; background: var(--bg2);
+    border-right: 1px solid var(--border2);
+    padding: 12px 8px; flex-shrink: 0;
+  }
+  .mock-sidebar .ms-logo { font-size: 14px; font-weight: 800; color: var(--primary2); padding: 4px 8px 12px; }
+  .mock-sidebar a {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 7px;
+    font-size: 11px; color: var(--t3); text-decoration: none;
+    margin-bottom: 1px;
+  }
+  .mock-sidebar a.active { background: rgba(99,102,241,0.15); color: var(--primary2); }
+  .mock-sidebar .ms-sec { font-size: 9px; color: var(--t4); text-transform: uppercase; letter-spacing: 1px; padding: 8px 10px 2px; font-weight: 700; }
+  .mock-content { flex: 1; padding: 16px; overflow: hidden; }
+
+  /* ── STATUS FLOW ── */
+  .status-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+  .status-flow .arrow { color: var(--t4); font-size: 14px; }
+
+  /* ── TABLE ── */
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; }
+  th { background: var(--card); color: var(--t3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border2); }
+  td { padding: 12px 16px; border-bottom: 1px solid var(--border2); color: var(--t2); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── PERM TABLE ── */
+  .perm-yes { color: var(--success); }
+  .perm-no  { color: var(--t4); }
+
+  /* ── ACTA TYPE CARDS ── */
+  .acta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin: 20px 0; }
+  .acta-card {
+    background: var(--card); border: 1px solid var(--border2);
+    border-radius: 14px; padding: 18px;
+    text-align: center;
+  }
+  .acta-card .acta-icon { font-size: 28px; margin-bottom: 10px; }
+  .acta-card h4 { font-size: 13px; font-weight: 700; color: var(--t1); margin-bottom: 6px; }
+  .acta-card p  { font-size: 11px; color: var(--t4); margin: 0; line-height: 1.5; }
+
+  /* ── DIVIDER ── */
+  hr { border: none; border-top: 1px solid var(--border2); margin: 32px 0; }
+
+  /* ── PRINT ── */
+  @media print {
+    nav#sidebar { display: none; }
+    main { margin-left: 0; max-width: 100%; }
+    section { padding: 40px 40px 30px; page-break-inside: avoid; }
+    .hero { padding: 40px; }
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .tag { display: inline-block; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); color: var(--primary2); font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 600; }
+  .highlight-box { background: linear-gradient(135deg, rgba(99,102,241,0.07), rgba(167,139,250,0.05)); border: 1px solid rgba(99,102,241,0.2); border-radius: 14px; padding: 20px 24px; margin: 20px 0; }
+
+  .icon-lg { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<nav id="sidebar">
+  <div class="nav-brand">
+    <h1>AURA</h1>
+    <p>GUÍA DEL USUARIO · v1.0</p>
+  </div>
+
+  <div class="nav-section">Introducción</div>
+  <a href="#intro">🏠 ¿Qué es AURA?</a>
+  <a href="#acceso">🔐 Acceso al sistema</a>
+  <a href="#navegacion">🧭 Navegación</a>
+
+  <div class="nav-section">Módulos</div>
+  <a href="#dashboard">📊 Dashboard</a>
+  <a href="#clientes">👥 Clientes</a>
+  <a href="#ordenes">📋 Órdenes de Servicio</a>
+  <a href="#plantillas">🗂️ Plantillas</a>
+  <a href="#proyectos">🚀 Proyectos</a>
+  <a href="#actividades">✅ Plan de Trabajo</a>
+  <a href="#actas">📄 Actas</a>
+  <a href="#requerimientos">🎫 Requerimientos</a>
+  <a href="#analisis">📈 Análisis</a>
+  <a href="#cronograma">🗓️ Cronograma</a>
+  <a href="#notificaciones">🔔 Notificaciones</a>
+
+  <div class="nav-section">Administración</div>
+  <a href="#usuarios">👤 Usuarios</a>
+  <a href="#configuracion">⚙️ Configuración</a>
+  <a href="#faq">❓ FAQ</a>
+</nav>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<main>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">✦ Documentación oficial</div>
+  <h1>Guía del<br><span>Usuario AURA</span></h1>
+  <p>Plataforma integral para la gestión de implementaciones de software de salud. Todo lo que necesitas saber para operar el sistema con eficiencia.</p>
+  <div class="hero-meta">
+    <div class="hero-stat"><div class="num">14</div><div class="lbl">Módulos</div></div>
+    <div class="hero-stat"><div class="num">5</div><div class="lbl">Tipos de acta</div></div>
+    <div class="hero-stat"><div class="num">∞</div><div class="lbl">Proyectos</div></div>
+  </div>
+</div>
+
+<!-- ══ INTRO ══ -->
+<section id="intro">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(99,102,241,0.15)">🏠</span>
+    ¿Qué es AURA?
+  </h2>
+  <p class="sec-desc">AURA es un ERP especializado en la gestión de implementaciones de software de salud. Centraliza clientes, proyectos, actas, requerimientos e informes en una sola plataforma.</p>
+
+  <div class="card-grid">
+    <div class="card card-accent">
+      <div class="icon-lg" style="background:rgba(99,102,241,0.15)">🚀</div>
+      <h4>Gestión de proyectos</h4>
+      <p>Módulos, fases y actividades con seguimiento de progreso en tiempo real.</p>
+    </div>
+    <div class="card card-accent" style="border-top-color:#10b981">
+      <div class="icon-lg" style="background:rgba(16,185,129,0.15)">📄</div>
+      <h4>Actas digitales</h4>
+      <p>5 tipos de acta con firma digital, compromisos y generación de PDF premium.</p>
+    </div>
+    <div class="card card-accent" style="border-top-color:#f59e0b">
+      <div class="icon-lg" style="background:rgba(245,158,11,0.15)">🎫</div>
+      <h4>Tickets / Requerimientos</h4>
+      <p>Registro, priorización, historial y analítica completa de cada solicitud.</p>
+    </div>
+    <div class="card card-accent" style="border-top-color:#a78bfa">
+      <div class="icon-lg" style="background:rgba(167,139,250,0.15)">📊</div>
+      <h4>Analítica e informes</h4>
+      <p>KPIs en tiempo real, gráficas estadísticas y reportes ejecutivos automáticos.</p>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span class="callout-icon">ℹ️</span>
+    <p>AURA está optimizado para equipos de implementación de clínicas, hospitales y centros de salud. Cada módulo fue diseñado para el flujo real de trabajo del equipo de implementación.</p>
+  </div>
+</section>
+
+<!-- ══ ACCESO ══ -->
+<section id="acceso">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(96,165,250,0.15)">🔐</span>
+    Acceso al Sistema
+  </h2>
+  <p class="sec-desc">Ingreso seguro con autenticación JWT, renovación automática de sesión y cierre por inactividad.</p>
+
+  <div class="card-grid-2">
+    <div>
+      <h3 class="sub-title">Iniciar sesión</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <h4>Abre el navegador</h4>
+            <p>Accede a la URL del sistema proporcionada por tu administrador.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <h4>Ingresa tus credenciales</h4>
+            <p>Escribe tu <strong>correo electrónico</strong> y <strong>contraseña</strong> asignados.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <h4>Haz clic en "Ingresar"</h4>
+            <p>El sistema te redirige automáticamente al Dashboard según tu rol.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <p>Si ves el mensaje <strong>"Sesión expirada"</strong>, tu token venció. Inicia sesión nuevamente. Las credenciales las asigna el administrador del sistema.</p>
+      </div>
+    </div>
+    <div>
+      <!-- Login mockup -->
+      <div class="mockup">
+        <div class="mockup-bar">
+          <div class="mockup-dot" style="background:#ef4444"></div>
+          <div class="mockup-dot" style="background:#f59e0b"></div>
+          <div class="mockup-dot" style="background:#10b981"></div>
+          <div class="mockup-url">aura.tuempresa.com/login</div>
+        </div>
+        <div class="mockup-body" style="display:flex;align-items:center;justify-content:center;min-height:240px;">
+          <div style="width:100%;max-width:300px;">
+            <div style="text-align:center;margin-bottom:24px;">
+              <div style="font-size:28px;font-weight:900;background:linear-gradient(135deg,#818cf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">AURA</div>
+              <p style="font-size:12px;color:var(--t4);margin-top:4px;">Gestión de Implementaciones</p>
+            </div>
+            <div style="margin-bottom:14px;">
+              <div style="font-size:11px;color:var(--t3);margin-bottom:5px;font-weight:600;">Correo electrónico</div>
+              <div style="background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--t3);">agente@empresa.com</div>
+            </div>
+            <div style="margin-bottom:20px;">
+              <div style="font-size:11px;color:var(--t3);margin-bottom:5px;font-weight:600;">Contraseña</div>
+              <div style="background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--t4);">••••••••</div>
+            </div>
+            <div style="background:var(--primary);color:#fff;border-radius:10px;padding:11px;text-align:center;font-size:13px;font-weight:700;">Ingresar</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ NAVEGACIÓN ══ -->
+<section id="navegacion">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(167,139,250,0.15)">🧭</span>
+    Navegación General
+  </h2>
+  <p class="sec-desc">La interfaz está dividida en una barra lateral fija con todos los módulos y un área de contenido principal.</p>
+
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dot" style="background:#ef4444"></div>
+      <div class="mockup-dot" style="background:#f59e0b"></div>
+      <div class="mockup-dot" style="background:#10b981"></div>
+      <div class="mockup-url">aura.tuempresa.com/dashboard</div>
+    </div>
+    <div class="mock-layout">
+      <div class="mock-sidebar">
+        <div class="ms-logo">AURA</div>
+        <div class="ms-sec">Principal</div>
+        <a href="#" class="active">📊 Dashboard</a>
+        <a href="#">👥 Clientes</a>
+        <div class="ms-sec">Implementación</div>
+        <a href="#">📋 Órdenes</a>
+        <a href="#">🚀 Proyectos</a>
+        <a href="#">📄 Actas</a>
+        <a href="#">📈 Análisis</a>
+        <div class="ms-sec">Tickets</div>
+        <a href="#">🎫 Requerimientos</a>
+        <a href="#">📝 Registrar</a>
+      </div>
+      <div class="mock-content">
+        <div style="font-size:11px;color:var(--t4);margin-bottom:10px;">Buen día, Carlos — <span style="color:var(--primary2)">Dashboard ejecutivo</span></div>
+        <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);gap:8px;">
+          <div class="kpi-card"><div class="kpi-label">OS Activas</div><div class="kpi-val" style="color:var(--primary2)">12</div></div>
+          <div class="kpi-card"><div class="kpi-label">Proyectos</div><div class="kpi-val" style="color:var(--success)">8</div></div>
+        </div>
+        <div style="background:var(--card2);border-radius:10px;padding:12px;margin-top:8px;font-size:11px;color:var(--t4);">📈 Gráfica de progreso mensual…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-grid-3" style="margin-top:24px;">
+    <div class="card">
+      <h4>🔔 Campana de notificaciones</h4>
+      <p>En la esquina superior derecha. Muestra en tiempo real avisos de cambios de estado, actas firmadas y requerimientos nuevos.</p>
+    </div>
+    <div class="card">
+      <h4>🌙 Modo oscuro / claro</h4>
+      <p>Botón de tema en el encabezado. El sistema recuerda tu preferencia entre sesiones.</p>
+    </div>
+    <div class="card">
+      <h4>🔍 Búsqueda rápida</h4>
+      <p>Cada sección tiene su propio campo de búsqueda y filtros contextuales para encontrar registros al instante.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ DASHBOARD ══ -->
+<section id="dashboard">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(99,102,241,0.15)">📊</span>
+    Dashboard Ejecutivo
+  </h2>
+  <p class="sec-desc">Vista central de KPIs en tiempo real. Se actualiza automáticamente vía WebSocket sin necesidad de recargar la página.</p>
+
+  <!-- KPI mockup -->
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dot" style="background:#ef4444"></div>
+      <div class="mockup-dot" style="background:#f59e0b"></div>
+      <div class="mockup-dot" style="background:#10b981"></div>
+      <div class="mockup-url">aura / dashboard</div>
+      <div style="font-size:10px;color:var(--success);font-weight:700;">● EN VIVO</div>
+    </div>
+    <div class="mockup-body">
+      <div class="kpi-row">
+        <div class="kpi-card" style="border-top:2px solid #6366f1">
+          <div class="kpi-label">OS Activas</div>
+          <div class="kpi-val" style="color:#818cf8">14</div>
+          <div class="kpi-sub">órdenes de servicio</div>
+        </div>
+        <div class="kpi-card" style="border-top:2px solid #10b981">
+          <div class="kpi-label">Proyectos</div>
+          <div class="kpi-val" style="color:#34d399">9</div>
+          <div class="kpi-sub">en implementación</div>
+        </div>
+        <div class="kpi-card" style="border-top:2px solid #f59e0b">
+          <div class="kpi-label">Tickets abiertos</div>
+          <div class="kpi-val" style="color:#fbbf24">43</div>
+          <div class="kpi-sub">requerimientos</div>
+        </div>
+        <div class="kpi-card" style="border-top:2px solid #ef4444">
+          <div class="kpi-label">Actas pendientes</div>
+          <div class="kpi-val" style="color:#f87171">6</div>
+          <div class="kpi-sub">sin firma</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:12px;">
+        <div style="background:var(--card2);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:var(--t4);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">Progreso por cliente</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span style="color:var(--t2)">Clínica Norte</span><span style="color:var(--success)">72%</span></div><div style="height:5px;background:var(--bg);border-radius:3px;"><div style="width:72%;height:100%;background:var(--success);border-radius:3px;"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span style="color:var(--t2)">Hospital Sur</span><span style="color:var(--warn)">48%</span></div><div style="height:5px;background:var(--bg);border-radius:3px;"><div style="width:48%;height:100%;background:var(--warn);border-radius:3px;"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;"><span style="color:var(--t2)">Laboratorio ABC</span><span style="color:var(--primary2)">91%</span></div><div style="height:5px;background:var(--bg);border-radius:3px;"><div style="width:91%;height:100%;background:var(--primary2);border-radius:3px;"></div></div></div>
+          </div>
+        </div>
+        <div style="background:var(--card2);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:var(--t4);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;">Actividades hoy</div>
+          <div style="font-size:22px;font-weight:800;color:var(--primary2)">17</div>
+          <div style="font-size:11px;color:var(--success);margin-top:2px;">↑ 3 completadas</div>
+          <div style="font-size:11px;color:var(--danger);margin-top:2px;">● 2 bloqueadas</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Filtros del Dashboard</h3>
+  <p>Puedes segmentar todos los KPIs usando los filtros en la parte superior:</p>
+  <div class="card-grid">
+    <div class="card"><h4>📅 Rango de fechas</h4><p>Filtra el período de análisis para ver datos históricos o del mes actual.</p></div>
+    <div class="card"><h4>👥 Por cliente</h4><p>Muestra solo los indicadores del cliente seleccionado.</p></div>
+    <div class="card"><h4>👤 Por agente</h4><p>Filtra por el implementador asignado.</p></div>
+  </div>
+
+  <div class="callout tip">
+    <span class="callout-icon">💡</span>
+    <p>El Dashboard se actualiza <strong>en tiempo real</strong> via WebSocket. Cuando otro agente cambia el estado de una actividad o crea un acta, verás el cambio reflejado automáticamente sin recargar la página.</p>
+  </div>
+</section>
+
+<!-- ══ CLIENTES ══ -->
+<section id="clientes">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(16,185,129,0.15)">👥</span>
+    Gestión de Clientes
+  </h2>
+  <p class="sec-desc">Directorio central de todos los clientes activos con su información, personal de contacto y estado.</p>
+
+  <div class="card-grid-2">
+    <div>
+      <h3 class="sub-title">Registrar un cliente</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Ir a Clientes</h4><p>En el menú lateral, selecciona <strong>Clientes</strong>.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Clic en "+ Nuevo cliente"</h4><p>Se abre el formulario de registro.</p></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Completa los datos</h4><p>Razón social, NIT, ciudad y datos de contacto principal.</p></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Guardar</h4><p>El cliente queda disponible para vincular a Órdenes de Servicio.</p></div></div>
+      </div>
+    </div>
+    <div>
+      <h3 class="sub-title">Personal del cliente (Staff)</h3>
+      <p>Desde el <strong>detalle de un cliente</strong> puedes registrar sus contactos internos (jefes de proyecto, líderes médicos, etc.).</p>
+      <p>Cada miembro del staff puede tener un rol dentro del proyecto y sus datos de contacto para comunicaciones y firmas de actas.</p>
+      <div class="callout info">
+        <span class="callout-icon">📌</span>
+        <p>El staff del cliente aparece como opciones de firmante al crear Actas de Visita, Capacitación, Cierre y Entrega.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Estados del cliente</h3>
+  <div class="status-flow">
+    <span class="badge b-green">Activo</span>
+    <span class="arrow">→</span>
+    <span class="badge b-red">Inactivo</span>
+    <span class="arrow">→</span>
+    <span class="badge b-green">Activo</span>
+  </div>
+  <p style="font-size:13px;color:var(--t4)">Los clientes inactivos no reciben nuevas órdenes de servicio pero conservan todo su historial.</p>
+</section>
+
+<!-- ══ ORDENES ══ -->
+<section id="ordenes">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(245,158,11,0.15)">📋</span>
+    Órdenes de Servicio
+  </h2>
+  <p class="sec-desc">Una Orden de Servicio (OS) es el contrato operativo entre AURA y el cliente. Agrupa proyectos, actas, requerimientos e informes de una implementación.</p>
+
+  <h3 class="sub-title">Ciclo de vida de una OS</h3>
+  <div class="status-flow" style="margin-bottom:24px;">
+    <span class="badge b-blue">Pendiente</span>
+    <span class="arrow">→</span>
+    <span class="badge b-green">En curso</span>
+    <span class="arrow">→</span>
+    <span class="badge b-yellow">Suspendida</span>
+    <span class="arrow">↕</span>
+    <span class="badge b-purple">Completada</span>
+    <span class="arrow">→</span>
+    <span class="badge b-red">Cancelada</span>
+  </div>
+
+  <div class="card-grid-3">
+    <div class="card">
+      <h4>📝 Pestaña Información</h4>
+      <p>Datos generales: cliente, producto, fecha de inicio, estado, implementadores asignados y descripción.</p>
+    </div>
+    <div class="card">
+      <h4>💬 Pestaña Historial</h4>
+      <p>Hilo de notas internas y públicas. Las notas públicas se envían por correo al cliente automáticamente.</p>
+    </div>
+    <div class="card">
+      <h4>📧 Pestaña Correos</h4>
+      <p>Configura los destinatarios automáticos que reciben emails al crear notas públicas o generar informes.</p>
+    </div>
+    <div class="card">
+      <h4>🚀 Pestaña Proyecto</h4>
+      <p>Enlace directo al proyecto de implementación asociado con su progreso de actividades.</p>
+    </div>
+    <div class="card">
+      <h4>🎓 Pestaña Capacitaciones</h4>
+      <p>Lista de sesiones de capacitación agendadas y completadas para este cliente.</p>
+    </div>
+    <div class="card">
+      <h4>📁 Pestaña Documentos</h4>
+      <p>Archivos adjuntos, contratos, especificaciones y cualquier documento relacionado con la OS.</p>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Notas internas vs. públicas</h3>
+  <table>
+    <thead><tr><th>Tipo</th><th>¿Quién la ve?</th><th>¿Envía email?</th><th>¿Cuándo usarla?</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-indigo">Interna</span></td><td>Solo el equipo AURA</td><td class="perm-no">✕ No</td><td>Observaciones del equipo, acuerdos internos</td></tr>
+      <tr><td><span class="badge b-green">Pública</span></td><td>Cliente + equipo</td><td class="perm-yes">✓ Sí</td><td>Actualizaciones de avance, comunicados formales</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip">
+    <span class="callout-icon">💡</span>
+    <p>Los <strong>informes automáticos</strong> (semanales y bimensuales) se generan desde la OS. Los destinatarios se configuran en la pestaña Correos de cada OS.</p>
+  </div>
+</section>
+
+<!-- ══ PLANTILLAS ══ -->
+<section id="plantillas">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(167,139,250,0.15)">🗂️</span>
+    Plantillas de Implementación
+  </h2>
+  <p class="sec-desc">Las plantillas definen la estructura estándar de un proyecto: sus módulos y las fases dentro de cada módulo. Se aplican como punto de partida para nuevos proyectos.</p>
+
+  <div class="card-grid-2">
+    <div class="card">
+      <h4>📦 Estructura de una plantilla</h4>
+      <div style="margin-top:12px;font-size:13px;">
+        <div style="padding:8px 12px;background:rgba(99,102,241,0.1);border-radius:8px;border-left:3px solid var(--primary);margin-bottom:8px;">
+          <strong style="color:var(--primary2)">Plantilla:</strong> <span style="color:var(--t2)">HIS Ambulatorio v2</span>
+        </div>
+        <div style="padding:8px 12px 8px 24px;background:var(--card2);border-radius:8px;margin-bottom:6px;color:var(--t3);">
+          📁 Módulo: Instalación
+        </div>
+        <div style="padding:6px 12px 6px 48px;font-size:12px;color:var(--t4)">⚙️ Fase: Configuración inicial</div>
+        <div style="padding:6px 12px 6px 48px;font-size:12px;color:var(--t4)">⚙️ Fase: Parametrización</div>
+        <div style="padding:8px 12px 8px 24px;background:var(--card2);border-radius:8px;margin-top:6px;color:var(--t3);">
+          📁 Módulo: Capacitación
+        </div>
+        <div style="padding:6px 12px 6px 48px;font-size:12px;color:var(--t4)">⚙️ Fase: Usuarios finales</div>
+      </div>
+    </div>
+    <div>
+      <h3 class="sub-title">¿Para qué sirven?</h3>
+      <p>Al crear un proyecto, puedes <strong>cargar una plantilla</strong> y ésta genera automáticamente todos los módulos y fases preconfigurados, ahorrando tiempo en proyectos similares.</p>
+      <p>Las plantillas son editables: puedes agregar módulos, ajustar fases o personalizarlas antes de aplicarlas.</p>
+      <div class="callout info">
+        <span class="callout-icon">📌</span>
+        <p>Los requerimientos/tickets también pueden asociarse a un módulo de plantilla para trazabilidad por área funcional.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PROYECTOS ══ -->
+<section id="proyectos">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(99,102,241,0.15)">🚀</span>
+    Proyectos
+  </h2>
+  <p class="sec-desc">Un proyecto es la implementación técnica asociada a una OS. Contiene módulos → fases → actividades y muestra el progreso global de la implementación.</p>
+
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dot" style="background:#ef4444"></div>
+      <div class="mockup-dot" style="background:#f59e0b"></div>
+      <div class="mockup-dot" style="background:#10b981"></div>
+      <div class="mockup-url">aura / implementacion / proyectos / [id]</div>
+    </div>
+    <div class="mockup-body">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-size:18px;font-weight:800;color:var(--t1)">HIS Clínica Norte — Impl. 2024</div>
+          <div style="font-size:12px;color:var(--t4);margin-top:2px;">En progreso · 42 días · <span style="color:var(--success)">68% completado</span></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <span class="badge b-green">En progreso</span>
+        </div>
+      </div>
+      <!-- progress bar -->
+      <div style="height:8px;background:var(--bg);border-radius:4px;margin-bottom:20px;overflow:hidden;">
+        <div style="width:68%;height:100%;background:linear-gradient(90deg,var(--primary),var(--success));border-radius:4px;"></div>
+      </div>
+      <!-- modules -->
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="background:var(--card2);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:13px;font-weight:700;color:var(--t1)">📦 Módulo: Instalación</div>
+          <div style="display:flex;align-items:center;gap:8px;"><div style="width:80px;height:5px;background:var(--bg);border-radius:3px;"><div style="width:100%;height:100%;background:var(--success);border-radius:3px;"></div></div><span style="font-size:11px;color:var(--success)">100%</span></div>
+        </div>
+        <div style="background:var(--card2);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:13px;font-weight:700;color:var(--t1)">📦 Módulo: Parametrización</div>
+          <div style="display:flex;align-items:center;gap:8px;"><div style="width:80px;height:5px;background:var(--bg);border-radius:3px;"><div style="width:65%;height:100%;background:var(--warn);border-radius:3px;"></div></div><span style="font-size:11px;color:var(--warn)">65%</span></div>
+        </div>
+        <div style="background:var(--card2);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:13px;font-weight:700;color:var(--t1)">📦 Módulo: Capacitación</div>
+          <div style="display:flex;align-items:center;gap:8px;"><div style="width:80px;height:5px;background:var(--bg);border-radius:3px;"><div style="width:20%;height:100%;background:var(--primary);border-radius:3px;"></div></div><span style="font-size:11px;color:var(--primary2)">20%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Funciones principales</h3>
+  <div class="card-grid">
+    <div class="card"><h4>📥 Cargar plantilla</h4><p>Aplica una plantilla existente para generar módulos y fases automáticamente en el proyecto.</p></div>
+    <div class="card"><h4>💬 Novedades (hilo)</h4><p>Registra observaciones, actualizaciones o incidencias en el hilo de novedades del proyecto.</p></div>
+    <div class="card"><h4>📊 Progreso automático</h4><p>El porcentaje de avance se calcula automáticamente según actividades completadas vs. totales.</p></div>
+    <div class="card"><h4>🗑️ Eliminar módulos</h4><p>Puedes eliminar módulos completos si no aplican para este cliente específico.</p></div>
+  </div>
+</section>
+
+<!-- ══ ACTIVIDADES ══ -->
+<section id="actividades">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(16,185,129,0.15)">✅</span>
+    Plan de Trabajo y Actividades
+  </h2>
+  <p class="sec-desc">Las actividades son las tareas individuales dentro de cada fase del proyecto. Pueden tener estados, notas, bloqueos y un historial completo de cambios.</p>
+
+  <h3 class="sub-title">Estados de una actividad</h3>
+  <div class="status-flow" style="margin-bottom:24px;">
+    <span class="badge b-blue">Pendiente</span>
+    <span class="arrow">→</span>
+    <span class="badge b-yellow">En progreso</span>
+    <span class="arrow">→</span>
+    <span class="badge b-green">Completado</span>
+  </div>
+  <div class="status-flow">
+    <span style="color:var(--t4);font-size:13px;">Desde cualquier estado →</span>
+    <span class="badge b-red">Bloqueado</span>
+    <span style="color:var(--t4);font-size:13px;">→ desbloquear → retoma estado anterior</span>
+  </div>
+
+  <div class="card-grid-2" style="margin-top:24px;">
+    <div>
+      <h3 class="sub-title">Cambiar estado individual</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Haz clic en la actividad</h4><p>Se abre el panel lateral con los detalles.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Selecciona el nuevo estado</h4><p>Usa el desplegable de estado en el panel.</p></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Agrega una nota (opcional)</h4><p>Documenta el contexto del cambio.</p></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Guardar</h4><p>El cambio queda registrado en el historial de la actividad.</p></div></div>
+      </div>
+    </div>
+    <div>
+      <h3 class="sub-title">Marcar como Bloqueada</h3>
+      <p>Cuando una actividad no puede avanzar, márcala como <span class="badge b-red">Bloqueado</span>. El sistema te pedirá:</p>
+      <ul>
+        <li><strong>Responsable del bloqueo</strong> — quién está causando la demora:</li>
+      </ul>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+        <span class="badge b-orange">Cliente</span>
+        <span class="badge b-indigo">Desarrollo</span>
+        <span class="badge b-purple">Implementador</span>
+      </div>
+      <ul>
+        <li><strong>Nota obligatoria</strong> — descripción del bloqueo.</li>
+      </ul>
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <p>Si el bloqueo es <strong>por cliente</strong>, los días acumulados se registran automáticamente en el indicador <code>clientDelayDays</code> para el análisis de retrasos.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Edición masiva de actividades</h3>
+  <p>Puedes seleccionar <strong>varias actividades a la vez</strong> usando la casilla de verificación de cada fila y editarlas en lote:</p>
+
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dot" style="background:#ef4444"></div>
+      <div class="mockup-dot" style="background:#f59e0b"></div>
+      <div class="mockup-dot" style="background:#10b981"></div>
+      <div class="mockup-url">aura / proyectos / [id] — Modo selección</div>
+    </div>
+    <div class="mockup-body">
+      <!-- floating bar -->
+      <div style="background:var(--primary);border-radius:12px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <span style="color:#fff;font-size:13px;font-weight:700;">✓ 4 actividades seleccionadas</span>
+        <button style="background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;">Editar selección →</button>
+      </div>
+      <!-- activity rows -->
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+          <div style="width:14px;height:14px;background:var(--primary);border-radius:3px;"></div>
+          <span style="color:var(--t1);font-size:13px;flex:1;">Configurar módulo de admisiones</span>
+          <select style="background:var(--card);border:1px solid var(--border2);color:var(--t2);font-size:12px;border-radius:7px;padding:4px 8px;">
+            <option>En progreso</option>
+          </select>
+        </div>
+        <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+          <div style="width:14px;height:14px;background:var(--primary);border-radius:3px;"></div>
+          <span style="color:var(--t1);font-size:13px;flex:1;">Parametrizar tipos de consulta</span>
+          <select style="background:var(--card);border:1px solid var(--border2);color:var(--t2);font-size:12px;border-radius:7px;padding:4px 8px;">
+            <option>Completado</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout tip">
+    <span class="callout-icon">💡</span>
+    <p>En la edición masiva, <strong>cada actividad puede tener un estado y nota diferente</strong>. No es obligatorio aplicar el mismo estado a todas. Si una actividad se marca como Bloqueada, se habilitan los botones de atribución de responsable solo para esa actividad.</p>
+  </div>
+
+  <h3 class="sub-title">Historial de actividad</h3>
+  <p>Cada cambio de estado queda registrado en el <strong>hilo de historial</strong> de la actividad con fecha, usuario y nota. Este historial es inmutable y auditado.</p>
+</section>
+
+<!-- ══ ACTAS ══ -->
+<section id="actas">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(96,165,250,0.15)">📄</span>
+    Actas
+  </h2>
+  <p class="sec-desc">AURA genera actas digitales con firma electrónica para todos los hitos del proyecto. Cada acta produce un PDF premium con el branding de la empresa.</p>
+
+  <h3 class="sub-title">Tipos de acta</h3>
+  <div class="acta-grid">
+    <div class="acta-card">
+      <div class="acta-icon">🚀</div>
+      <h4>Acta de Inicio</h4>
+      <p>Formaliza el comienzo del proyecto. Incluye alcance, fechas y compromisos iniciales.</p>
+    </div>
+    <div class="acta-card">
+      <div class="acta-icon">🏃</div>
+      <h4>Acta de Visita</h4>
+      <p>Documenta visitas presenciales o remotas. Registra asistentes, temas tratados y acuerdos.</p>
+    </div>
+    <div class="acta-card">
+      <div class="acta-icon">🎓</div>
+      <h4>Acta de Capacitación</h4>
+      <p>Certifica sesiones de entrenamiento al personal del cliente.</p>
+    </div>
+    <div class="acta-card">
+      <div class="acta-icon">🎯</div>
+      <h4>Acta de Cierre</h4>
+      <p>Formaliza la finalización del proyecto y la aceptación del cliente.</p>
+    </div>
+    <div class="acta-card">
+      <div class="acta-icon">🤝</div>
+      <h4>Entrega a Soporte</h4>
+      <p>Transfiere la responsabilidad del sistema al equipo de soporte post-implementación.</p>
+    </div>
+  </div>
+
+  <div class="card-grid-2" style="margin-top:24px;">
+    <div>
+      <h3 class="sub-title">Crear un acta</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Ir a Actas</h4><p>En el menú lateral, sección Implementación → Actas.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Selecciona el tipo</h4><p>Elige entre los 5 tipos disponibles.</p></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Completa el formulario</h4><p>Fecha, OS asociada, asistentes, temas y observaciones.</p></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Agrega compromisos</h4><p>Cada compromiso tiene responsable, descripción y plazo en días (AURA calcula la fecha límite automáticamente).</p></div></div>
+        <div class="step"><div class="step-num">5</div><div class="step-body"><h4>Enviar para firma</h4><p>El firmante recibe un enlace único por email. La firma es digital con pad táctil.</p></div></div>
+      </div>
+    </div>
+    <div>
+      <h3 class="sub-title">Proceso de firma digital</h3>
+      <p>Al enviar el acta para firma, el sistema genera un <strong>enlace único</strong> para cada firmante. Este enlace puede abrirse en cualquier dispositivo (celular, tablet, PC).</p>
+
+      <div class="mockup" style="margin-top:16px;">
+        <div class="mockup-bar">
+          <div class="mockup-dot" style="background:#ef4444"></div>
+          <div class="mockup-dot" style="background:#f59e0b"></div>
+          <div class="mockup-dot" style="background:#10b981"></div>
+          <div class="mockup-url">aura / firmar / [token-único]</div>
+        </div>
+        <div class="mockup-body">
+          <div style="text-align:center;padding:8px 0;">
+            <div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px;">Acta de Capacitación</div>
+            <div style="font-size:11px;color:var(--t4);">Clínica Norte · 15 jun 2026</div>
+            <div style="background:var(--bg);border:2px dashed var(--border);border-radius:10px;height:80px;margin:16px 0;display:flex;align-items:center;justify-content:center;">
+              <span style="color:var(--t4);font-size:12px;">✍️ Área de firma — desliza para firmar</span>
+            </div>
+            <div style="background:var(--primary);color:#fff;border-radius:8px;padding:8px 20px;display:inline-block;font-size:12px;font-weight:700;">Confirmar y firmar</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <p>También puedes buscar un acta por firma en <code>/buscar-firmas</code> sin necesidad de iniciar sesión — útil para clientes externos.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Compromisos del acta</h3>
+  <p>Cada acta puede contener una lista de compromisos. Al registrar un compromiso, especificas:</p>
+  <table>
+    <thead><tr><th>Campo</th><th>Descripción</th><th>Ejemplo</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Descripción</strong></td><td>Qué debe hacerse</td><td>Entregar listado de usuarios por capacitar</td></tr>
+      <tr><td><strong>Responsable</strong></td><td>Quién debe cumplirlo</td><td>Cliente / Implementador / Desarrollo</td></tr>
+      <tr><td><strong>Días</strong></td><td>Plazo en días hábiles</td><td>5</td></tr>
+      <tr><td><strong>Fecha límite</strong></td><td>Calculada: fecha acta + días</td><td>20 jun 2026</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══ REQUERIMIENTOS ══ -->
+<section id="requerimientos">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(251,146,60,0.15)">🎫</span>
+    Requerimientos / Tickets
+  </h2>
+  <p class="sec-desc">Sistema de gestión de solicitudes del cliente (funcionales, mejoras, bugs, etc.). Cada ticket tiene historial completo de gestiones y estados.</p>
+
+  <h3 class="sub-title">Flujo de estados de un requerimiento</h3>
+  <div class="status-flow" style="flex-direction:column;align-items:flex-start;gap:12px;">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge b-blue">Elaborado</span>
+      <span class="arrow">→</span>
+      <span style="font-size:12px;color:var(--t4)">Registrado, pendiente de revisión</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge b-purple">Priorizado</span>
+      <span class="arrow">→</span>
+      <span style="font-size:12px;color:var(--t4)">Aprobado y en cola de desarrollo</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge b-yellow">Repriorizado</span>
+      <span class="arrow">→</span>
+      <span style="font-size:12px;color:var(--t4)">Ajuste de prioridad posterior</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge b-orange">Devuelto</span>
+      <span class="arrow">→</span>
+      <span style="font-size:12px;color:var(--t4)">Requiere ajustes o aclaraciones</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge b-red">Negado</span>
+      <span class="arrow">→</span>
+      <span style="font-size:12px;color:var(--t4)">No se implementará</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge b-green">Entregado</span>
+      <span class="arrow">→</span>
+      <span style="font-size:12px;color:var(--t4)">Implementado y aceptado</span>
+    </div>
+  </div>
+
+  <div class="card-grid-2" style="margin-top:28px;">
+    <div>
+      <h3 class="sub-title">Registrar un requerimiento</h3>
+      <p>Ve a <strong>Requerimientos → Registrar</strong> y completa:</p>
+      <ul>
+        <li><strong>Título</strong> — descripción breve y clara</li>
+        <li><strong>Tipo</strong> — Funcional, Mejora, Bug, etc.</li>
+        <li><strong>Prioridad</strong> — Alta, Media, Baja</li>
+        <li><strong>Área</strong> — módulo o área funcional afectada</li>
+        <li><strong>Descripción</strong> — detalle completo del requerimiento</li>
+        <li><strong>Criterios de aceptación</strong> — cómo se validará que está listo</li>
+        <li><strong>Ticket Rubí</strong> — número en el sistema externo (opcional)</li>
+      </ul>
+    </div>
+    <div>
+      <h3 class="sub-title">Priorización</h3>
+      <p>Hay tres formas de priorizar requerimientos:</p>
+      <div class="card-grid" style="grid-template-columns:1fr;">
+        <div class="card"><h4>Individual</h4><p>Desde el detalle del ticket, cambia el estado a <span class="badge b-purple">Priorizado</span>.</p></div>
+        <div class="card"><h4>Selección múltiple</h4><p>Selecciona varios tickets en la lista y aplica el estado a todos a la vez.</p></div>
+        <div class="card"><h4>Importación CSV</h4><p>Sube un archivo CSV con múltiples tickets y se crean o actualizan en lote.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Gestionar una devolución</h3>
+  <p>Cuando un ticket cambia a <span class="badge b-orange">Devuelto</span>, el sistema te pide:</p>
+  <div class="highlight-box">
+    <div style="display:flex;gap:16px;align-items:flex-start;">
+      <div style="flex:1;">
+        <p style="font-size:13px;margin-bottom:8px;"><strong>¿Quién devuelve?</strong></p>
+        <div style="display:flex;gap:8px;">
+          <span class="badge b-orange">Cliente</span>
+          <span class="badge b-indigo">Desarrollo</span>
+        </div>
+        <p style="font-size:12px;color:var(--t4);margin-top:8px;">Esta información alimenta la analítica de devoluciones para detectar problemas sistemáticos.</p>
+      </div>
+      <div style="flex:1;">
+        <p style="font-size:13px;margin-bottom:8px;"><strong>Nota de devolución</strong></p>
+        <p style="font-size:12px;color:var(--t4);">Describe por qué se devuelve: qué falta, qué debe corregir el cliente o qué necesita aclaración.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ ANALISIS ══ -->
+<section id="analisis">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(99,102,241,0.15)">📈</span>
+    Análisis
+  </h2>
+  <p class="sec-desc">AURA ofrece dos módulos de analítica: uno para implementaciones (proyectos y actividades) y otro para requerimientos/tickets.</p>
+
+  <div class="card-grid-2">
+    <div class="highlight-box">
+      <h4 style="color:var(--primary2);margin-bottom:8px;">📊 Análisis de Implementación</h4>
+      <p style="font-size:13px;color:var(--t3);">Accede desde <strong>Implementación → Análisis</strong>. Muestra señales de alerta sobre el avance del proyecto seleccionado:</p>
+      <ul style="font-size:13px;color:var(--t3);margin-top:8px;">
+        <li>Días de retraso acumulados por cliente</li>
+        <li>Actividades bloqueadas por responsable</li>
+        <li>Porcentaje de avance por fase</li>
+        <li>Alertas de retraso y bloqueos críticos</li>
+      </ul>
+    </div>
+    <div class="highlight-box">
+      <h4 style="color:var(--purple);margin-bottom:8px;">🎫 Análisis de Requerimientos</h4>
+      <p style="font-size:13px;color:var(--t3);">Accede desde <strong>Requerimientos → Análisis</strong>. Provee:</p>
+      <ul style="font-size:13px;color:var(--t3);margin-top:8px;">
+        <li>KPIs: tasa de entrega, devolución, negación</li>
+        <li>Alertas automáticas (alta prio pendientes, tasa de devolución alta)</li>
+        <li>Gráficas: por estado, prioridad, área, tipo, cliente, agente</li>
+        <li>Evolución mensual y atribución de devoluciones</li>
+        <li>Tabla de rendimiento por agente</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Filtros de análisis</h3>
+  <div class="card-grid">
+    <div class="card"><h4>🔍 Buscar cliente</h4><p>Campo de texto con búsqueda inteligente: encuentra clientes aunque escribas sin tildes (ej: "Clinica" encuentra "Clínica").</p></div>
+    <div class="card"><h4>👤 Por agente</h4><p>Filtra los datos al agente seleccionado para evaluar rendimiento individual.</p></div>
+    <div class="card"><h4>📁 Por área / tipo</h4><p>Segmenta los requerimientos por área funcional o tipo para análisis por categoría.</p></div>
+    <div class="card"><h4>📅 Rango de fechas</h4><p>Define el período de análisis con fechas de inicio y fin.</p></div>
+  </div>
+
+  <h3 class="sub-title">Alertas automáticas</h3>
+  <table>
+    <thead><tr><th>Nivel</th><th>Condición</th><th>Acción recomendada</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-red">Crítico</span></td><td>Requerimientos Alta prioridad sin entregar</td><td>Revisar y escalar inmediatamente</td></tr>
+      <tr><td><span class="badge b-red">Crítico</span></td><td>Tasa de devolución &gt; 25%</td><td>Revisar calidad de especificaciones</td></tr>
+      <tr><td><span class="badge b-yellow">Advertencia</span></td><td>Tasa de devolución entre 10% y 25%</td><td>Mejorar proceso de registro</td></tr>
+      <tr><td><span class="badge b-yellow">Advertencia</span></td><td>Tickets negados &gt; 15%</td><td>Validar criterios de aceptación</td></tr>
+      <tr><td><span class="badge b-blue">Info</span></td><td>Devoluciones sin responsable atribuido</td><td>Completar atribución al registrar</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub-title">Informes ejecutivos</h3>
+  <p>Desde la pantalla de Análisis de implementación puedes:</p>
+  <div class="card-grid-3">
+    <div class="card"><h4>📄 Generar PDF</h4><p>PDF premium con gráficas, KPIs y resumen ejecutivo del estado de la implementación.</p></div>
+    <div class="card"><h4>📧 Enviar por correo</h4><p>Envía el informe directamente al cliente con un clic.</p></div>
+    <div class="card"><h4>⏰ Informes automáticos</h4><p>Configura envíos semanales o bimensuales automáticos desde la OS.</p></div>
+  </div>
+</section>
+
+<!-- ══ CRONOGRAMA ══ -->
+<section id="cronograma">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(245,158,11,0.15)">🗓️</span>
+    Cronograma
+  </h2>
+  <p class="sec-desc">Vista de bloques de tiempo de los implementadores. Permite planificar y visualizar la disponibilidad y asignaciones del equipo.</p>
+
+  <div class="card-grid-2">
+    <div>
+      <h3 class="sub-title">Crear un bloque</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Ir a Cronograma</h4><p>Menú lateral → Cronograma.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Selecciona fecha y hora</h4><p>Elige el día, hora de inicio y hora de fin.</p></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Asigna al agente</h4><p>Selecciona el implementador que realizará la actividad.</p></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Describe la actividad</h4><p>Título y descripción de lo que se va a realizar.</p></div></div>
+      </div>
+    </div>
+    <div>
+      <h3 class="sub-title">Estados de un bloque</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:10px;"><span class="badge b-blue">Programado</span><span style="font-size:13px;color:var(--t3);">Agendado, aún no realizado</span></div>
+        <div style="display:flex;align-items:center;gap:10px;"><span class="badge b-orange">En curso</span><span style="font-size:13px;color:var(--t3);">Actualmente en ejecución</span></div>
+        <div style="display:flex;align-items:center;gap:10px;"><span class="badge b-green">Completado</span><span style="font-size:13px;color:var(--t3);">Finalizado exitosamente</span></div>
+        <div style="display:flex;align-items:center;gap:10px;"><span class="badge b-red">Cancelado</span><span style="font-size:13px;color:var(--t3);">No se realizó</span></div>
+      </div>
+      <div class="callout info" style="margin-top:16px;">
+        <span class="callout-icon">📌</span>
+        <p>Puedes seleccionar múltiples bloques para eliminarlos en lote usando las casillas de verificación.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ NOTIFICACIONES ══ -->
+<section id="notificaciones">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(251,146,60,0.15)">🔔</span>
+    Notificaciones
+  </h2>
+  <p class="sec-desc">Sistema de notificaciones en tiempo real. Recibes alertas instantáneas sin necesidad de recargar la página.</p>
+
+  <div class="card-grid-3">
+    <div class="card">
+      <h4>⚡ Tiempo real</h4>
+      <p>Las notificaciones llegan vía WebSocket al instante cuando ocurren eventos relevantes.</p>
+    </div>
+    <div class="card">
+      <h4>🔴 Indicador visual</h4>
+      <p>La campana en el encabezado muestra un contador rojo con las notificaciones no leídas.</p>
+    </div>
+    <div class="card">
+      <h4>📧 También por email</h4>
+      <p>Algunos eventos (notas públicas, actas para firma) también se notifican por correo electrónico.</p>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Tipos de eventos que generan notificaciones</h3>
+  <table>
+    <thead><tr><th>Evento</th><th>Quién la recibe</th></tr></thead>
+    <tbody>
+      <tr><td>Cambio de estado en actividad importante</td><td>Agentes del proyecto</td></tr>
+      <tr><td>Nueva nota pública en OS</td><td>Agentes + cliente (email)</td></tr>
+      <tr><td>Acta enviada para firma</td><td>Firmante designado (email)</td></tr>
+      <tr><td>Acta firmada</td><td>Creador del acta</td></tr>
+      <tr><td>Nuevo requerimiento registrado</td><td>Agente asignado</td></tr>
+      <tr><td>Requerimiento devuelto o negado</td><td>Agente responsable</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout tip">
+    <span class="callout-icon">💡</span>
+    <p>Haz clic en <strong>"Marcar todo como leído"</strong> en el panel de notificaciones para limpiar el contador de una vez.</p>
+  </div>
+</section>
+
+<!-- ══ USUARIOS ══ -->
+<section id="usuarios">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(16,185,129,0.15)">👤</span>
+    Gestión de Usuarios
+  </h2>
+  <p class="sec-desc">Solo los administradores pueden crear y gestionar usuarios. Cada usuario tiene un tipo y un rol con permisos específicos.</p>
+
+  <h3 class="sub-title">Tipos de usuario</h3>
+  <div class="card-grid-2">
+    <div class="card" style="border-top:2px solid var(--primary)">
+      <h4>🧑‍💼 Agente / Implementador</h4>
+      <p>Personal interno de AURA. Tiene acceso completo o parcial según su rol. Puede gestionar proyectos, actas, tickets y análisis.</p>
+    </div>
+    <div class="card" style="border-top:2px solid var(--success)">
+      <h4>👤 Usuario de cliente (portal)</h4>
+      <p>Personal del cliente con acceso limitado al portal de seguimiento. Solo ve información de su propia OS.</p>
+    </div>
+  </div>
+
+  <h3 class="sub-title">Crear un usuario</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Ir a Usuarios</h4><p>Menú lateral → Usuarios.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Clic en "+ Nuevo usuario"</h4><p>Se abre el formulario de creación.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Completa los datos</h4><p>Nombre, apellido, correo, contraseña temporal y tipo de usuario.</p></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Asigna un rol</h4><p>Selecciona el rol con los permisos apropiados para este usuario.</p></div></div>
+  </div>
+
+  <div class="callout warn">
+    <span class="callout-icon">⚠️</span>
+    <p>Al desactivar un usuario, éste pierde acceso al sistema inmediatamente. Sus registros históricos se conservan. Puedes reactivarlo en cualquier momento.</p>
+  </div>
+</section>
+
+<!-- ══ CONFIGURACION ══ -->
+<section id="configuracion">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(148,163,184,0.15)">⚙️</span>
+    Configuración y Roles
+  </h2>
+  <p class="sec-desc">El sistema de roles permite controlar exactamente qué puede hacer cada usuario en el sistema.</p>
+
+  <div class="card-grid-2">
+    <div>
+      <h3 class="sub-title">Módulo de roles</h3>
+      <p>Los roles definen conjuntos de permisos. Puedes crear roles personalizados asignando solo los permisos necesarios para cada perfil de usuario.</p>
+
+      <table>
+        <thead><tr><th>Permiso</th><th>Descripción</th></tr></thead>
+        <tbody>
+          <tr><td><code>orders.ver</code></td><td>Ver órdenes de servicio</td></tr>
+          <tr><td><code>orders.crear</code></td><td>Crear nuevas OS</td></tr>
+          <tr><td><code>tickets.buscar</code></td><td>Ver requerimientos</td></tr>
+          <tr><td><code>tickets.crear</code></td><td>Registrar nuevos tickets</td></tr>
+          <tr><td><code>projects.ver</code></td><td>Ver proyectos</td></tr>
+          <tr><td><code>actas.crear</code></td><td>Crear y enviar actas</td></tr>
+          <tr><td><code>users.admin</code></td><td>Administrar usuarios</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3 class="sub-title">Configuración de empresa</h3>
+      <p>Desde <strong>Configuración</strong> el administrador puede:</p>
+      <ul>
+        <li>Actualizar logo y datos de la empresa</li>
+        <li>Configurar parámetros globales del sistema</li>
+        <li>Gestionar los roles y sus permisos</li>
+        <li>Ver estadísticas globales de uso</li>
+      </ul>
+      <div class="callout info">
+        <span class="callout-icon">ℹ️</span>
+        <p>El logo y nombre de la empresa aparecen en todos los PDFs generados (actas e informes ejecutivos).</p>
+      </div>
+
+      <h3 class="sub-title" style="margin-top:24px;">Firma digital del agente</h3>
+      <p>Cada agente puede registrar su <strong>firma digital</strong> desde su perfil (<strong>Mi cuenta</strong>). Esta firma aparece en las actas que él crea.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FAQ ══ -->
+<section id="faq">
+  <h2 class="sec-title">
+    <span class="sec-icon" style="background:rgba(96,165,250,0.15)">❓</span>
+    Preguntas Frecuentes
+  </h2>
+
+  <div style="display:flex;flex-direction:column;gap:16px;margin-top:8px;">
+    <div class="card">
+      <h4>¿Qué hago si olvido mi contraseña?</h4>
+      <p>Contacta al administrador del sistema para que restablezca tu contraseña desde el módulo de Usuarios.</p>
+    </div>
+    <div class="card">
+      <h4>¿Puedo recuperar una actividad eliminada?</h4>
+      <p>No. La eliminación de actividades es permanente. Antes de eliminar, el sistema solicita confirmación explícita.</p>
+    </div>
+    <div class="card">
+      <h4>¿El acta puede firmarse desde un celular?</h4>
+      <p>Sí. El enlace de firma funciona en cualquier navegador moderno en celular, tablet o computadora. El firmante no necesita tener cuenta en AURA.</p>
+    </div>
+    <div class="card">
+      <h4>¿Qué pasa si cierro el navegador mientras edito un acta?</h4>
+      <p>Los cambios no guardados se pierden. AURA no guarda borradores automáticamente. Guarda frecuentemente usando el botón "Guardar".</p>
+    </div>
+    <div class="card">
+      <h4>¿Puedo cambiar el estado de varias actividades a la vez?</h4>
+      <p>Sí. Activa el modo selección (casilla de verificación en cada actividad), selecciona las que necesitas y haz clic en "Editar selección". Puedes asignar un estado y nota diferente a cada una.</p>
+    </div>
+    <div class="card">
+      <h4>¿Los informes se envían automáticamente?</h4>
+      <p>Sí, si configuras la programación de informes en la OS (sección de Informes). Puedes elegir envío semanal o bimensual. Los destinatarios se configuran en la pestaña Correos de cada OS.</p>
+    </div>
+    <div class="card">
+      <h4>¿Por qué el Dashboard no se actualiza?</h4>
+      <p>El Dashboard usa WebSocket para actualizaciones en tiempo real. Si no se actualiza, verifica tu conexión a internet. En caso de pérdida de conexión, el sistema intenta reconectarse automáticamente.</p>
+    </div>
+    <div class="card">
+      <h4>¿Cómo busco un cliente sin tildes?</h4>
+      <p>En los filtros de búsqueda de clientes puedes escribir sin tildes y AURA los encontrará igualmente. Por ejemplo, escribir "Clinica" encontrará "Clínica Norte" y "Clínica Sur".</p>
+    </div>
+  </div>
+
+  <div class="highlight-box" style="margin-top:32px;text-align:center;">
+    <div style="font-size:24px;margin-bottom:8px;">💬</div>
+    <h3 style="color:var(--t1);margin-bottom:8px;">¿Tienes más preguntas?</h3>
+    <p style="color:var(--t3);font-size:14px;">Contacta al equipo de soporte interno o al administrador del sistema AURA.</p>
+  </div>
+
+  <!-- Footer -->
+  <div style="margin-top:48px;padding-top:24px;border-top:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;flex-wrap:gap:16px;">
+    <div>
+      <div style="font-size:18px;font-weight:800;background:linear-gradient(135deg,#818cf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">AURA ERP</div>
+      <div style="font-size:12px;color:var(--t4);margin-top:2px;">Guía del Usuario Final · Versión 1.0 · Junio 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--t4);text-align:right;">
+      Gestión de implementaciones de software de salud<br>
+      <span style="color:var(--t4);">Documento generado automáticamente</span>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+  // Active sidebar link on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('nav#sidebar a[href^="#"]');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const link = document.querySelector(`nav#sidebar a[href="#${entry.target.id}"]`);
+        if (link) link.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-80px 0px -60% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

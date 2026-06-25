@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURA ERP — Documentación Técnica de Desarrollo</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:      #0a0f1e;
+    --bg2:     #0f172a;
+    --card:    #1e293b;
+    --card2:   #243044;
+    --border:  rgba(99,102,241,0.18);
+    --border2: rgba(255,255,255,0.07);
+    --primary: #6366f1;
+    --primary2:#818cf8;
+    --success: #10b981;
+    --warn:    #f59e0b;
+    --danger:  #ef4444;
+    --info:    #60a5fa;
+    --purple:  #a78bfa;
+    --orange:  #fb923c;
+    --cyan:    #22d3ee;
+    --t1:      #f1f5f9;
+    --t2:      #cbd5e1;
+    --t3:      #94a3b8;
+    --t4:      #64748b;
+    --sidebar-w: 270px;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--t2);
+    line-height: 1.65;
+    font-size: 14px;
+    display: flex;
+    min-height: 100vh;
+  }
+  nav#sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
+    background: var(--bg2);
+    border-right: 1px solid var(--border2);
+    overflow-y: auto;
+    padding: 0 0 32px;
+    z-index: 100;
+  }
+  .sidebar-logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border2);
+    margin-bottom: 8px;
+  }
+  .sidebar-logo .brand { font-size: 20px; font-weight: 800; color: var(--t1); letter-spacing: -0.5px; }
+  .sidebar-logo .sub { font-size: 11px; color: var(--t4); margin-top: 2px; }
+  .sidebar-section { padding: 12px 20px 4px; font-size: 10px; font-weight: 700; color: var(--t4); text-transform: uppercase; letter-spacing: 1px; }
+  nav#sidebar a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 20px;
+    color: var(--t3);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+  }
+  nav#sidebar a:hover, nav#sidebar a.active { color: var(--t1); background: rgba(99,102,241,.08); border-left-color: var(--primary); }
+  nav#sidebar a .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  main { margin-left: var(--sidebar-w); flex: 1; padding: 40px 48px; max-width: 1100px; }
+  h1 { font-size: 32px; font-weight: 800; color: var(--t1); letter-spacing: -1px; margin-bottom: 8px; }
+  h2 { font-size: 22px; font-weight: 700; color: var(--t1); margin: 48px 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border2); }
+  h3 { font-size: 16px; font-weight: 700; color: var(--primary2); margin: 28px 0 10px; }
+  h4 { font-size: 13px; font-weight: 700; color: var(--warn); margin: 18px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
+  p { color: var(--t2); margin-bottom: 12px; }
+  .lead { font-size: 16px; color: var(--t3); margin-bottom: 32px; max-width: 700px; line-height: 1.7; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .badge-blue   { background: rgba(96,165,250,.15); color: var(--info); border: 1px solid rgba(96,165,250,.3); }
+  .badge-green  { background: rgba(16,185,129,.15); color: var(--success); border: 1px solid rgba(16,185,129,.3); }
+  .badge-purple { background: rgba(167,139,250,.15); color: var(--purple); border: 1px solid rgba(167,139,250,.3); }
+  .badge-orange { background: rgba(251,146,60,.15);  color: var(--orange); border: 1px solid rgba(251,146,60,.3); }
+  .badge-cyan   { background: rgba(34,211,238,.15);  color: var(--cyan);   border: 1px solid rgba(34,211,238,.3); }
+  .badge-red    { background: rgba(239,68,68,.15);   color: var(--danger); border: 1px solid rgba(239,68,68,.3); }
+  .badge-gray   { background: rgba(100,116,139,.15); color: var(--t3);     border: 1px solid rgba(100,116,139,.3); }
+  .stack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin: 20px 0; }
+  .stack-card {
+    background: var(--card); border: 1px solid var(--border2); border-radius: 12px;
+    padding: 20px; transition: border-color .2s;
+  }
+  .stack-card:hover { border-color: var(--border); }
+  .stack-card .icon { font-size: 28px; margin-bottom: 10px; }
+  .stack-card .name { font-size: 15px; font-weight: 700; color: var(--t1); margin-bottom: 4px; }
+  .stack-card .version { font-size: 11px; color: var(--t4); margin-bottom: 6px; }
+  .stack-card .desc { font-size: 12px; color: var(--t3); }
+  .dep-table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 13px; }
+  .dep-table th { background: var(--card2); color: var(--t3); font-weight: 600; text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  .dep-table td { padding: 7px 12px; border-bottom: 1px solid var(--border2); vertical-align: middle; }
+  .dep-table tr:last-child td { border-bottom: none; }
+  .dep-table .pkg { font-family: 'Consolas','Courier New',monospace; color: var(--primary2); font-size: 12px; }
+  .dep-table .ver { font-family: 'Consolas','Courier New',monospace; color: var(--t4); font-size: 11px; }
+  .section-box { background: var(--card); border: 1px solid var(--border2); border-radius: 12px; margin: 16px 0; overflow: hidden; }
+  .section-box-header {
+    background: var(--card2); padding: 12px 18px; font-size: 13px; font-weight: 700;
+    color: var(--t1); display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border2);
+  }
+  .db-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .db-table th { background: #162032; color: var(--t3); font-weight: 600; text-align: left; padding: 7px 10px; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+  .db-table td { padding: 6px 10px; border-bottom: 1px solid var(--border2); vertical-align: top; }
+  .db-table tr:last-child td { border-bottom: none; }
+  .db-table .col-name { font-family: 'Consolas','Courier New',monospace; color: var(--t1); font-weight: 600; }
+  .db-table .col-type { font-family: 'Consolas','Courier New',monospace; color: var(--cyan); font-size: 11px; }
+  .db-table .col-note { color: var(--t4); font-size: 11px; }
+  .pk  { background: rgba(245,158,11,.12); color: var(--warn); border: 1px solid rgba(245,158,11,.3); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; margin-right: 4px; }
+  .fk  { background: rgba(99,102,241,.12); color: var(--primary2); border: 1px solid rgba(99,102,241,.3); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; margin-right: 4px; }
+  .uk  { background: rgba(16,185,129,.12); color: var(--success); border: 1px solid rgba(16,185,129,.3); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; margin-right: 4px; }
+  .nn  { background: rgba(239,68,68,.10); color: var(--danger); border: 1px solid rgba(239,68,68,.25); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; margin-right: 4px; }
+  .opt { color: var(--t4); font-size: 10px; }
+  .rel-block { background: var(--card); border: 1px solid var(--border2); border-radius: 10px; padding: 16px; margin: 12px 0; }
+  .rel-block .rel-title { font-size: 13px; font-weight: 700; color: var(--t1); margin-bottom: 10px; }
+  .rel-item { display: flex; align-items: flex-start; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--border2); font-size: 12px; }
+  .rel-item:last-child { border-bottom: none; }
+  .rel-arrow { color: var(--primary); font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .rel-from { font-family: monospace; color: var(--warn); font-weight: 600; }
+  .rel-to   { font-family: monospace; color: var(--success); font-weight: 600; }
+  .rel-type { font-size: 10px; color: var(--t4); margin-left: 4px; }
+  .arch-diagram { background: var(--card); border: 1px solid var(--border2); border-radius: 12px; padding: 32px; margin: 20px 0; display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .arch-layer { display: flex; gap: 16px; justify-content: center; width: 100%; }
+  .arch-box { background: var(--card2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; text-align: center; min-width: 130px; }
+  .arch-box .ab-label { font-size: 10px; color: var(--t4); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+  .arch-box .ab-name { font-size: 13px; font-weight: 700; color: var(--t1); }
+  .arch-box .ab-tech { font-size: 11px; color: var(--t3); margin-top: 2px; }
+  .arch-arrow { color: var(--t4); font-size: 20px; text-align: center; margin: 8px 0; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+  code { font-family: 'Consolas','Courier New',monospace; background: rgba(99,102,241,.1); color: var(--primary2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  .info-box { background: rgba(96,165,250,.07); border: 1px solid rgba(96,165,250,.2); border-radius: 8px; padding: 14px 16px; margin: 12px 0; font-size: 13px; color: var(--t2); }
+  .warn-box { background: rgba(245,158,11,.07); border: 1px solid rgba(245,158,11,.2); border-radius: 8px; padding: 14px 16px; margin: 12px 0; font-size: 13px; color: var(--t2); }
+  .toc-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--border2); border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--t3); margin: 4px; text-decoration: none; transition: all .15s; }
+  .toc-chip:hover { color: var(--t1); border-color: var(--border); }
+  @media (max-width: 900px) {
+    nav#sidebar { display: none; }
+    main { margin-left: 0; padding: 24px 20px; }
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ── -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">⬡ AURA ERP</div>
+    <div class="sub">Documentación Técnica · v1.0</div>
+  </div>
+
+  <div class="sidebar-section">Arquitectura</div>
+  <a href="#arquitectura"><span class="dot" style="background:#6366f1"></span> Visión general</a>
+  <a href="#stack"><span class="dot" style="background:#818cf8"></span> Stack tecnológico</a>
+
+  <div class="sidebar-section">Backend</div>
+  <a href="#backend-tech"><span class="dot" style="background:#10b981"></span> Tecnologías</a>
+  <a href="#backend-deps"><span class="dot" style="background:#10b981"></span> Dependencias</a>
+  <a href="#backend-modulos"><span class="dot" style="background:#10b981"></span> Módulos NestJS</a>
+
+  <div class="sidebar-section">Frontend</div>
+  <a href="#frontend-tech"><span class="dot" style="background:#60a5fa"></span> Tecnologías</a>
+  <a href="#frontend-deps"><span class="dot" style="background:#60a5fa"></span> Dependencias</a>
+
+  <div class="sidebar-section">Base de Datos</div>
+  <a href="#db-overview"><span class="dot" style="background:#f59e0b"></span> Resumen BD</a>
+  <a href="#db-empresa"><span class="dot" style="background:#f59e0b"></span> Empresa / Config</a>
+  <a href="#db-usuarios"><span class="dot" style="background:#f59e0b"></span> Usuarios y Auth</a>
+  <a href="#db-clientes"><span class="dot" style="background:#f59e0b"></span> Clientes</a>
+  <a href="#db-plantillas"><span class="dot" style="background:#f59e0b"></span> Motor Plantillas</a>
+  <a href="#db-os"><span class="dot" style="background:#f59e0b"></span> Órdenes Servicio</a>
+  <a href="#db-proyectos"><span class="dot" style="background:#f59e0b"></span> Proyectos</a>
+  <a href="#db-actividades"><span class="dot" style="background:#f59e0b"></span> Actividades</a>
+  <a href="#db-visitas"><span class="dot" style="background:#f59e0b"></span> Visitas / Caps.</a>
+  <a href="#db-documentos"><span class="dot" style="background:#f59e0b"></span> Documentos</a>
+  <a href="#db-actas"><span class="dot" style="background:#f59e0b"></span> Actas</a>
+  <a href="#db-reqs"><span class="dot" style="background:#f59e0b"></span> Requerimientos</a>
+  <a href="#db-otros"><span class="dot" style="background:#f59e0b"></span> Archivos / Notas</a>
+  <a href="#db-comercial"><span class="dot" style="background:#f59e0b"></span> Comercial</a>
+  <a href="#db-relaciones"><span class="dot" style="background:#a78bfa"></span> Mapa Relaciones</a>
+</nav>
+
+<!-- ── MAIN ── -->
+<main>
+
+  <!-- HEADER -->
+  <div style="margin-bottom:40px">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <span class="badge badge-blue">Versión 1.0</span>
+      <span class="badge badge-green">SQL Server 2016</span>
+      <span class="badge badge-purple">NestJS 11 · Next.js 14</span>
+      <span class="badge badge-gray">Junio 2026</span>
+    </div>
+    <h1>Documentación Técnica</h1>
+    <p class="lead">Referencia completa del stack tecnológico, dependencias, estructura de base de datos, relaciones y diseño del sistema AURA ERP.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">
+      <a href="#arquitectura" class="toc-chip">🏗 Arquitectura</a>
+      <a href="#backend-deps" class="toc-chip">⚙ Backend</a>
+      <a href="#frontend-deps" class="toc-chip">🎨 Frontend</a>
+      <a href="#db-overview" class="toc-chip">🗄 Base de Datos</a>
+      <a href="#db-relaciones" class="toc-chip">🔗 Relaciones</a>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       ARQUITECTURA
+  ══════════════════════════════════════════ -->
+  <h2 id="arquitectura">Arquitectura General</h2>
+  <p>AURA ERP es un sistema monorepo con arquitectura cliente-servidor desacoplada. El backend expone una API REST + WebSockets y el frontend consume la API vía HTTP y sockets en tiempo real.</p>
+
+  <div class="arch-diagram">
+    <div class="arch-layer">
+      <div class="arch-box" style="border-color:rgba(96,165,250,.4)">
+        <div class="ab-label">Cliente</div>
+        <div class="ab-name">Navegador</div>
+        <div class="ab-tech">Chrome / Edge / Firefox</div>
+      </div>
+      <div class="arch-box" style="border-color:rgba(96,165,250,.4)">
+        <div class="ab-label">Cliente</div>
+        <div class="ab-name">Portal Cliente</div>
+        <div class="ab-tech">Acceso limitado</div>
+      </div>
+    </div>
+    <div class="arch-arrow">↕ HTTPS · WebSocket</div>
+    <div class="arch-layer">
+      <div class="arch-box" style="border-color:rgba(99,102,241,.5);min-width:300px">
+        <div class="ab-label">Frontend · :3000</div>
+        <div class="ab-name">Next.js 14 (App Router)</div>
+        <div class="ab-tech">React 18 · TypeScript · Tailwind CSS</div>
+      </div>
+    </div>
+    <div class="arch-arrow">↕ HTTP REST · Socket.IO</div>
+    <div class="arch-layer">
+      <div class="arch-box" style="border-color:rgba(16,185,129,.5);min-width:300px">
+        <div class="ab-label">Backend · :3001</div>
+        <div class="ab-name">NestJS 11</div>
+        <div class="ab-tech">TypeScript · Prisma ORM · Passport JWT</div>
+      </div>
+    </div>
+    <div class="arch-arrow">↕ Prisma Client</div>
+    <div class="arch-layer">
+      <div class="arch-box" style="border-color:rgba(245,158,11,.5)">
+        <div class="ab-label">Base de Datos</div>
+        <div class="ab-name">SQL Server 2016</div>
+        <div class="ab-tech">47 tablas · UUID PKs</div>
+      </div>
+      <div class="arch-box" style="border-color:rgba(239,68,68,.4)">
+        <div class="ab-label">Cola / Caché</div>
+        <div class="ab-name">Redis</div>
+        <div class="ab-tech">Bull queues · Sessions</div>
+      </div>
+    </div>
+    <div class="arch-arrow">↕</div>
+    <div class="arch-layer">
+      <div class="arch-box" style="border-color:rgba(167,139,250,.4)">
+        <div class="ab-label">Storage</div>
+        <div class="ab-name">Sistema de Archivos</div>
+        <div class="ab-tech">C:\AURA_FILES\FILES</div>
+      </div>
+      <div class="arch-box" style="border-color:rgba(251,146,60,.4)">
+        <div class="ab-label">WhatsApp</div>
+        <div class="ab-name">Baileys</div>
+        <div class="ab-tech">wa.me integration</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       STACK
+  ══════════════════════════════════════════ -->
+  <h2 id="stack">Stack Tecnológico</h2>
+  <div class="stack-grid">
+    <div class="stack-card">
+      <div class="icon">⚙️</div>
+      <div class="name">NestJS 11</div>
+      <div class="version">^11.0.1</div>
+      <div class="desc">Framework backend modular con inyección de dependencias, decoradores y módulos. Base del API REST.</div>
+    </div>
+    <div class="stack-card">
+      <div class="icon">⚛️</div>
+      <div class="name">Next.js 14</div>
+      <div class="version">14.2.35</div>
+      <div class="desc">Framework React con App Router, SSR/CSR híbrido, rutas de API y optimización de imágenes.</div>
+    </div>
+    <div class="stack-card">
+      <div class="icon">🔷</div>
+      <div class="name">TypeScript</div>
+      <div class="version">^5.7 / ^5.0</div>
+      <div class="desc">Tipado estático en todo el stack. Strict mode habilitado en backend y frontend.</div>
+    </div>
+    <div class="stack-card">
+      <div class="icon">🗄️</div>
+      <div class="name">Prisma ORM</div>
+      <div class="version">5.22.0</div>
+      <div class="desc">ORM type-safe para SQL Server. Schema declarativo, migraciones y Prisma Client generado.</div>
+    </div>
+    <div class="stack-card">
+      <div class="icon">🛢️</div>
+      <div class="name">SQL Server 2016</div>
+      <div class="version">SQL Server 2016+</div>
+      <div class="desc">Base de datos relacional principal. 47 tablas, UUID como PK (UniqueIdentifier), DateTime2.</div>
+    </div>
+    <div class="stack-card">
+      <div class="icon">⚡</div>
+      <div class="name">Redis</div>
+      <div class="version">^6.0.0</div>
+      <div class="desc">Caché en memoria y broker de colas Bull para tareas asíncronas (emails, reportes).</div>
+    </div>
+    <div class="stack-card">
+      <div class="icon">🎨</div>
+      <div class="name">Tailwind CSS</div>
+      <div class="version">^3.4.1</div>
+      <div class="desc">Framework CSS utility-first. Sistema de diseño consistente en todo el frontend.</div>
+    </div>
+    <div class="stack-card">
+      <div class="icon">🔌</div>
+      <div class="name">Socket.IO</div>
+      <div class="version">^4.8.3</div>
+      <div class="desc">WebSockets para notificaciones en tiempo real, actualizaciones de estado y chat de actividades.</div>
+    </div>
+    <div class="stack-card">
+      <div class="icon">🔐</div>
+      <div class="name">JWT + Passport</div>
+      <div class="version">^11.0.2 / ^0.7.0</div>
+      <div class="desc">Autenticación stateless con access token (JWT) y refresh token hasheado en BD.</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       BACKEND — TECNOLOGÍAS
+  ══════════════════════════════════════════ -->
+  <h2 id="backend-tech">Backend — Tecnologías y Patrones</h2>
+
+  <div class="two-col">
+    <div>
+      <h3>Estructura del proyecto</h3>
+      <div class="info-box">
+        <code>apps/backend/src/</code><br>
+        ├── <code>modules/</code> — Módulos NestJS por dominio<br>
+        ├── <code>common/</code> — Guards, decoradores, pipes<br>
+        ├── <code>prisma/</code> — Servicio Prisma singleton<br>
+        └── <code>main.ts</code> — Bootstrap, CORS, Swagger
+      </div>
+    </div>
+    <div>
+      <h3>Convenciones clave</h3>
+      <div class="info-box">
+        • Puerto: <code>3001</code><br>
+        • IDs: <code>UUID v4</code> (UniqueIdentifier en SQL Server)<br>
+        • Fechas: <code>DateTime2</code> (UTC)<br>
+        • Auth header: <code>Bearer &lt;JWT&gt;</code><br>
+        • Multi-tenant: <code>companyId</code> en cada query
+      </div>
+    </div>
+  </div>
+
+  <h2 id="backend-deps">Backend — Dependencias</h2>
+
+  <h4>Core Framework</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">@nestjs/common</td><td class="ver">^11.0.1</td><td>Decoradores, módulos, pipes, guards</td></tr>
+    <tr><td class="pkg">@nestjs/core</td><td class="ver">^11.0.1</td><td>Núcleo del framework NestJS</td></tr>
+    <tr><td class="pkg">@nestjs/platform-express</td><td class="ver">^11.0.1</td><td>Adaptador HTTP sobre Express</td></tr>
+    <tr><td class="pkg">@nestjs/config</td><td class="ver">^4.0.4</td><td>Variables de entorno con validación</td></tr>
+    <tr><td class="pkg">rxjs</td><td class="ver">^7.8.1</td><td>Programación reactiva (Observables)</td></tr>
+    <tr><td class="pkg">reflect-metadata</td><td class="ver">^0.2.2</td><td>Decoradores TypeScript (requerido por NestJS)</td></tr>
+  </table>
+
+  <h4>Autenticación y Seguridad</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">@nestjs/jwt</td><td class="ver">^11.0.2</td><td>Generación y verificación de JSON Web Tokens</td></tr>
+    <tr><td class="pkg">@nestjs/passport</td><td class="ver">^11.0.5</td><td>Integración Passport con NestJS</td></tr>
+    <tr><td class="pkg">passport</td><td class="ver">^0.7.0</td><td>Middleware de autenticación</td></tr>
+    <tr><td class="pkg">passport-jwt</td><td class="ver">^4.0.1</td><td>Estrategia JWT para Passport</td></tr>
+    <tr><td class="pkg">passport-local</td><td class="ver">^1.0.0</td><td>Estrategia usuario/password</td></tr>
+    <tr><td class="pkg">bcrypt</td><td class="ver">^6.0.0</td><td>Hash seguro de contraseñas (salt rounds)</td></tr>
+  </table>
+
+  <h4>Base de Datos</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">prisma</td><td class="ver">5.22.0</td><td>CLI y motor de migraciones</td></tr>
+    <tr><td class="pkg">@prisma/client</td><td class="ver">5.22.0</td><td>Cliente type-safe generado a partir del schema</td></tr>
+  </table>
+
+  <h4>Colas y Caché</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">@nestjs/bull</td><td class="ver">^11.0.4</td><td>Integración Bull con NestJS para colas</td></tr>
+    <tr><td class="pkg">bull</td><td class="ver">^4.16.5</td><td>Sistema de colas basado en Redis</td></tr>
+    <tr><td class="pkg">ioredis</td><td class="ver">^5.11.0</td><td>Cliente Redis robusto para Node.js</td></tr>
+    <tr><td class="pkg">redis</td><td class="ver">^6.0.0</td><td>Cliente Redis oficial</td></tr>
+    <tr><td class="pkg">@nestjs/schedule</td><td class="ver">^6.1.3</td><td>Tareas cron programadas dentro de NestJS</td></tr>
+    <tr><td class="pkg">cron</td><td class="ver">^4.4.0</td><td>Expresiones cron para tareas periódicas</td></tr>
+  </table>
+
+  <h4>WebSockets y Tiempo Real</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">@nestjs/websockets</td><td class="ver">^11.1.24</td><td>Gateways WebSocket en NestJS</td></tr>
+    <tr><td class="pkg">@nestjs/platform-socket.io</td><td class="ver">^11.1.24</td><td>Adaptador Socket.IO para NestJS</td></tr>
+    <tr><td class="pkg">socket.io</td><td class="ver">^4.8.3</td><td>Motor WebSocket bidireccional</td></tr>
+  </table>
+
+  <h4>Generación de Documentos</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">pdfkit</td><td class="ver">^0.18.0</td><td>Generación de PDFs programáticamente</td></tr>
+    <tr><td class="pkg">docx</td><td class="ver">^9.7.1</td><td>Generación de archivos Word (.docx)</td></tr>
+    <tr><td class="pkg">exceljs</td><td class="ver">^4.4.0</td><td>Lectura y escritura de hojas de cálculo Excel</td></tr>
+    <tr><td class="pkg">qrcode</td><td class="ver">^1.5.4</td><td>Generación de códigos QR para documentos</td></tr>
+  </table>
+
+  <h4>Comunicación</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">nodemailer</td><td class="ver">^8.0.10</td><td>Envío de emails vía SMTP (Office 365)</td></tr>
+    <tr><td class="pkg">resend</td><td class="ver">^6.12.4</td><td>API de email transaccional alternativa</td></tr>
+    <tr><td class="pkg">@whiskeysockets/baileys</td><td class="ver">7.0.0-rc13</td><td>Integración WhatsApp Web API</td></tr>
+  </table>
+
+  <h4>Validación y Utilidades</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">class-validator</td><td class="ver">^0.15.1</td><td>Validación de DTOs con decoradores</td></tr>
+    <tr><td class="pkg">class-transformer</td><td class="ver">^0.5.1</td><td>Transformación y serialización de objetos</td></tr>
+    <tr><td class="pkg">dayjs</td><td class="ver">^1.11.21</td><td>Manipulación de fechas ligera</td></tr>
+    <tr><td class="pkg">uuid</td><td class="ver">^14.0.0</td><td>Generación de UUIDs v4</td></tr>
+    <tr><td class="pkg">multer</td><td class="ver">^2.1.1</td><td>Middleware para upload de archivos (multipart)</td></tr>
+    <tr><td class="pkg">@nestjs/swagger</td><td class="ver">^11.4.4</td><td>Documentación API auto-generada (OpenAPI)</td></tr>
+    <tr><td class="pkg">swagger-ui-express</td><td class="ver">^5.0.1</td><td>UI de Swagger integrada en Express</td></tr>
+    <tr><td class="pkg">@hapi/boom</td><td class="ver">^10.0.1</td><td>Respuestas de error HTTP estructuradas</td></tr>
+    <tr><td class="pkg">dotenv</td><td class="ver">^17.4.2</td><td>Carga de variables de entorno desde .env</td></tr>
+  </table>
+
+  <h2 id="backend-modulos">Backend — Módulos NestJS</h2>
+  <div class="stack-grid">
+    <div class="stack-card"><div class="name">AuthModule</div><div class="desc">Login, refresh token, logout. Estrategias JWT y Local.</div></div>
+    <div class="stack-card"><div class="name">UsersModule</div><div class="desc">CRUD de usuarios agentes y clientes. Gestión de roles.</div></div>
+    <div class="stack-card"><div class="name">ClientsModule</div><div class="desc">Clientes, personal de cliente (staff), municipios.</div></div>
+    <div class="stack-card"><div class="name">ServiceOrdersModule</div><div class="desc">Órdenes de servicio, implementadores, historial.</div></div>
+    <div class="stack-card"><div class="name">ProjectsModule</div><div class="desc">Proyectos, módulos, fases, progreso.</div></div>
+    <div class="stack-card"><div class="name">ActivitiesModule</div><div class="desc">Actividades, sub-actividades, hilos, dependencias, bloqueos.</div></div>
+    <div class="stack-card"><div class="name">VisitsModule</div><div class="desc">Visitas y actividades asociadas.</div></div>
+    <div class="stack-card"><div class="name">TrainingsModule</div><div class="desc">Capacitaciones y participantes.</div></div>
+    <div class="stack-card"><div class="name">DocumentsModule</div><div class="desc">Documentos generados, firmas digitales.</div></div>
+    <div class="stack-card"><div class="name">ActasModule</div><div class="desc">Actas (inicio, visita, capacitación, cierre, entrega soporte).</div></div>
+    <div class="stack-card"><div class="name">RequerimientosModule</div><div class="desc">Tickets de requerimiento y gestiones.</div></div>
+    <div class="stack-card"><div class="name">ArchivosModule</div><div class="desc">Repositorio de documentos adjuntos por cliente/OS.</div></div>
+    <div class="stack-card"><div class="name">CronogramaModule</div><div class="desc">Bloques de agenda de agentes.</div></div>
+    <div class="stack-card"><div class="name">CotizacionesModule</div><div class="desc">Cotizaciones comerciales e ítems.</div></div>
+    <div class="stack-card"><div class="name">TemplatesModule</div><div class="desc">Motor de plantillas: flujos, módulos, fases, actividades.</div></div>
+    <div class="stack-card"><div class="name">NotificationsModule</div><div class="desc">Notificaciones in-app + gateway WebSocket.</div></div>
+    <div class="stack-card"><div class="name">EmailModule</div><div class="desc">Envío de emails, plantillas de correo.</div></div>
+    <div class="stack-card"><div class="name">AuditModule</div><div class="desc">Registro de auditoría de todas las acciones.</div></div>
+    <div class="stack-card"><div class="name">AnalyticsModule</div><div class="desc">Endpoints de métricas, KPIs y dashboards.</div></div>
+    <div class="stack-card"><div class="name">CompanyModule</div><div class="desc">Configuración de empresa, SMTP, colores, logo.</div></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       FRONTEND
+  ══════════════════════════════════════════ -->
+  <h2 id="frontend-tech">Frontend — Tecnologías</h2>
+  <div class="info-box">
+    <strong>Puerto:</strong> <code>3000</code> &nbsp;·&nbsp;
+    <strong>Router:</strong> App Router (Next.js 14) &nbsp;·&nbsp;
+    <strong>Auth:</strong> cookies httpOnly + Zustand &nbsp;·&nbsp;
+    <strong>HTTP:</strong> Axios con interceptors &nbsp;·&nbsp;
+    <strong>Estado servidor:</strong> TanStack Query
+  </div>
+
+  <h2 id="frontend-deps">Frontend — Dependencias</h2>
+
+  <h4>Framework y Runtime</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">next</td><td class="ver">14.2.35</td><td>Framework React con SSR, App Router, optimizaciones</td></tr>
+    <tr><td class="pkg">react</td><td class="ver">^18</td><td>Biblioteca UI con Concurrent Mode y hooks</td></tr>
+    <tr><td class="pkg">react-dom</td><td class="ver">^18</td><td>Renderizado DOM de React</td></tr>
+    <tr><td class="pkg">typescript</td><td class="ver">^5</td><td>Tipado estático</td></tr>
+  </table>
+
+  <h4>UI y Estilos</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">tailwindcss</td><td class="ver">^3.4.1</td><td>CSS utility-first para todo el diseño</td></tr>
+    <tr><td class="pkg">@radix-ui/react-*</td><td class="ver">varios</td><td>Componentes accesibles sin estilos: dialog, select, tabs, switch, avatar, dropdown, progress, tooltip</td></tr>
+    <tr><td class="pkg">lucide-react</td><td class="ver">^1.17.0</td><td>Iconografía SVG consistente</td></tr>
+    <tr><td class="pkg">framer-motion</td><td class="ver">^12.40.0</td><td>Animaciones y transiciones fluidas</td></tr>
+    <tr><td class="pkg">sonner</td><td class="ver">^2.0.7</td><td>Notificaciones toast accesibles</td></tr>
+    <tr><td class="pkg">next-themes</td><td class="ver">^0.4.6</td><td>Sistema de temas claro/oscuro</td></tr>
+    <tr><td class="pkg">clsx</td><td class="ver">^2.1.1</td><td>Utilidad para clases condicionales</td></tr>
+    <tr><td class="pkg">tailwind-merge</td><td class="ver">^3.6.0</td><td>Merge seguro de clases Tailwind</td></tr>
+    <tr><td class="pkg">class-variance-authority</td><td class="ver">^0.7.1</td><td>Variantes de componentes con CVA</td></tr>
+  </table>
+
+  <h4>Estado y Datos</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">zustand</td><td class="ver">^5.0.14</td><td>Estado global ligero (auth, UI, configuración)</td></tr>
+    <tr><td class="pkg">@tanstack/react-query</td><td class="ver">^5.101.0</td><td>Caché, sincronización y estado del servidor</td></tr>
+    <tr><td class="pkg">@tanstack/react-query-devtools</td><td class="ver">^5.101.0</td><td>DevTools de React Query en desarrollo</td></tr>
+    <tr><td class="pkg">axios</td><td class="ver">^1.17.0</td><td>Cliente HTTP con interceptors (auth, errores)</td></tr>
+  </table>
+
+  <h4>Formularios y Validación</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">react-hook-form</td><td class="ver">^7.77.0</td><td>Formularios performantes con mínimo re-render</td></tr>
+    <tr><td class="pkg">@hookform/resolvers</td><td class="ver">^5.4.0</td><td>Integración React Hook Form + Zod</td></tr>
+    <tr><td class="pkg">zod</td><td class="ver">^4.4.3</td><td>Validación de esquemas TypeScript-first</td></tr>
+  </table>
+
+  <h4>Generación de Documentos / Exportación</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">@react-pdf/renderer</td><td class="ver">^4.5.1</td><td>PDFs declarativos en React (actas, informes)</td></tr>
+    <tr><td class="pkg">jspdf</td><td class="ver">^4.2.1</td><td>Generación PDF desde el cliente</td></tr>
+    <tr><td class="pkg">html2canvas</td><td class="ver">^1.4.1</td><td>Captura de componentes como imagen para PDF</td></tr>
+    <tr><td class="pkg">xlsx</td><td class="ver">^0.18.5</td><td>Exportación de datos a Excel</td></tr>
+  </table>
+
+  <h4>Componentes Especializados</h4>
+  <table class="dep-table">
+    <tr><th>Paquete</th><th>Versión</th><th>Propósito</th></tr>
+    <tr><td class="pkg">recharts</td><td class="ver">^3.8.1</td><td>Gráficas y visualizaciones de datos (analytics)</td></tr>
+    <tr><td class="pkg">@hello-pangea/dnd</td><td class="ver">^18.0.1</td><td>Drag & Drop para tableros Kanban y listas</td></tr>
+    <tr><td class="pkg">react-signature-canvas</td><td class="ver">1.1.0-alpha.2</td><td>Canvas para captura de firmas digitales</td></tr>
+    <tr><td class="pkg">dayjs</td><td class="ver">^1.11.21</td><td>Formateo y cálculo de fechas</td></tr>
+    <tr><td class="pkg">socket.io-client</td><td class="ver">^4.8.3</td><td>WebSocket client para notificaciones real-time</td></tr>
+  </table>
+
+  <!-- ══════════════════════════════════════════
+       BASE DE DATOS — OVERVIEW
+  ══════════════════════════════════════════ -->
+  <h2 id="db-overview">Base de Datos — Resumen</h2>
+
+  <div class="two-col">
+    <div class="info-box">
+      <strong>Motor:</strong> Microsoft SQL Server 2016<br>
+      <strong>ORM:</strong> Prisma 5.22 (provider: sqlserver)<br>
+      <strong>Conexión:</strong> Variable <code>DATABASE_URL</code><br>
+      <strong>PKs:</strong> <code>UUID v4</code> (tipo <code>UniqueIdentifier</code>)<br>
+      <strong>Fechas:</strong> <code>DateTime2</code> en UTC<br>
+      <strong>Textos largos:</strong> <code>NVarChar(Max)</code>
+    </div>
+    <div class="info-box">
+      <strong>Total de tablas:</strong> 47<br>
+      <strong>Multi-tenant:</strong> <code>companyId</code> en 25+ tablas<br>
+      <strong>Tablas pivot:</strong> 5 con PK compuesta<br>
+      <strong>Soft-delete:</strong> campo <code>isActive</code> en entidades principales<br>
+      <strong>Auditoría:</strong> tabla <code>RegistroAuditoria</code> con PK autoincrement<br>
+      <strong>Prefijo:</strong> Nombres en español (@@map)
+    </div>
+  </div>
+
+  <div class="warn-box">
+    <strong>Nota sobre nombres de tabla:</strong> El schema usa <code>@@map()</code> para mapear modelos en inglés a nombres de tabla en español. Por ejemplo: <code>Company</code> → tabla <code>Empresas</code>. Esto evita palabras reservadas de SQL Server.
+  </div>
+
+  <!-- SECCIÓN 1: EMPRESA -->
+  <h2 id="db-empresa">Sección 1 — Empresa y Configuración</h2>
+
+  <div class="section-box">
+    <div class="section-box-header">
+      <span class="badge badge-orange">Tabla</span> <strong>Empresas</strong>
+      <span style="margin-left:auto;font-size:11px;color:var(--t4)">Modelo: Company</span>
+    </div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL · UUID</td><td>Identificador único empresa</td></tr>
+      <tr><td class="col-name">name</td><td class="col-type">NVarChar(200)</td><td>NOT NULL</td><td>Razón social</td></tr>
+      <tr><td class="col-name">commercialName</td><td class="col-type">NVarChar(200)</td><td class="opt">NULL</td><td>Nombre comercial</td></tr>
+      <tr><td class="col-name">nit</td><td class="col-type">NVarChar(20)</td><td>UNIQUE · NOT NULL</td><td>NIT / identificación fiscal</td></tr>
+      <tr><td class="col-name">logo</td><td class="col-type">NVarChar(500)</td><td class="opt">NULL</td><td>Ruta del logo</td></tr>
+      <tr><td class="col-name">logoData</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>Logo en Base64</td></tr>
+      <tr><td class="col-name">primaryColor</td><td class="col-type">NVarChar(7)</td><td>DEFAULT '#1E3A5F'</td><td>Color primario HEX</td></tr>
+      <tr><td class="col-name">secondaryColor</td><td class="col-type">NVarChar(7)</td><td>DEFAULT '#2D5086'</td><td>Color secundario HEX</td></tr>
+      <tr><td class="col-name">address</td><td class="col-type">NVarChar(300)</td><td class="opt">NULL</td><td>Dirección</td></tr>
+      <tr><td class="col-name">city / department</td><td class="col-type">NVarChar(100)</td><td class="opt">NULL</td><td>Ciudad / Departamento</td></tr>
+      <tr><td class="col-name">email</td><td class="col-type">NVarChar(200)</td><td>UNIQUE · NOT NULL</td><td>Email corporativo</td></tr>
+      <tr><td class="col-name">phone</td><td class="col-type">NVarChar(50)</td><td class="opt">NULL</td><td>Teléfono</td></tr>
+      <tr><td class="col-name">rootPassword</td><td class="col-type">NVarChar(200)</td><td>NOT NULL</td><td>Password hash raíz</td></tr>
+      <tr><td class="col-name">agentRegPassword</td><td class="col-type">NVarChar(200)</td><td>NOT NULL</td><td>Password registro agentes</td></tr>
+      <tr><td class="col-name">smtpHost/Port/User/Password</td><td class="col-type">NVarChar / Int</td><td class="opt">NULL</td><td>Config SMTP para emails</td></tr>
+      <tr><td class="col-name">smtpFromName / smtpFromEmail</td><td class="col-type">NVarChar(200)</td><td class="opt">NULL</td><td>Remitente de correo</td></tr>
+      <tr><td class="col-name">emailSignature</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>Firma HTML de emails</td></tr>
+      <tr><td class="col-name">filesBasePath</td><td class="col-type">NVarChar(500)</td><td>DEFAULT 'C:\AURA_FILES\FILES'</td><td>Ruta base archivos del servidor</td></tr>
+      <tr><td class="col-name">isActive</td><td class="col-type">bit</td><td>DEFAULT true</td><td>Estado activo/inactivo</td></tr>
+      <tr><td class="col-name">createdAt / updatedAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td>Timestamps automáticos</td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header">
+      <span class="badge badge-orange">Tabla</span> <strong>ConfiguracionSistema</strong>
+      <span style="margin-left:auto;font-size:11px;color:var(--t4)">Modelo: SystemConfig</span>
+    </div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL · UUID</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>companyId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Empresas</td><td>Cascade delete</td></tr>
+      <tr><td class="col-name"><span class="uk">UQ</span>configKey</td><td class="col-type">NVarChar(100)</td><td>UNIQUE(companyId, configKey)</td><td>Clave de configuración</td></tr>
+      <tr><td class="col-name">configValue</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>Valor (JSON o texto)</td></tr>
+      <tr><td class="col-name">description</td><td class="col-type">NVarChar(500)</td><td class="opt">NULL</td><td>Descripción de la config</td></tr>
+      <tr><td class="col-name">updatedAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td>Auto-actualizado</td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 2: USUARIOS -->
+  <h2 id="db-usuarios">Sección 2 — Usuarios y Autenticación</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>RolesSistema</strong> <span style="margin-left:auto;font-size:11px;color:var(--t4)">Modelo: Role</span></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL · UUID</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>companyId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Empresas</td><td>NoAction</td></tr>
+      <tr><td class="col-name">name</td><td class="col-type">NVarChar(100)</td><td>NOT NULL</td><td>Nombre del rol</td></tr>
+      <tr><td class="col-name"><span class="uk">UQ</span>slug</td><td class="col-type">NVarChar(50)</td><td>UNIQUE(companyId, slug)</td><td>Identificador slug del rol</td></tr>
+      <tr><td class="col-name">description</td><td class="col-type">NVarChar(300)</td><td class="opt">NULL</td><td></td></tr>
+      <tr><td class="col-name">permissions</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>JSON de permisos</td></tr>
+      <tr><td class="col-name">isSystem</td><td class="col-type">bit</td><td>DEFAULT false</td><td>Rol de sistema no editable</td></tr>
+      <tr><td class="col-name">isActive</td><td class="col-type">bit</td><td>DEFAULT true</td><td></td></tr>
+      <tr><td class="col-name">createdAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>Usuarios</strong> <span style="margin-left:auto;font-size:11px;color:var(--t4)">Modelo: User</span></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL · UUID</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>companyId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Empresas</td><td>NoAction</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>roleId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → RolesSistema</td><td>NoAction</td></tr>
+      <tr><td class="col-name">userType</td><td class="col-type">NVarChar(10)</td><td>NOT NULL</td><td>'agent' | 'client'</td></tr>
+      <tr><td class="col-name">document</td><td class="col-type">NVarChar(30)</td><td>NOT NULL</td><td>Número de documento</td></tr>
+      <tr><td class="col-name">firstName / lastName</td><td class="col-type">NVarChar(100)</td><td>NOT NULL</td><td>Nombre y apellido</td></tr>
+      <tr><td class="col-name"><span class="uk">UQ</span>email</td><td class="col-type">NVarChar(200)</td><td>UNIQUE · NOT NULL</td><td>Email de login</td></tr>
+      <tr><td class="col-name">passwordHash</td><td class="col-type">NVarChar(300)</td><td>NOT NULL</td><td>bcrypt hash</td></tr>
+      <tr><td class="col-name">jobTitle / phone</td><td class="col-type">NVarChar</td><td class="opt">NULL</td><td>Cargo y teléfono</td></tr>
+      <tr><td class="col-name">signatureFilePath / signatureData</td><td class="col-type">NVarChar</td><td class="opt">NULL</td><td>Firma digital del agente</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>clientId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → Clientes</td><td>Solo si userType='client'</td></tr>
+      <tr><td class="col-name">isActive / isEmailVerified</td><td class="col-type">bit</td><td>DEFAULT false/true</td><td>Estado y verificación</td></tr>
+      <tr><td class="col-name">lastLoginAt</td><td class="col-type">DateTime2</td><td class="opt">NULL</td><td>Último login</td></tr>
+      <tr><td class="col-name">failedLoginCount</td><td class="col-type">Int</td><td>DEFAULT 0</td><td>Contador de intentos fallidos</td></tr>
+      <tr><td class="col-name">lockedUntil</td><td class="col-type">DateTime2</td><td class="opt">NULL</td><td>Bloqueo temporal por intentos</td></tr>
+      <tr><td class="col-name">refreshTokenHash</td><td class="col-type">NVarChar(300)</td><td class="opt">NULL</td><td>Hash del refresh token activo</td></tr>
+      <tr><td class="col-name">createdAt / updatedAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td>Timestamps</td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 3: CLIENTES -->
+  <h2 id="db-clientes">Sección 3 — Clientes</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>Municipios</strong></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>companyId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Empresas</td><td></td></tr>
+      <tr><td class="col-name">codigoDepartamento / nombreDepartamento</td><td class="col-type">NVarChar</td><td>NOT NULL</td><td>Código y nombre dpto.</td></tr>
+      <tr><td class="col-name"><span class="uk">UQ</span>codigoMunicipio / nombreMunicipio</td><td class="col-type">NVarChar</td><td>UNIQUE(companyId, codigoDpto, codigoMun)</td><td></td></tr>
+      <tr><td class="col-name">codigoPostal</td><td class="col-type">NVarChar(10)</td><td class="opt">NULL</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>Clientes</strong> <span style="margin-left:auto;font-size:11px;color:var(--t4)">Modelo: Client</span></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL · UUID</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>companyId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Empresas</td><td></td></tr>
+      <tr><td class="col-name"><span class="uk">UQ</span>nit</td><td class="col-type">NVarChar(20)</td><td>UNIQUE(companyId, nit)</td><td>NIT del cliente</td></tr>
+      <tr><td class="col-name">businessName / commercialName</td><td class="col-type">NVarChar(200)</td><td>NOT NULL / NULL</td><td>Razón social y comercial</td></tr>
+      <tr><td class="col-name">address / city / department</td><td class="col-type">NVarChar</td><td class="opt">NULL</td><td>Ubicación</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>municipioId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → Municipios</td><td></td></tr>
+      <tr><td class="col-name">email / phone</td><td class="col-type">NVarChar</td><td class="opt">NULL</td><td>Contacto</td></tr>
+      <tr><td class="col-name">economicActivity</td><td class="col-type">NVarChar(200)</td><td class="opt">NULL</td><td>Actividad económica</td></tr>
+      <tr><td class="col-name">isActive</td><td class="col-type">bit</td><td>DEFAULT true</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>createdById</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → Usuarios</td><td></td></tr>
+      <tr><td class="col-name">createdAt / updatedAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>PersonalCliente</strong> <span style="margin-left:auto;font-size:11px;color:var(--t4)">Modelo: ClientStaff</span></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>clientId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Clientes</td><td>Cascade delete</td></tr>
+      <tr><td class="col-name">document / firstName / lastName</td><td class="col-type">NVarChar</td><td>NOT NULL</td><td>Datos personales</td></tr>
+      <tr><td class="col-name">jobTitle / email / phone / area</td><td class="col-type">NVarChar</td><td class="opt">NULL</td><td>Cargo, contacto, área</td></tr>
+      <tr><td class="col-name">isProjectLeader</td><td class="col-type">bit</td><td>DEFAULT false</td><td>Líder de proyecto del cliente</td></tr>
+      <tr><td class="col-name">isTrainingParticipant</td><td class="col-type">bit</td><td>DEFAULT false</td><td>Participa en capacitaciones</td></tr>
+      <tr><td class="col-name">isActSigner</td><td class="col-type">bit</td><td>DEFAULT false</td><td>Firma actas</td></tr>
+      <tr><td class="col-name">isActive</td><td class="col-type">bit</td><td>DEFAULT true</td><td></td></tr>
+      <tr><td class="col-name">createdAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td></td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 4: PLANTILLAS -->
+  <h2 id="db-plantillas">Sección 4 — Motor de Plantillas</h2>
+
+  <div class="info-box">El motor de plantillas define flujos reutilizables de implementación. Un <strong>TemplateFlow</strong> contiene <strong>TemplateModules</strong>, cada uno con <strong>TemplatePhases</strong> y <strong>TemplateActivities</strong>. Al crear un proyecto se instancia esta jerarquía.</div>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>FlujoPlantillas → ModulosPlantilla → FasesPlantilla → ActividadesPlantilla → SubActividadesPlantilla</strong></div>
+    <table class="db-table">
+      <tr><th>Tabla</th><th>PK</th><th>FK principal</th><th>Notas</th></tr>
+      <tr><td class="col-name">FlujoPlantillas</td><td class="col-type">id (UUID)</td><td>companyId → Empresas</td><td>Flujo completo reutilizable, tiene versión</td></tr>
+      <tr><td class="col-name">ModulosPlantilla</td><td class="col-type">id (UUID)</td><td>companyId, templateFlowId → FlujoPlantillas (Cascade)</td><td>UNIQUE(companyId, code). Días estimados</td></tr>
+      <tr><td class="col-name">FasesPlantilla</td><td class="col-type">id (UUID)</td><td>templateModuleId → ModulosPlantilla (Cascade)</td><td>Color, ícono, orden</td></tr>
+      <tr><td class="col-name">ActividadesPlantilla</td><td class="col-type">id (UUID)</td><td>templatePhaseId → FasesPlantilla (Cascade)</td><td>Horas estimadas, rol por defecto</td></tr>
+      <tr><td class="col-name">SubActividadesPlantilla</td><td class="col-type">id (UUID)</td><td>templateActivityId → ActividadesPlantilla (Cascade)</td><td>Horas estimadas</td></tr>
+      <tr><td class="col-name">RiesgosPlantilla</td><td class="col-type">id (UUID)</td><td>companyId → Empresas</td><td>Catálogo de riesgos reutilizables</td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 5: ÓRDENES DE SERVICIO -->
+  <h2 id="db-os">Sección 5 — Órdenes de Servicio</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>OrdenesServicio</strong> <span style="margin-left:auto;font-size:11px;color:var(--t4)">Modelo: ServiceOrder</span></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>companyId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Empresas</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>clientId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Clientes</td><td></td></tr>
+      <tr><td class="col-name"><span class="uk">UQ</span>osNumber</td><td class="col-type">NVarChar(50)</td><td>UNIQUE(companyId, osNumber)</td><td>Número de OS</td></tr>
+      <tr><td class="col-name">ticketRubi</td><td class="col-type">NVarChar(100)</td><td class="opt">NULL</td><td>Referencia ticket externo</td></tr>
+      <tr><td class="col-name">product</td><td class="col-type">NVarChar(200)</td><td>NOT NULL</td><td>Producto a implementar</td></tr>
+      <tr><td class="col-name">scope / observations</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>Alcance y observaciones</td></tr>
+      <tr><td class="col-name">durationDays</td><td class="col-type">Int</td><td>DEFAULT 0</td><td>Días de implementación</td></tr>
+      <tr><td class="col-name">startDate / endDate</td><td class="col-type">Date</td><td>NOT NULL</td><td>Fechas del contrato</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>clinicalLeaderId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → Usuarios</td><td>Líder clínico</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>financialLeaderId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → Usuarios</td><td>Líder financiero</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>clientLeaderId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → PersonalCliente</td><td>Líder del lado cliente</td></tr>
+      <tr><td class="col-name">status</td><td class="col-type">NVarChar(30)</td><td>DEFAULT 'pendiente'</td><td>pendiente | activa | cerrada | cancelada</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>createdById</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Usuarios</td><td></td></tr>
+      <tr><td class="col-name">createdAt / updatedAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>ImplementadoresOS</strong> &nbsp;<span class="badge badge-gray">PK Compuesta</span> <span style="margin-left:auto;font-size:11px;color:var(--t4)">Modelo: ServiceOrderImplementer</span></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span><span class="fk">FK</span>serviceOrderId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → OrdenesServicio (Cascade)</td><td></td></tr>
+      <tr><td class="col-name"><span class="pk">PK</span><span class="fk">FK</span>userId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Usuarios</td><td></td></tr>
+      <tr><td class="col-name">role</td><td class="col-type">NVarChar(50)</td><td>DEFAULT 'apoyo'</td><td>Rol en la OS</td></tr>
+      <tr><td class="col-name">assignedAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>HistorialOS</strong></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>serviceOrderId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → OrdenesServicio (Cascade)</td><td></td></tr>
+      <tr><td class="col-name">changedById</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td>Usuario que realizó el cambio</td></tr>
+      <tr><td class="col-name">fieldName</td><td class="col-type">NVarChar(100)</td><td>NOT NULL</td><td>Campo modificado</td></tr>
+      <tr><td class="col-name">oldValue / newValue</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>Valores anterior y nuevo</td></tr>
+      <tr><td class="col-name">reason / noteType / noteLevel</td><td class="col-type">NVarChar</td><td class="opt">NULL</td><td>Contexto de la nota</td></tr>
+      <tr><td class="col-name">createdAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td></td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 6: PROYECTOS -->
+  <h2 id="db-proyectos">Sección 6 — Proyectos y Estructura</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>Proyectos</strong></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span><span class="uk">UQ</span>serviceOrderId</td><td class="col-type">UniqueIdentifier</td><td>UNIQUE → OrdenesServicio (1:1)</td><td>Relación 1 a 1 con OS</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>templateFlowId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → FlujoPlantillas</td><td>Plantilla origen</td></tr>
+      <tr><td class="col-name">name / description</td><td class="col-type">NVarChar</td><td>NOT NULL / NULL</td><td>Nombre y descripción</td></tr>
+      <tr><td class="col-name">startDate / endDate</td><td class="col-type">Date</td><td>NOT NULL</td><td>Vigencia del proyecto</td></tr>
+      <tr><td class="col-name">progressPercent</td><td class="col-type">Decimal(5,2)</td><td>DEFAULT 0</td><td>Porcentaje global</td></tr>
+      <tr><td class="col-name">status</td><td class="col-type">NVarChar(30)</td><td>DEFAULT 'activo'</td><td>activo | pausado | cerrado</td></tr>
+      <tr><td class="col-name">createdAt / updatedAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header"><span class="badge badge-orange">Tablas</span> <strong>ModulosProyecto → Fases</strong></div>
+    <table class="db-table">
+      <tr><th>Tabla</th><th>PK</th><th>FK principal</th><th>Campos clave</th></tr>
+      <tr><td class="col-name">ModulosProyecto</td><td class="col-type">id (UUID)</td><td>projectId → Proyectos (Cascade)</td><td>name, order, progressPercent, startDate, endDate</td></tr>
+      <tr><td class="col-name">Fases</td><td class="col-type">id (UUID)</td><td>projectModuleId → ModulosProyecto (Cascade)</td><td>name, slug, order, startDate, endDate, executionDate, progressPercent, status, color, icon</td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 7: ACTIVIDADES -->
+  <h2 id="db-actividades">Sección 7 — Actividades</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>Actividades</strong></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>phaseId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Fases</td><td>NoAction</td></tr>
+      <tr><td class="col-name">code / name</td><td class="col-type">NVarChar(30/300)</td><td>NOT NULL</td><td>Código y nombre</td></tr>
+      <tr><td class="col-name">description</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>assignedToId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → Usuarios</td><td>Agente asignado</td></tr>
+      <tr><td class="col-name">assigneeType</td><td class="col-type">NVarChar(20)</td><td class="opt">NULL</td><td>'agent' | 'client'</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>clientStaffId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → PersonalCliente</td><td>Personal cliente asignado</td></tr>
+      <tr><td class="col-name">priority</td><td class="col-type">NVarChar(20)</td><td>DEFAULT 'media'</td><td>baja | media | alta | crítica</td></tr>
+      <tr><td class="col-name">status</td><td class="col-type">NVarChar(30)</td><td>DEFAULT 'pendiente'</td><td>pendiente | en_progreso | completado | bloqueado</td></tr>
+      <tr><td class="col-name">plannedStartDate / plannedEndDate</td><td class="col-type">Date</td><td class="opt">NULL</td><td>Fechas planificadas</td></tr>
+      <tr><td class="col-name">actualStartDate / actualEndDate</td><td class="col-type">Date</td><td class="opt">NULL</td><td>Fechas reales de ejecución</td></tr>
+      <tr><td class="col-name">executionDate</td><td class="col-type">Date</td><td class="opt">NULL</td><td>Fecha ejecución efectiva</td></tr>
+      <tr><td class="col-name">calculatedDays</td><td class="col-type">Int</td><td>DEFAULT 0</td><td>Días calculados</td></tr>
+      <tr><td class="col-name">plannedHours / actualHours</td><td class="col-type">Decimal(6,2)</td><td>DEFAULT 0</td><td>Horas planificadas y reales</td></tr>
+      <tr><td class="col-name">progressPercent</td><td class="col-type">Decimal(5,2)</td><td>DEFAULT 0</td><td>Avance 0–100</td></tr>
+      <tr><td class="col-name">blockedBy</td><td class="col-type">NVarChar(20)</td><td class="opt">NULL</td><td>'client' | 'internal' | 'external'</td></tr>
+      <tr><td class="col-name">blockedNote / blockedSince</td><td class="col-type">NVarChar(Max) / DateTime2</td><td class="opt">NULL</td><td>Detalle del bloqueo</td></tr>
+      <tr><td class="col-name">clientDelayDays</td><td class="col-type">Int</td><td>DEFAULT 0</td><td>Días de retraso atribuidos al cliente</td></tr>
+      <tr><td class="col-name">order</td><td class="col-type">Int</td><td>DEFAULT 0</td><td>Orden en la fase</td></tr>
+      <tr><td class="col-name">createdAt / updatedAt</td><td class="col-type">DateTime2</td><td>NOT NULL</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header"><span class="badge badge-orange">Tablas</span> <strong>SubActividades · HilosActividad · ActivityBlockLogs · DependenciasActividad</strong></div>
+    <table class="db-table">
+      <tr><th>Tabla</th><th>PK</th><th>FK principal</th><th>Descripción</th></tr>
+      <tr><td class="col-name">SubActividades</td><td class="col-type">id (UUID)</td><td>activityId → Actividades (Cascade)</td><td>Sub-tareas con estado, fechas y porcentaje</td></tr>
+      <tr><td class="col-name">HilosActividad</td><td class="col-type">id (UUID)</td><td>activityId → Actividades (Cascade), authorId → Usuarios</td><td>Comentarios y cambios de estado por actividad</td></tr>
+      <tr><td class="col-name">ActivityBlockLogs</td><td class="col-type">id (UUID)</td><td>activityId → Actividades (Cascade)</td><td>Historial de bloqueos: quién, cuándo, días bloqueado</td></tr>
+      <tr><td class="col-name">DependenciasActividad</td><td class="col-type">(activityId, dependsOnActivityId)</td><td>Ambas → Actividades</td><td>Dependencias entre actividades (grafo DAG)</td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 8: VISITAS Y CAPACITACIONES -->
+  <h2 id="db-visitas">Sección 8 — Visitas y Capacitaciones</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tablas</span> <strong>Visitas · ActividadesVisita · Capacitaciones · ParticipantesCapacitacion</strong></div>
+    <table class="db-table">
+      <tr><th>Tabla</th><th>PK</th><th>FK principal</th><th>Campos clave</th></tr>
+      <tr><td class="col-name">Visitas</td><td class="col-type">id (UUID)</td><td>projectId → Proyectos, createdById → Usuarios</td><td>visitType, visitDate, startTime, endTime, location, status</td></tr>
+      <tr><td class="col-name">ActividadesVisita</td><td class="col-type">(visitId, activityId)</td><td>visitId → Visitas (Cascade), activityId → Actividades</td><td>Tabla pivot M:N</td></tr>
+      <tr><td class="col-name">Capacitaciones</td><td class="col-type">id (UUID)</td><td>projectId → Proyectos, moduleId → ModulosProyecto, trainerId → Usuarios</td><td>topic, trainingDate, durationHours, location, status</td></tr>
+      <tr><td class="col-name">ParticipantesCapacitacion</td><td class="col-type">id (UUID)</td><td>trainingId → Capacitaciones (Cascade), staffId → PersonalCliente, userId → Usuarios</td><td>attendedAt — staff o usuario interno</td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 9: DOCUMENTOS -->
+  <h2 id="db-documentos">Sección 9 — Documentos, Firmas y Evidencias</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tablas</span> <strong>Documentos · Firmas · Evidencias · Riesgos · Novedades</strong></div>
+    <table class="db-table">
+      <tr><th>Tabla</th><th>PK</th><th>FK principal</th><th>Campos clave</th></tr>
+      <tr><td class="col-name">Documentos</td><td class="col-type">id (UUID)</td><td>projectId → Proyectos, generatedById → Usuarios</td><td>documentType, title, filePath, status (borrador|finalizado)</td></tr>
+      <tr><td class="col-name">Firmas</td><td class="col-type">id (UUID)</td><td>documentId → Documentos (Cascade), userId → Usuarios, staffId → PersonalCliente</td><td>signerType ('agent'|'client_staff'), signatureFile, signedAt</td></tr>
+      <tr><td class="col-name">Evidencias</td><td class="col-type">id (UUID)</td><td>uploadedById → Usuarios</td><td>entityType + entityId (polimórfico). fileName, filePath, fileSizeKb</td></tr>
+      <tr><td class="col-name">Riesgos</td><td class="col-type">id (UUID)</td><td>projectId → Proyectos</td><td>entityType (polimórfico), level, probability, impact, mitigation, status</td></tr>
+      <tr><td class="col-name">Novedades</td><td class="col-type">id (UUID)</td><td>projectId → Proyectos, reportedById → Usuarios</td><td>noveltyType, affectsSchedule, daysImpact, status</td></tr>
+      <tr><td class="col-name">LeccionesAprendidas</td><td class="col-type">id (UUID)</td><td>projectId → Proyectos, createdById → Usuarios</td><td>whatWentWell, whatWentWrong, recommendations, aiAnalysis</td></tr>
+      <tr><td class="col-name">EntregasSoporte</td><td class="col-type">id (UUID) UNIQUE</td><td>projectId → Proyectos (1:1), createdById → Usuarios</td><td>checklists de infraestructura, capacitación, documentación, emisión</td></tr>
+      <tr><td class="col-name">InformesProgramados</td><td class="col-type">id (UUID)</td><td>projectId → Proyectos, createdById → Usuarios</td><td>reportType, frequency, cronExpr, formats, recipients</td></tr>
+      <tr><td class="col-name">PlantillasCorreo</td><td class="col-type">id (UUID)</td><td>companyId → Empresas</td><td>UNIQUE(companyId, slug). subject, bodyHtml, variables (JSON)</td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 10: ACTAS -->
+  <h2 id="db-actas">Sección 10 — Actas</h2>
+
+  <div class="info-box">Las actas son documentos estructurados de tipo: <code>inicio</code>, <code>visita</code>, <code>capacitacion</code>, <code>cierre</code>, <code>entrega_soporte</code>. Cada tipo usa campos específicos del modelo polimórfico <strong>Actas</strong>.</div>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>Actas</strong></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td>INDEX en projectId</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>projectId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Proyectos</td><td></td></tr>
+      <tr><td class="col-name">type</td><td class="col-type">NVarChar(30)</td><td>NOT NULL</td><td>inicio | visita | capacitacion | cierre | entrega_soporte</td></tr>
+      <tr><td class="col-name">numero / fecha / ciudad</td><td class="col-type">NVarChar / Date / NVarChar</td><td>NULL / NOT NULL / NULL</td><td>Numeración, fecha y lugar</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>municipioId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → Municipios</td><td></td></tr>
+      <tr><td class="col-name">asunto / objetivoGeneral / alcance</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>Campos tipo "inicio"</td></tr>
+      <tr><td class="col-name">actividadesRealizadas / cuerpo</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>Campos tipo "visita" / "cierre"</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>moduloId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → ModulosProyecto</td><td>Para actas de capacitación</td></tr>
+      <tr><td class="col-name">expositor / temasCapacitacion</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>Campos tipo "capacitacion"</td></tr>
+      <tr><td class="col-name">modulosChecklist / infraestructuraChecklist</td><td class="col-type">NVarChar(Max)</td><td class="opt">NULL</td><td>JSON checklists para entrega soporte</td></tr>
+      <tr><td class="col-name">status</td><td class="col-type">NVarChar(20)</td><td>DEFAULT 'borrador'</td><td>borrador | firmado | anulado</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>createdById</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Usuarios</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header"><span class="badge badge-orange">Tablas hijo de Actas</span> (todas con Cascade delete en actaId)</div>
+    <table class="db-table">
+      <tr><th>Tabla</th><th>PK</th><th>Campos principales</th></tr>
+      <tr><td class="col-name">ActaFirmantes</td><td class="col-type">id (UUID)</td><td>nombre, cargo, empresa, email, signatureData (Base64), signedAt, comprendio</td></tr>
+      <tr><td class="col-name">ActaFechasVisita</td><td class="col-type">id (UUID)</td><td>fecha, horaInicio, horaFin</td></tr>
+      <tr><td class="col-name">ActaCompromisos</td><td class="col-type">id (UUID)</td><td>compromiso, estado, fechaLimite. FK: assignedToId→Usuarios, clientStaffId→PersonalCliente, moduleId, phaseId</td></tr>
+      <tr><td class="col-name">ActaParticipantes</td><td class="col-type">id (UUID)</td><td>nombre, cargo, documento, horaEntrada, horaSalida, comprendio</td></tr>
+      <tr><td class="col-name">ActaAcciones</td><td class="col-type">id (UUID)</td><td>accion, responsable, fechaLimite</td></tr>
+      <tr><td class="col-name">ActaContactos</td><td class="col-type">id (UUID)</td><td>nombre, telefono, area</td></tr>
+      <tr><td class="col-name">ActasActividades</td><td class="col-type">id (UUID)</td><td>UNIQUE(actaId, activityId). FK: activityId→Actividades, assignedToId→Usuarios, clientStaffId→PersonalCliente</td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 11: REQUERIMIENTOS -->
+  <h2 id="db-reqs">Sección 11 — Requerimientos</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>Requerimientos</strong></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>companyId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Empresas</td><td></td></tr>
+      <tr><td class="col-name"><span class="uk">UQ</span>numero</td><td class="col-type">NVarChar(20)</td><td>UNIQUE(companyId, numero)</td><td>Número correlativo</td></tr>
+      <tr><td class="col-name">titulo / tipo / prioridad</td><td class="col-type">NVarChar</td><td>NOT NULL</td><td>tipo: Funcional|No Funcional|Mejora. prioridad: Alta|Media|Baja|Crítica</td></tr>
+      <tr><td class="col-name">descripcion / criteriosAceptacion</td><td class="col-type">NVarChar(Max)</td><td>NOT NULL / NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>templateModuleId / templatePhaseId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → plantillas</td><td>Ubicación en plantilla</td></tr>
+      <tr><td class="col-name">area</td><td class="col-type">NVarChar(50)</td><td>NOT NULL</td><td>Módulo/área del sistema</td></tr>
+      <tr><td class="col-name">ticketRubi</td><td class="col-type">NVarChar(100)</td><td class="opt">NULL</td><td>Ticket externo de desarrollo</td></tr>
+      <tr><td class="col-name">estadoActual</td><td class="col-type">NVarChar(30)</td><td>DEFAULT 'Elaborado'</td><td>Elaborado|En Análisis|Aprobado|En Desarrollo|QA|Devuelto|Entregado</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>clientId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Clientes</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>serviceOrderId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL → OrdenesServicio</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>agenteId / createdById</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Usuarios</td><td>Agente responsable y creador</td></tr>
+      <tr><td class="col-name">activityId</td><td class="col-type">UniqueIdentifier</td><td class="opt">NULL</td><td>Actividad de implementación (sin FK Prisma)</td></tr>
+      <tr><td class="col-name">devueltoPor / devueltoNota</td><td class="col-type">NVarChar</td><td class="opt">NULL</td><td>Quién devolvió y por qué</td></tr>
+    </table>
+  </div>
+
+  <div class="section-box" style="margin-top:12px">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>RequerimientoGestiones</strong></div>
+    <table class="db-table">
+      <tr><th>Columna</th><th>Tipo SQL</th><th>Restricciones</th><th>Descripción</th></tr>
+      <tr><td class="col-name"><span class="pk">PK</span>id</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL</td><td></td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>requerimientoId</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Requerimientos (Cascade)</td><td></td></tr>
+      <tr><td class="col-name">fecha</td><td class="col-type">Date</td><td>NOT NULL</td><td>Fecha del cambio de estado</td></tr>
+      <tr><td class="col-name">estado</td><td class="col-type">NVarChar(30)</td><td>NOT NULL</td><td>Estado nuevo registrado</td></tr>
+      <tr><td class="col-name">observacion</td><td class="col-type">NVarChar(Max)</td><td>NOT NULL</td><td>Nota de la gestión</td></tr>
+      <tr><td class="col-name"><span class="fk">FK</span>changedById</td><td class="col-type">UniqueIdentifier</td><td>NOT NULL → Usuarios</td><td></td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 12: OTROS -->
+  <h2 id="db-otros">Sección 12 — Archivos, Notificaciones, Auditoría y Cronograma</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tablas</span> <strong>TiposDocumento · ArchivosRepositorio · Notificaciones · RegistroAuditoria · CronogramaBloques</strong></div>
+    <table class="db-table">
+      <tr><th>Tabla</th><th>PK</th><th>FK principal</th><th>Campos clave</th></tr>
+      <tr><td class="col-name">TiposDocumento</td><td class="col-type">id (UUID)</td><td>companyId → Empresas</td><td>UNIQUE(companyId, nombre). color, scope ('interno'|'cliente'|'ambos'), orden</td></tr>
+      <tr><td class="col-name">ArchivosRepositorio</td><td class="col-type">id (UUID)</td><td>companyId, tipoDocumentoId → TiposDocumento, clientId → Clientes, serviceOrderId → OrdenesServicio, subidoPorId → Usuarios</td><td>nombre, mimeType, tamanioBytes, ruta, esInterno</td></tr>
+      <tr><td class="col-name">Notificaciones</td><td class="col-type">id (UUID)</td><td>userId → Usuarios (Cascade)</td><td>type, title, message, entityType, entityId, isRead, readAt</td></tr>
+      <tr><td class="col-name">RegistroAuditoria</td><td class="col-type">id (INT autoincrement)</td><td>companyId → Empresas (NULL), userId → Usuarios (NULL)</td><td>entityType, entityId, action, oldValues/newValues (JSON), ipAddress, userAgent</td></tr>
+      <tr><td class="col-name">CronogramaBloques</td><td class="col-type">id (UUID)</td><td>companyId, agenteId → Usuarios, clientId → Clientes, serviceOrderId → OrdenesServicio, createdById → Usuarios</td><td>titulo, fecha, horaInicio, horaFin, color, status, tipoActa, actaId</td></tr>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 13: COMERCIAL -->
+  <h2 id="db-comercial">Sección 13 — Comercial (Cotizaciones)</h2>
+
+  <div class="section-box">
+    <div class="section-box-header"><span class="badge badge-orange">Tabla</span> <strong>Cotizaciones · CotizacionItems</strong></div>
+    <table class="db-table">
+      <tr><th>Tabla</th><th>PK</th><th>FK principal</th><th>Campos clave</th></tr>
+      <tr><td class="col-name">Cotizaciones</td><td class="col-type">id (UUID)</td><td>companyId → Empresas, clientId → Clientes (NULL), createdById → Usuarios</td><td>UNIQUE(companyId, numero). titulo, prospecto, contacto, valor (Decimal 18,2), status, validHasta</td></tr>
+      <tr><td class="col-name">CotizacionItems</td><td class="col-type">id (UUID)</td><td>cotizacionId → Cotizaciones (Cascade)</td><td>descripcion, cantidad (Decimal 10,2), valorUnitario (Decimal 18,2), descuento (Decimal 5,2)</td></tr>
+    </table>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       MAPA DE RELACIONES
+  ══════════════════════════════════════════ -->
+  <h2 id="db-relaciones">Mapa de Relaciones</h2>
+  <p>Resumen de todas las relaciones entre entidades principales, tipo y comportamiento de cascada.</p>
+
+  <div class="rel-block">
+    <div class="rel-title">Núcleo Multi-tenant (Empresas como raíz)</div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Empresas</span> 1:N <span class="rel-to">Usuarios, Clientes, RolesSistema, OrdenesServicio, Requerimientos, CronogramaBloques, Cotizaciones, TiposDocumento, Municipios, FlujoPlantillas, ModulosPlantilla, RiesgosPlantilla, PlantillasCorreo, ConfiguracionSistema, ArchivosRepositorio, RegistroAuditoria</span><span class="rel-type">NoAction (mayoría)</span></div></div>
+  </div>
+
+  <div class="rel-block">
+    <div class="rel-title">Jerarquía de Proyecto</div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">OrdenesServicio</span> 1:1 <span class="rel-to">Proyectos</span><span class="rel-type">Unique serviceOrderId</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Proyectos</span> 1:N <span class="rel-to">ModulosProyecto</span><span class="rel-type">Cascade delete</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">ModulosProyecto</span> 1:N <span class="rel-to">Fases</span><span class="rel-type">Cascade delete</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Fases</span> 1:N <span class="rel-to">Actividades</span><span class="rel-type">NoAction</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Actividades</span> 1:N <span class="rel-to">SubActividades, HilosActividad, ActivityBlockLogs</span><span class="rel-type">Cascade delete</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Actividades</span> M:N <span class="rel-to">Actividades</span><span class="rel-type">DependenciasActividad (tabla pivot, PK compuesta)</span></div></div>
+  </div>
+
+  <div class="rel-block">
+    <div class="rel-title">Jerarquía de Plantillas</div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">FlujoPlantillas</span> 1:N <span class="rel-to">ModulosPlantilla</span><span class="rel-type">Cascade delete</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">ModulosPlantilla</span> 1:N <span class="rel-to">FasesPlantilla</span><span class="rel-type">Cascade delete</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">FasesPlantilla</span> 1:N <span class="rel-to">ActividadesPlantilla</span><span class="rel-type">Cascade delete</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">ActividadesPlantilla</span> 1:N <span class="rel-to">SubActividadesPlantilla</span><span class="rel-type">Cascade delete</span></div></div>
+  </div>
+
+  <div class="rel-block">
+    <div class="rel-title">Clientes</div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Clientes</span> 1:N <span class="rel-to">PersonalCliente</span><span class="rel-type">Cascade delete</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Clientes</span> 1:N <span class="rel-to">Usuarios</span><span class="rel-type">(userType='client')</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Clientes</span> 1:N <span class="rel-to">OrdenesServicio, Requerimientos, CronogramaBloques, Cotizaciones, ArchivosRepositorio</span></div></div>
+  </div>
+
+  <div class="rel-block">
+    <div class="rel-title">Actas (relaciones hijo, todas Cascade)</div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Actas</span> 1:N <span class="rel-to">ActaFirmantes, ActaFechasVisita, ActaCompromisos, ActaParticipantes, ActaAcciones, ActaContactos, ActasActividades</span><span class="rel-type">Cascade delete en actaId</span></div></div>
+  </div>
+
+  <div class="rel-block">
+    <div class="rel-title">Relaciones Polimórficas (sin FK Prisma, usando entityType + entityId)</div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Evidencias</span> → entityType ('activity'|'visit'|'training'|'project') + entityId (UUID string)<span class="rel-type">Sin FK directa; join manual en app</span></div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">Riesgos</span> → entityType ('project'|'activity'|'visit') + entityId<span class="rel-type">Sin FK directa</span></div></div>
+  </div>
+
+  <div class="rel-block">
+    <div class="rel-title">Tablas Pivot M:N</div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">ImplementadoresOS</span> PK(serviceOrderId, userId) — Usuarios M:N OrdenesServicio</div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">ActividadesVisita</span> PK(visitId, activityId) — Visitas M:N Actividades</div></div>
+    <div class="rel-item"><span class="rel-arrow">→</span><div><span class="rel-from">DependenciasActividad</span> PK(activityId, dependsOnActivityId) — Actividades M:N Actividades (self-join)</div></div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="margin-top:64px;padding-top:24px;border-top:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:13px;font-weight:700;color:var(--t1)">AURA ERP — Documentación Técnica</div>
+      <div style="font-size:11px;color:var(--t4);margin-top:2px">SQL Server 2016 · Prisma 5.22 · NestJS 11 · Next.js 14 · 47 tablas</div>
+    </div>
+    <div style="font-size:11px;color:var(--t4)">Generado: Junio 2026</div>
+  </div>
+
+</main>
+
+<script>
+  // Highlight active sidebar link on scroll
+  const sections = document.querySelectorAll('h2[id]');
+  const links = document.querySelectorAll('nav#sidebar a');
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = document.querySelector(`nav#sidebar a[href="#${e.target.id}"]`);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+  sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

@@ -21,7 +21,7 @@ type ActaType = 'inicio' | 'visita' | 'cierre' | 'capacitacion' | 'entrega_sopor
 interface Firmante  { id?: string; nombre: string; cargo: string; empresa: string; email?: string; telefono?: string; documento?: string; fecha: string; orden: number; signatureData?: string; signedAt?: string; signerType?: string; }
 interface FechaV    { fecha: string; horaInicio: string; horaFin: string; }
 interface Compromiso{ numero: number; compromiso: string; responsable: string; estado: string; assignedToId?: string; clientStaffId?: string; moduleId?: string; phaseId?: string; activityId?: string; fechaLimite?: string; diasVigencia?: number; responsablePrincipal?: string; }
-interface Participante { numero: number; nombre: string; cargo?: string; documento?: string; }
+interface Participante { numero: number; nombre: string; cargo?: string; documento?: string; email?: string; }
 interface Accion    { accion: string; responsable: string; fechaLimite: string; }
 interface Contacto  { nombre: string; telefono: string; area: string; }
 interface CheckItem { label: string; checked: boolean; obs: string; medio?: string; }
@@ -1253,7 +1253,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
   const [participantes, setParticipantes] = useState<Participante[]>(
     acta?.participantes?.map((p: any) => ({
       numero: p.numero ?? 1, nombre: p.nombre, cargo: p.cargo ?? '',
-      documento: p.documento ?? '',
+      documento: p.documento ?? '', email: p.email ?? '',
     })) ?? []
   );
   const [acciones, setAcciones]           = useState<Accion[]>(
@@ -1336,7 +1336,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
         })),
         participantes: participantes.map((p, i) => ({
           numero: i + 1, nombre: p.nombre, cargo: p.cargo || undefined,
-          documento: p.documento || undefined,
+          documento: p.documento || undefined, email: p.email || undefined,
         })),
         acciones: acciones.map(a => ({ ...a, fechaLimite: a.fechaLimite || undefined })),
         contactos,
@@ -1677,7 +1677,8 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                         setParticipantes(prev => [
                           ...prev,
                           { numero: prev.length + 1, nombre: `${s.firstName} ${s.lastName}`,
-                            cargo: s.jobTitle ?? '', documento: s.document ?? '' },
+                            cargo: s.jobTitle ?? '', documento: s.document ?? '',
+                            email: s.email ?? '' },
                         ]);
                       }}
                       className="text-xs px-2 py-1.5 rounded-lg outline-none"
@@ -1704,11 +1705,11 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                 <p className="text-xs text-center py-3" style={{ color: tc.m }}>Sin registros</p>
               ) : (
                 <div className="overflow-x-auto">
-                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)', minWidth: '380px' }}>
+                <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-subtle)', minWidth: '520px' }}>
                   <table className="w-full text-xs">
                     <thead>
                       <tr style={{ background: 'var(--surface-2)' }}>
-                        {['Nombre', 'Cargo', 'Documento', ''].map(h => (
+                        {['Nombre', 'Cargo', 'Documento', 'Correo', ''].map(h => (
                           <th key={h} className="px-2 py-2 text-left font-medium" style={{ color: tc.m }}>{h}</th>
                         ))}
                       </tr>
@@ -1716,13 +1717,15 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                     <tbody>
                       {participantes.map((p, i) => (
                         <tr key={i} className="border-t" style={{ borderColor: 'var(--border-subtle)' }}>
-                          {(['nombre', 'cargo', 'documento'] as const).map(k => (
+                          {(['nombre', 'cargo', 'documento', 'email'] as const).map(k => (
                             <td key={k} className="px-2 py-1">
                               <input
+                                type={k === 'email' ? 'email' : 'text'}
                                 value={(p as any)[k] ?? ''}
                                 onChange={e => setParticipantes(prev => prev.map((r, j) => j === i ? { ...r, [k]: e.target.value } : r))}
+                                placeholder={k === 'email' ? 'correo@empresa.com' : undefined}
                                 className="w-full bg-transparent outline-none text-xs"
-                                style={{ color: tc.s, minWidth: 60 }}
+                                style={{ color: tc.s, minWidth: k === 'email' ? 140 : 60 }}
                               />
                             </td>
                           ))}
@@ -1738,9 +1741,9 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                 </div>
                 </div>
               )}
-              {participantes.some(p => p.documento) && (
+              {participantes.some(p => p.documento || p.email) && (
                 <p className="text-[10px] mt-1.5" style={{ color: 'rgba(96,165,250,0.7)' }}>
-                  ℹ Los participantes con documento podrán firmar desde "Buscar documentos para firmar"
+                  ℹ Con documento: pueden firmar en "Buscar documentos para firmar". Con correo: recibirán enlace de firma por email.
                 </p>
               )}
             </div>

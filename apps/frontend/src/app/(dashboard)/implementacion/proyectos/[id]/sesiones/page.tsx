@@ -5,10 +5,10 @@ import Link from 'next/link';
 import {
   Plus, ArrowLeft, Calendar, MapPin, Monitor, BookOpen, Loader2,
   Trash2, ChevronDown, ChevronUp, Copy, Send, FileText, RefreshCw,
-  UserPlus, X, CheckSquare, Square,
+  UserPlus, X, CheckSquare, Square, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { sesionesApi, projectsApi, clientsApi, companyApi, type CreateSesionPayload, type SesionInvitadoPayload } from '@/lib/api';
+import { sesionesApi, projectsApi, clientsApi, companyApi, usersApi, type CreateSesionPayload, type SesionInvitadoPayload } from '@/lib/api';
 
 // ── tipos ─────────────────────────────────────────────────────────────────────
 
@@ -472,18 +472,40 @@ function NuevaSesionModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [titulo,    setTitulo]    = useState('');
-  const [fecha,     setFecha]     = useState('');
-  const [lugar,     setLugar]     = useState('');
-  const [teamsLink, setTeamsLink] = useState('');
-  const [expositor, setExpositor] = useState('');
-  const [temas,     setTemas]     = useState('');
-  const [moduloId,  setModuloId]  = useState('');
-  const [selected,  setSelected]  = useState<Set<string>>(new Set());
-  const [saving,    setSaving]    = useState(false);
+  const [titulo,      setTitulo]      = useState('');
+  const [fecha,       setFecha]       = useState('');
+  const [lugar,       setLugar]       = useState('');
+  const [teamsLink,   setTeamsLink]   = useState('');
+  const [expositorId, setExpositorId] = useState('');
+  const [temas,       setTemas]       = useState('');
+  const [moduloId,    setModuloId]    = useState('');
+  const [selected,    setSelected]    = useState<Set<string>>(new Set());
+  const [saving,      setSaving]      = useState(false);
+  const [agents,      setAgents]      = useState<Array<{ id: string; firstName: string; lastName: string }>>([]);
+  const [staffSearch, setStaffSearch] = useState('');
+  const [cargoFilter, setCargoFilter] = useState('');
 
-  const staffConEmail = staff.filter(s => s.email);
-  const allSelected   = staffConEmail.length > 0 && staffConEmail.every(s => selected.has(s.id));
+  useEffect(() => {
+    usersApi.listAgents({ limit: 200 })
+      .then(r => setAgents(r.data ?? []))
+      .catch(() => {});
+  }, []);
+
+  // Cargos únicos del personal
+  const cargosUnicos = Array.from(new Set(staff.map(s => s.jobTitle).filter(Boolean))) as string[];
+
+  // Staff filtrado por búsqueda y cargo
+  const staffFiltrado = staff.filter(s => {
+    const nombre = `${s.firstName} ${s.lastName}`.toLowerCase();
+    const matchSearch = !staffSearch || nombre.includes(staffSearch.toLowerCase());
+    const matchCargo  = !cargoFilter || s.jobTitle === cargoFilter;
+    return matchSearch && matchCargo;
+  });
+
+  const staffConEmailFiltrado = staffFiltrado.filter(s => s.email);
+  const staffConEmail         = staff.filter(s => s.email);
+  const allSelected           = staffConEmail.length > 0 && staffConEmail.every(s => selected.has(s.id));
+  const allVisibleSelected    = staffConEmailFiltrado.length > 0 && staffConEmailFiltrado.every(s => selected.has(s.id));
 
   const toggleAll = () => {
     if (allSelected) {
@@ -491,6 +513,18 @@ function NuevaSesionModal({
     } else {
       setSelected(new Set(staffConEmail.map(s => s.id)));
     }
+  };
+
+  const toggleVisible = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        staffConEmailFiltrado.forEach(s => next.delete(s.id));
+      } else {
+        staffConEmailFiltrado.forEach(s => next.add(s.id));
+      }
+      return next;
+    });
   };
 
   const toggle = (id: string) => setSelected(prev => {
@@ -503,17 +537,19 @@ function NuevaSesionModal({
     if (!titulo.trim() || !fecha) { toast.error('Título y fecha son obligatorios'); return; }
     setSaving(true);
     try {
+      const agente      = agents.find(a => a.id === expositorId);
+      const expositorNm = agente ? `${agente.firstName} ${agente.lastName}` : undefined;
       const invitados: SesionInvitadoPayload[] = staff
         .filter(s => selected.has(s.id) && s.email)
         .map(s => ({ nombre: `${s.firstName} ${s.lastName}`, email: s.email!, cargo: s.jobTitle ?? undefined, clientStaffId: s.id }));
 
       await sesionesApi.create({
         projectId, companyId, titulo: titulo.trim(),
-        fecha: new Date(fecha).toISOString(),
-        moduloId:  moduloId  || undefined,
-        expositor: expositor.trim() || undefined,
-        temas:     temas.trim()     || undefined,
-        lugar:     lugar.trim()     || undefined,
+        fecha:     new Date(fecha).toISOString(),
+        moduloId:  moduloId      || undefined,
+        expositor: expositorNm   || undefined,
+        temas:     temas.trim()  || undefined,
+        lugar:     lugar.trim()  || undefined,
         teamsLink: teamsLink.trim() || undefined,
         invitados: invitados.length ? invitados : undefined,
       });
@@ -526,15 +562,30 @@ function NuevaSesionModal({
     }
   };
 
-  // Estilo para inputs del modal
-  const mInput = {
+  // Estilos para selects nativos con soporte dark/light
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    borderRadius: '0.5rem',
+    padding: '0.625rem 2rem 0.625rem 0.75rem',
+    fontSize: '0.875rem',
+    width: '100%',
+    outline: 'none',
+    cursor: 'pointer',
+    appearance: 'none',
+    WebkitAppearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 0.75rem center',
+  };
+
+  const mInput: React.CSSProperties = {
     ...inputStyle,
     borderRadius: '0.5rem',
     padding: '0.625rem 0.75rem',
     fontSize: '0.875rem',
     width: '100%',
     outline: 'none',
-  } as React.CSSProperties;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -542,7 +593,7 @@ function NuevaSesionModal({
       <div className="w-full sm:max-w-2xl max-h-screen sm:max-h-[90vh] flex flex-col rounded-none sm:rounded-2xl overflow-hidden"
         style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: 'var(--card-shadow)' }}>
 
-        {/* Header sticky */}
+        {/* Header */}
         <div className="flex items-center justify-between p-5 shrink-0"
           style={{ borderBottom: '1px solid var(--border-subtle)' }}>
           <h2 className="text-lg font-bold" style={primaryText}>Nueva sesión de capacitación</h2>
@@ -554,11 +605,11 @@ function NuevaSesionModal({
           </button>
         </div>
 
-        {/* Cuerpo scrollable */}
+        {/* Cuerpo */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
 
           <div>
-            <label className="block text-xs mb-1.5" style={mutedText}>Título de la capacitación *</label>
+            <label className="block text-xs mb-1.5" style={mutedText}>Título *</label>
             <input value={titulo} onChange={e => setTitulo(e.target.value)}
               placeholder="Ej: Capacitación módulo facturación" style={mInput} />
           </div>
@@ -567,15 +618,16 @@ function NuevaSesionModal({
             <div>
               <label className="block text-xs mb-1.5" style={mutedText}>Fecha y hora *</label>
               <input type="datetime-local" value={fecha} onChange={e => setFecha(e.target.value)}
-                style={{ ...mInput, colorScheme: 'auto' }} />
+                style={{ ...mInput, colorScheme: 'dark light' }} />
             </div>
             <div>
               <label className="block text-xs mb-1.5" style={mutedText}>Módulo</label>
-              <select value={moduloId} onChange={e => setModuloId(e.target.value)}
-                style={{ ...mInput, cursor: 'pointer' }}>
-                <option value="">— Sin módulo —</option>
-                {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+              <div className="relative">
+                <select value={moduloId} onChange={e => setModuloId(e.target.value)} style={selectStyle}>
+                  <option value="">— Sin módulo —</option>
+                  {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -583,12 +635,18 @@ function NuevaSesionModal({
             <div>
               <label className="block text-xs mb-1.5" style={mutedText}>Lugar</label>
               <input value={lugar} onChange={e => setLugar(e.target.value)}
-                placeholder="Ej: Sala de reuniones / Virtual" style={mInput} />
+                placeholder="Sala de reuniones / Virtual" style={mInput} />
             </div>
             <div>
               <label className="block text-xs mb-1.5" style={mutedText}>Expositor</label>
-              <input value={expositor} onChange={e => setExpositor(e.target.value)}
-                placeholder="Nombre del expositor" style={mInput} />
+              <div className="relative">
+                <select value={expositorId} onChange={e => setExpositorId(e.target.value)} style={selectStyle}>
+                  <option value="">— Sin expositor —</option>
+                  {agents.map(a => (
+                    <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -611,34 +669,76 @@ function NuevaSesionModal({
           {/* Selección de invitados */}
           {staff.length > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs uppercase tracking-wider" style={mutedText}>
+              {/* Encabezado + seleccionar todo */}
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs uppercase tracking-wider font-medium" style={mutedText}>
                   Invitar funcionarios del cliente
                 </p>
-                {staffConEmail.length > 0 && (
-                  <button onClick={toggleAll}
-                    className="flex items-center gap-1.5 text-xs font-medium transition-colors px-2 py-1 rounded-lg"
-                    style={{ color: allSelected ? 'var(--accent-red)' : 'var(--accent-blue)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    {allSelected
-                      ? <><Square className="w-3.5 h-3.5" /> Deseleccionar todo</>
-                      : <><CheckSquare className="w-3.5 h-3.5" /> Seleccionar todo</>}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {staffConEmailFiltrado.length > 0 && staffConEmailFiltrado.length < staffConEmail.length && (
+                    <button onClick={toggleVisible}
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
+                      style={{ color: 'var(--accent-blue)' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      {allVisibleSelected
+                        ? <><Square className="w-3 h-3" /> Quitar visibles</>
+                        : <><CheckSquare className="w-3 h-3" /> Sel. visibles</>}
+                    </button>
+                  )}
+                  {staffConEmail.length > 0 && (
+                    <button onClick={toggleAll}
+                      className="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-lg transition-colors"
+                      style={{ color: allSelected ? 'var(--accent-red)' : 'var(--accent-green)' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      {allSelected
+                        ? <><Square className="w-3.5 h-3.5" /> Deseleccionar todo</>
+                        : <><CheckSquare className="w-3.5 h-3.5" /> Seleccionar todo</>}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-1 max-h-52 overflow-y-auto rounded-lg p-1"
+              {/* Filtros */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={mutedText} />
+                  <input
+                    value={staffSearch}
+                    onChange={e => setStaffSearch(e.target.value)}
+                    placeholder="Buscar por nombre..."
+                    style={{ ...mInput, paddingLeft: '2rem', fontSize: '0.8rem' }}
+                  />
+                </div>
+                <div className="relative">
+                  <select
+                    value={cargoFilter}
+                    onChange={e => setCargoFilter(e.target.value)}
+                    style={{ ...selectStyle, fontSize: '0.8rem', padding: '0.55rem 2rem 0.55rem 0.75rem' }}>
+                    <option value="">Todos los cargos</option>
+                    {cargosUnicos.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Lista filtrada */}
+              <div className="space-y-0.5 max-h-52 overflow-y-auto rounded-lg p-1"
                 style={{ background: 'var(--surface-2)' }}>
-                {staff.map(s => (
+                {staffFiltrado.length === 0 ? (
+                  <p className="text-xs text-center py-4" style={mutedText}>Sin resultados</p>
+                ) : staffFiltrado.map(s => (
                   <label key={s.id}
                     className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors"
-                    style={{ opacity: s.email ? 1 : 0.5 }}
+                    style={{ opacity: s.email ? 1 : 0.45 }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-hover)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <input type="checkbox" checked={selected.has(s.id)} onChange={() => s.email && toggle(s.id)}
+                    <input type="checkbox"
+                      checked={selected.has(s.id)}
+                      onChange={() => s.email && toggle(s.id)}
                       disabled={!s.email}
-                      className="w-4 h-4 rounded" style={{ accentColor: 'var(--accent-blue)' }} />
+                      className="w-4 h-4 rounded shrink-0"
+                      style={{ accentColor: 'var(--accent-blue)' }} />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium" style={primaryText}>
                         {s.firstName} {s.lastName}
@@ -649,7 +749,7 @@ function NuevaSesionModal({
                     </div>
                     {s.email
                       ? <span className="text-xs truncate max-w-[160px]" style={mutedText}>{s.email}</span>
-                      : <span className="text-xs" style={{ color: 'var(--accent-red)' }}>sin correo</span>
+                      : <span className="text-xs shrink-0" style={{ color: 'var(--accent-red)' }}>sin correo</span>
                     }
                   </label>
                 ))}
@@ -664,9 +764,8 @@ function NuevaSesionModal({
           )}
         </div>
 
-        {/* Footer sticky */}
-        <div className="p-5 shrink-0 flex gap-3"
-          style={{ borderTop: '1px solid var(--border-subtle)' }}>
+        {/* Footer */}
+        <div className="p-5 shrink-0 flex gap-3" style={{ borderTop: '1px solid var(--border-subtle)' }}>
           <button onClick={onClose}
             className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors"
             style={{ border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}

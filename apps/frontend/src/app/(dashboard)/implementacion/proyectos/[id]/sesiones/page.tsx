@@ -3,14 +3,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Plus, ArrowLeft, Calendar, MapPin, Monitor, Users, CheckCircle2, XCircle,
-  Clock, BookOpen, Loader2, Trash2, ChevronDown, ChevronUp, Copy,
-  Send, FileText, RefreshCw, UserPlus, X,
+  Plus, ArrowLeft, Calendar, MapPin, Monitor, BookOpen, Loader2,
+  Trash2, ChevronDown, ChevronUp, Copy, Send, FileText, RefreshCw,
+  UserPlus, X, CheckSquare, Square,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sesionesApi, projectsApi, clientsApi, companyApi, type CreateSesionPayload, type SesionInvitadoPayload } from '@/lib/api';
 
-// ── tipos ────────────────────────────────────────────────────────────────────
+// ── tipos ─────────────────────────────────────────────────────────────────────
 
 interface Invitado {
   id: string;
@@ -45,21 +45,19 @@ interface Staff {
   jobTitle?: string;
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ───────────────────────────────────────────────────────────────────
 
-const ESTADO_COLOR: Record<string, string> = {
-  programada: 'bg-blue-500/20 text-blue-300',
-  en_curso:   'bg-yellow-500/20 text-yellow-300',
-  completada: 'bg-green-500/20 text-green-300',
-  cancelada:  'bg-red-500/20 text-red-300',
+const ESTADO_CFG: Record<string, { label: string; color: string; bg: string }> = {
+  programada: { label: 'Programada', color: 'var(--accent-blue)',   bg: 'var(--accent-blue-bg)' },
+  en_curso:   { label: 'En curso',   color: 'var(--accent-amber)',  bg: 'var(--accent-amber-bg)' },
+  completada: { label: 'Completada', color: 'var(--accent-green)',  bg: 'var(--accent-green-bg)' },
+  cancelada:  { label: 'Cancelada',  color: 'var(--accent-red)',    bg: 'var(--accent-red-bg)' },
 };
-const ESTADO_LABEL: Record<string, string> = {
-  programada: 'Programada', en_curso: 'En curso', completada: 'Completada', cancelada: 'Cancelada',
-};
+
 const RSVP_COLOR: Record<string, string> = {
-  pendiente:  'text-slate-400',
-  confirmado: 'text-green-400',
-  cancelado:  'text-red-400',
+  pendiente:  'var(--text-muted)',
+  confirmado: 'var(--accent-green)',
+  cancelado:  'var(--accent-red)',
 };
 
 function fmtFecha(iso: string) {
@@ -69,11 +67,23 @@ function fmtFecha(iso: string) {
   });
 }
 
-function fmtFechaInput(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+// ── Estilos base reutilizables ────────────────────────────────────────────────
+
+const cardStyle: React.CSSProperties = {
+  background: 'var(--card-bg)',
+  border: '1px solid var(--card-border)',
+  boxShadow: 'var(--card-shadow)',
+};
+
+const inputStyle: React.CSSProperties = {
+  background: 'var(--input-bg)',
+  border: '1px solid var(--input-border)',
+  color: 'var(--input-color)',
+};
+
+const mutedText: React.CSSProperties = { color: 'var(--text-muted)' };
+const secondaryText: React.CSSProperties = { color: 'var(--text-secondary)' };
+const primaryText: React.CSSProperties = { color: 'var(--text-primary)' };
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
@@ -99,7 +109,6 @@ export default function SesionesPage() {
       setSesiones(sesionesList);
       setProject(proj);
       setCompany(comp);
-      // Cargar staff del cliente
       const clientId = proj?.serviceOrder?.client?.id;
       if (clientId) {
         const s = await clientsApi.getStaff(clientId).catch(() => []);
@@ -131,34 +140,39 @@ export default function SesionesPage() {
     }
   };
 
-  const copyLink = (url: string) => {
-    navigator.clipboard.writeText(url).then(() => toast.success('Link copiado'));
-  };
-
   const frontendUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-white p-4 sm:p-6">
+    <div className="min-h-screen p-4 sm:p-6" style={{ background: 'var(--bg-base)' }}>
+
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Link href={`/implementacion/proyectos/${projectId}`}
-          className="p-2 rounded-lg hover:bg-white/5 transition">
-          <ArrowLeft className="w-5 h-5 text-slate-400" />
+          className="p-2 rounded-lg transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+          <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <p className="text-slate-400 text-xs">{project?.name ?? '...'}</p>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-blue-400" /> Sesiones de Capacitación
+          <p className="text-xs" style={mutedText}>{project?.name ?? '...'}</p>
+          <h1 className="text-xl font-bold flex items-center gap-2" style={primaryText}>
+            <BookOpen className="w-5 h-5" style={{ color: 'var(--accent-blue)' }} />
+            Sesiones de Capacitación
           </h1>
         </div>
         <div className="ml-auto flex gap-2">
-          <button onClick={load} className="p-2 rounded-lg hover:bg-white/5 transition text-slate-400">
+          <button onClick={load}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 transition text-sm font-semibold"
-          >
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
+            style={{ background: 'var(--accent-blue)', color: '#fff' }}>
             <Plus className="w-4 h-4" /> Nueva sesión
           </button>
         </div>
@@ -167,37 +181,39 @@ export default function SesionesPage() {
       {/* Lista */}
       {loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-blue)' }} />
         </div>
       ) : sesiones.length === 0 ? (
-        <div className="text-center py-20 text-slate-400">
+        <div className="text-center py-20" style={mutedText}>
           <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p className="font-semibold mb-1">Sin sesiones programadas</p>
+          <p className="font-semibold mb-1" style={primaryText}>Sin sesiones programadas</p>
           <p className="text-sm">Crea la primera sesión para enviar invitaciones al cliente.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {sesiones.map(sesion => {
+            const cfg         = ESTADO_CFG[sesion.estado] ?? ESTADO_CFG.programada;
             const confirmados = sesion.invitados.filter(i => i.respuesta === 'confirmado').length;
             const enSala      = sesion.invitados.filter(i => i.entroSalaAt).length;
             const isExpanded  = expandId === sesion.id;
 
             return (
-              <div key={sesion.id}
-                className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                {/* Cabecera de la tarjeta */}
+              <div key={sesion.id} className="rounded-xl overflow-hidden" style={cardStyle}>
+
+                {/* Cabecera */}
                 <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${ESTADO_COLOR[sesion.estado] ?? 'bg-slate-500/20 text-slate-300'}`}>
-                        {ESTADO_LABEL[sesion.estado] ?? sesion.estado}
+                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
+                        style={{ background: cfg.bg, color: cfg.color }}>
+                        {cfg.label}
                       </span>
                       {sesion.modulo && (
-                        <span className="text-xs text-slate-400">{sesion.modulo.name}</span>
+                        <span className="text-xs" style={mutedText}>{sesion.modulo.name}</span>
                       )}
                     </div>
-                    <h3 className="font-semibold text-base truncate">{sesion.titulo}</h3>
-                    <div className="flex flex-wrap gap-3 mt-1 text-xs text-slate-400">
+                    <h3 className="font-semibold text-base truncate" style={primaryText}>{sesion.titulo}</h3>
+                    <div className="flex flex-wrap gap-3 mt-1 text-xs" style={mutedText}>
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />{fmtFecha(sesion.fecha)}
                       </span>
@@ -211,55 +227,63 @@ export default function SesionesPage() {
 
                   {/* Stats */}
                   <div className="flex items-center gap-4 text-sm shrink-0">
-                    <div className="text-center">
-                      <div className="font-bold text-blue-300">{sesion.invitados.length}</div>
-                      <div className="text-slate-400 text-xs">Invitados</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-bold text-green-300">{confirmados}</div>
-                      <div className="text-slate-400 text-xs">Confirmados</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-bold text-yellow-300">{enSala}</div>
-                      <div className="text-slate-400 text-xs">En sala</div>
-                    </div>
+                    {[
+                      { val: sesion.invitados.length, label: 'Invitados',  color: 'var(--accent-blue)' },
+                      { val: confirmados,              label: 'Confirmados',color: 'var(--accent-green)' },
+                      { val: enSala,                   label: 'En sala',    color: 'var(--accent-amber)' },
+                    ].map(s => (
+                      <div key={s.label} className="text-center">
+                        <div className="font-bold" style={{ color: s.color }}>{s.val}</div>
+                        <div className="text-xs" style={mutedText}>{s.label}</div>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Acciones */}
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {sesion.teamsLink && (
                       <a href={sesion.teamsLink} target="_blank" rel="noreferrer"
-                        className="p-2 rounded-lg hover:bg-white/10 transition text-indigo-400" title="Abrir Teams">
+                        className="p-2 rounded-lg transition-colors"
+                        style={{ color: '#818cf8' }} title="Abrir reunión Teams"
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                         <Monitor className="w-4 h-4" />
                       </a>
                     )}
                     <button
-                      onClick={() => copyLink(`${frontendUrl}/sala/${sesion.salaToken}`)}
-                      className="p-2 rounded-lg hover:bg-white/10 transition text-slate-400" title="Copiar link de sala">
+                      onClick={() => navigator.clipboard.writeText(`${frontendUrl}/sala/${sesion.salaToken}`).then(() => toast.success('Link de sala copiado'))}
+                      className="p-2 rounded-lg transition-colors" style={mutedText} title="Copiar link de sala"
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       <Copy className="w-4 h-4" />
                     </button>
                     {!sesion.actaId && enSala > 0 && (
                       <button
                         onClick={() => handleGenerarActa(sesion.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-300 text-xs font-semibold transition"
-                        title="Generar acta de capacitación">
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                        style={{ background: 'var(--accent-green-bg)', color: 'var(--accent-green)' }}>
                         <FileText className="w-3.5 h-3.5" /> Generar acta
                       </button>
                     )}
                     {sesion.actaId && (
                       <Link href={`/implementacion/proyectos/${projectId}/actas`}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-xs font-semibold transition">
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                        style={{ background: 'var(--accent-violet-bg)', color: 'var(--accent-violet)' }}>
                         <FileText className="w-3.5 h-3.5" /> Ver acta
                       </Link>
                     )}
                     <button
                       onClick={() => handleDelete(sesion.id)}
-                      className="p-2 rounded-lg hover:bg-red-500/10 transition text-slate-400 hover:text-red-400">
+                      className="p-2 rounded-lg transition-colors" style={mutedText}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-red-bg)'; (e.currentTarget as HTMLElement).style.color = 'var(--accent-red)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}>
                       <Trash2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setExpandId(isExpanded ? null : sesion.id)}
-                      className="p-2 rounded-lg hover:bg-white/10 transition text-slate-400">
+                      className="p-2 rounded-lg transition-colors" style={mutedText}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                       {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                   </div>
@@ -267,7 +291,7 @@ export default function SesionesPage() {
 
                 {/* Detalle expandible */}
                 {isExpanded && (
-                  <div className="border-t border-white/10 p-4">
+                  <div className="p-4" style={{ borderTop: '1px solid var(--border-subtle)' }}>
                     <SesionDetalle
                       sesion={sesion}
                       staff={staff}
@@ -297,7 +321,7 @@ export default function SesionesPage() {
   );
 }
 
-// ── Detalle de sesión (invitados + acciones) ──────────────────────────────────
+// ── Detalle de sesión ─────────────────────────────────────────────────────────
 
 function SesionDetalle({
   sesion, staff, frontendUrl, onRefresh,
@@ -311,9 +335,7 @@ function SesionDetalle({
     if (!addEmail.trim() || !addNombre.trim()) { toast.error('Nombre y correo son obligatorios'); return; }
     setSending(true);
     await sesionesApi.addInvitado(sesion.id, {
-      nombre: addNombre.trim(),
-      email:  addEmail.trim(),
-      cargo:  addCargo.trim() || undefined,
+      nombre: addNombre.trim(), email: addEmail.trim(), cargo: addCargo.trim() || undefined,
     }).catch(e => toast.error(e?.response?.data?.message ?? 'Error'));
     setSending(false);
     setAddEmail(''); setAddNombre(''); setAddCargo('');
@@ -324,13 +346,11 @@ function SesionDetalle({
   const handleAddFromStaff = async (s: Staff) => {
     if (!s.email) { toast.error('Este funcionario no tiene correo registrado'); return; }
     await sesionesApi.addInvitado(sesion.id, {
-      nombre:       `${s.firstName} ${s.lastName}`,
-      email:        s.email,
-      cargo:        s.jobTitle ?? undefined,
-      clientStaffId: s.id,
+      nombre: `${s.firstName} ${s.lastName}`, email: s.email,
+      cargo: s.jobTitle ?? undefined, clientStaffId: s.id,
     }).catch(e => toast.error(e?.response?.data?.message ?? 'Error'));
     onRefresh();
-    toast.success('Invitado agregado');
+    toast.success('Invitado agregado y notificación enviada');
   };
 
   const handleRemove = async (invId: string) => {
@@ -338,57 +358,53 @@ function SesionDetalle({
     onRefresh();
   };
 
-  const copyRsvp = (token: string) => {
-    navigator.clipboard.writeText(`${frontendUrl}/confirmar/${token}`)
-      .then(() => toast.success('Link RSVP copiado'));
-  };
-
-  // Staff no invitado aún
   const invitadoEmails = new Set(sesion.invitados.map(i => i.email.toLowerCase()));
   const staffNoInvitado = staff.filter(s => s.email && !invitadoEmails.has(s.email.toLowerCase()));
 
   return (
     <div className="space-y-5">
-      {/* Info extra */}
       {(sesion.temas || sesion.expositor) && (
-        <div className="text-sm text-slate-300 space-y-1">
-          {sesion.expositor && <p><span className="text-slate-500">Expositor:</span> {sesion.expositor}</p>}
-          {sesion.temas     && <p><span className="text-slate-500">Temas:</span> {sesion.temas}</p>}
+        <div className="text-sm space-y-1" style={secondaryText}>
+          {sesion.expositor && <p><span style={mutedText}>Expositor: </span>{sesion.expositor}</p>}
+          {sesion.temas     && <p><span style={mutedText}>Temas: </span>{sesion.temas}</p>}
         </div>
       )}
 
       {/* Link sala */}
-      <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
-        <span className="text-xs text-slate-400 shrink-0">Link sala:</span>
-        <span className="text-xs text-blue-300 truncate flex-1">{frontendUrl}/sala/{sesion.salaToken}</span>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+        <span className="text-xs shrink-0" style={mutedText}>Link sala:</span>
+        <span className="text-xs truncate flex-1" style={{ color: 'var(--accent-blue)' }}>
+          {frontendUrl}/sala/{sesion.salaToken}
+        </span>
         <button onClick={() => navigator.clipboard.writeText(`${frontendUrl}/sala/${sesion.salaToken}`).then(() => toast.success('Copiado'))}
-          className="text-slate-400 hover:text-white shrink-0">
+          style={mutedText} className="shrink-0 hover:opacity-70 transition-opacity">
           <Copy className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Lista invitados */}
       <div>
-        <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Invitados ({sesion.invitados.length})</p>
+        <p className="text-xs uppercase tracking-wider mb-2" style={mutedText}>
+          Invitados ({sesion.invitados.length})
+        </p>
         {sesion.invitados.length === 0 ? (
-          <p className="text-slate-500 text-sm">Sin invitados aún.</p>
+          <p className="text-sm" style={mutedText}>Sin invitados aún.</p>
         ) : (
           <div className="space-y-1.5">
             {sesion.invitados.map(inv => (
-              <div key={inv.id} className="flex items-center gap-3 bg-white/3 rounded-lg px-3 py-2 text-sm">
+              <div key={inv.id} className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm"
+                style={{ background: 'var(--surface-2)' }}>
                 <div className="flex-1 min-w-0">
-                  <span className="font-medium">{inv.nombre}</span>
-                  {inv.cargo && <span className="text-slate-400 ml-2 text-xs">{inv.cargo}</span>}
-                  <span className="text-slate-500 text-xs ml-2">{inv.email}</span>
+                  <span className="font-medium" style={primaryText}>{inv.nombre}</span>
+                  {inv.cargo && <span className="text-xs ml-2" style={mutedText}>{inv.cargo}</span>}
+                  <span className="text-xs ml-2" style={mutedText}>{inv.email}</span>
                 </div>
-                <span className={`text-xs font-semibold ${RSVP_COLOR[inv.respuesta]}`}>
+                <span className="text-xs font-semibold shrink-0" style={{ color: RSVP_COLOR[inv.respuesta] }}>
                   {inv.respuesta === 'pendiente' ? 'Pendiente' : inv.respuesta === 'confirmado' ? '✓ Confirmado' : '✗ Cancelado'}
                   {inv.entroSalaAt && ' · En sala'}
                 </span>
-                <button onClick={() => copyRsvp(inv.id)} className="text-slate-400 hover:text-white" title="Copiar link RSVP">
-                  <Copy className="w-3 h-3" />
-                </button>
-                <button onClick={() => handleRemove(inv.id)} className="text-slate-500 hover:text-red-400">
+                <button onClick={() => handleRemove(inv.id)}
+                  className="shrink-0 hover:opacity-70 transition-opacity" style={mutedText}>
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -397,42 +413,45 @@ function SesionDetalle({
         )}
       </div>
 
-      {/* Agregar desde staff no invitado */}
+      {/* Agregar desde staff */}
       {staffNoInvitado.length > 0 && (
         <div>
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Agregar funcionarios del cliente</p>
+          <p className="text-xs uppercase tracking-wider mb-2" style={mutedText}>
+            Agregar funcionarios del cliente
+          </p>
           <div className="flex flex-wrap gap-2">
             {staffNoInvitado.map(s => (
-              <button
-                key={s.id}
-                onClick={() => handleAddFromStaff(s)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/10 hover:border-blue-400/50 hover:bg-blue-400/5 transition text-xs text-slate-300"
-              >
+              <button key={s.id} onClick={() => handleAddFromStaff(s)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-colors"
+                style={{ border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                 <UserPlus className="w-3 h-3" />
                 {s.firstName} {s.lastName}
-                {!s.email && <span className="text-red-400 ml-1">(sin correo)</span>}
+                {!s.email && <span style={{ color: 'var(--accent-red)' }} className="ml-1">(sin correo)</span>}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Agregar invitado manual */}
+      {/* Agregar manualmente */}
       <div>
-        <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">Agregar invitado manualmente</p>
+        <p className="text-xs uppercase tracking-wider mb-2" style={mutedText}>Agregar invitado manualmente</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <input value={addNombre} onChange={e => setAddNombre(e.target.value)} placeholder="Nombre *"
-            className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-400" />
-          <input value={addEmail} onChange={e => setAddEmail(e.target.value)} placeholder="Correo *" type="email"
-            className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-400" />
-          <input value={addCargo} onChange={e => setAddCargo(e.target.value)} placeholder="Cargo"
-            className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-400" />
+          {[
+            { val: addNombre, set: setAddNombre, ph: 'Nombre *' },
+            { val: addEmail,  set: setAddEmail,  ph: 'Correo *' },
+            { val: addCargo,  set: setAddCargo,  ph: 'Cargo' },
+          ].map(f => (
+            <input key={f.ph} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
+              className="rounded-lg px-3 py-2 text-sm outline-none transition-colors focus:ring-1"
+              style={{ ...inputStyle, '--tw-ring-color': 'var(--accent-blue)' } as any} />
+          ))}
         </div>
-        <button
-          onClick={handleAdd}
-          disabled={sending}
-          className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600/80 hover:bg-blue-500 disabled:opacity-60 transition text-sm font-semibold"
-        >
+        <button onClick={handleAdd} disabled={sending}
+          className="mt-2 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-opacity disabled:opacity-60"
+          style={{ background: 'var(--accent-blue)', color: '#fff' }}>
           {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
           Agregar y enviar invitación
         </button>
@@ -463,6 +482,17 @@ function NuevaSesionModal({
   const [selected,  setSelected]  = useState<Set<string>>(new Set());
   const [saving,    setSaving]    = useState(false);
 
+  const staffConEmail = staff.filter(s => s.email);
+  const allSelected   = staffConEmail.length > 0 && staffConEmail.every(s => selected.has(s.id));
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(staffConEmail.map(s => s.id)));
+    }
+  };
+
   const toggle = (id: string) => setSelected(prev => {
     const next = new Set(prev);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -480,10 +510,10 @@ function NuevaSesionModal({
       await sesionesApi.create({
         projectId, companyId, titulo: titulo.trim(),
         fecha: new Date(fecha).toISOString(),
-        moduloId:  moduloId || undefined,
+        moduloId:  moduloId  || undefined,
         expositor: expositor.trim() || undefined,
-        temas:     temas.trim() || undefined,
-        lugar:     lugar.trim() || undefined,
+        temas:     temas.trim()     || undefined,
+        lugar:     lugar.trim()     || undefined,
         teamsLink: teamsLink.trim() || undefined,
         invitados: invitados.length ? invitados : undefined,
       });
@@ -496,34 +526,53 @@ function NuevaSesionModal({
     }
   };
 
+  // Estilo para inputs del modal
+  const mInput = {
+    ...inputStyle,
+    borderRadius: '0.5rem',
+    padding: '0.625rem 0.75rem',
+    fontSize: '0.875rem',
+    width: '100%',
+    outline: 'none',
+  } as React.CSSProperties;
+
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-[#1a1f2e] border border-white/10 rounded-none sm:rounded-2xl w-full sm:max-w-2xl max-h-screen sm:max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-white/10 sticky top-0 bg-[#1a1f2e] z-10">
-          <h2 className="text-lg font-bold">Nueva sesión de capacitación</h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg">
-            <X className="w-5 h-5 text-slate-400" />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: 'rgba(0,0,0,0.6)' }}>
+      <div className="w-full sm:max-w-2xl max-h-screen sm:max-h-[90vh] flex flex-col rounded-none sm:rounded-2xl overflow-hidden"
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: 'var(--card-shadow)' }}>
+
+        {/* Header sticky */}
+        <div className="flex items-center justify-between p-5 shrink-0"
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+          <h2 className="text-lg font-bold" style={primaryText}>Nueva sesión de capacitación</h2>
+          <button onClick={onClose} className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
-          {/* Campos básicos */}
+        {/* Cuerpo scrollable */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Título de la capacitación *</label>
-            <input value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Ej: Capacitación módulo facturación"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 placeholder-slate-500" />
+            <label className="block text-xs mb-1.5" style={mutedText}>Título de la capacitación *</label>
+            <input value={titulo} onChange={e => setTitulo(e.target.value)}
+              placeholder="Ej: Capacitación módulo facturación" style={mInput} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Fecha y hora *</label>
+              <label className="block text-xs mb-1.5" style={mutedText}>Fecha y hora *</label>
               <input type="datetime-local" value={fecha} onChange={e => setFecha(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400" />
+                style={{ ...mInput, colorScheme: 'auto' }} />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Módulo</label>
+              <label className="block text-xs mb-1.5" style={mutedText}>Módulo</label>
               <select value={moduloId} onChange={e => setModuloId(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400">
+                style={{ ...mInput, cursor: 'pointer' }}>
                 <option value="">— Sin módulo —</option>
                 {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
@@ -532,75 +581,102 @@ function NuevaSesionModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Lugar</label>
-              <input value={lugar} onChange={e => setLugar(e.target.value)} placeholder="Ej: Sala de reuniones / Virtual"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 placeholder-slate-500" />
+              <label className="block text-xs mb-1.5" style={mutedText}>Lugar</label>
+              <input value={lugar} onChange={e => setLugar(e.target.value)}
+                placeholder="Ej: Sala de reuniones / Virtual" style={mInput} />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Expositor</label>
-              <input value={expositor} onChange={e => setExpositor(e.target.value)} placeholder="Nombre del expositor"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 placeholder-slate-500" />
+              <label className="block text-xs mb-1.5" style={mutedText}>Expositor</label>
+              <input value={expositor} onChange={e => setExpositor(e.target.value)}
+                placeholder="Nombre del expositor" style={mInput} />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs text-slate-400 mb-1">
-              <Monitor className="w-3.5 h-3.5 inline mr-1" />
-              Link de reunión Teams
+            <label className="block text-xs mb-1.5 flex items-center gap-1.5" style={mutedText}>
+              <Monitor className="w-3.5 h-3.5" /> Link de reunión Teams
             </label>
             <input value={teamsLink} onChange={e => setTeamsLink(e.target.value)}
               placeholder="https://teams.microsoft.com/l/meetup-join/..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 placeholder-slate-500" />
+              style={mInput} />
           </div>
 
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Temas a tratar</label>
+            <label className="block text-xs mb-1.5" style={mutedText}>Temas a tratar</label>
             <textarea value={temas} onChange={e => setTemas(e.target.value)} rows={2}
               placeholder="Describe los temas que se cubrirán..."
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400 placeholder-slate-500 resize-none" />
+              style={{ ...mInput, resize: 'none' }} />
           </div>
 
           {/* Selección de invitados */}
           {staff.length > 0 && (
             <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wider mb-2">
-                Invitar funcionarios del cliente
-              </p>
-              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs uppercase tracking-wider" style={mutedText}>
+                  Invitar funcionarios del cliente
+                </p>
+                {staffConEmail.length > 0 && (
+                  <button onClick={toggleAll}
+                    className="flex items-center gap-1.5 text-xs font-medium transition-colors px-2 py-1 rounded-lg"
+                    style={{ color: allSelected ? 'var(--accent-red)' : 'var(--accent-blue)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    {allSelected
+                      ? <><Square className="w-3.5 h-3.5" /> Deseleccionar todo</>
+                      : <><CheckSquare className="w-3.5 h-3.5" /> Seleccionar todo</>}
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-1 max-h-52 overflow-y-auto rounded-lg p-1"
+                style={{ background: 'var(--surface-2)' }}>
                 {staff.map(s => (
                   <label key={s.id}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 cursor-pointer">
-                    <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)}
-                      className="w-4 h-4 accent-blue-500" />
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                    style={{ opacity: s.email ? 1 : 0.5 }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-hover)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <input type="checkbox" checked={selected.has(s.id)} onChange={() => s.email && toggle(s.id)}
+                      disabled={!s.email}
+                      className="w-4 h-4 rounded" style={{ accentColor: 'var(--accent-blue)' }} />
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium">{s.firstName} {s.lastName}</span>
-                      {s.jobTitle && <span className="text-slate-400 text-xs ml-2">{s.jobTitle}</span>}
+                      <span className="text-sm font-medium" style={primaryText}>
+                        {s.firstName} {s.lastName}
+                      </span>
+                      {s.jobTitle && (
+                        <span className="text-xs ml-2" style={mutedText}>{s.jobTitle}</span>
+                      )}
                     </div>
                     {s.email
-                      ? <span className="text-xs text-slate-500 truncate max-w-[160px]">{s.email}</span>
-                      : <span className="text-xs text-red-400">sin correo</span>
+                      ? <span className="text-xs truncate max-w-[160px]" style={mutedText}>{s.email}</span>
+                      : <span className="text-xs" style={{ color: 'var(--accent-red)' }}>sin correo</span>
                     }
                   </label>
                 ))}
               </div>
+
               {selected.size > 0 && (
-                <p className="text-xs text-blue-300 mt-2">
-                  {selected.size} {selected.size === 1 ? 'funcionario seleccionado' : 'funcionarios seleccionados'} — se enviará invitación por correo al crear.
+                <p className="text-xs mt-2" style={{ color: 'var(--accent-blue)' }}>
+                  {selected.size} {selected.size === 1 ? 'funcionario seleccionado' : 'funcionarios seleccionados'} — se enviará invitación al crear.
                 </p>
               )}
             </div>
           )}
         </div>
 
-        <div className="p-5 border-t border-white/10 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 transition text-sm">
+        {/* Footer sticky */}
+        <div className="p-5 shrink-0 flex gap-3"
+          style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors"
+            style={{ border: '1px solid var(--border-strong)', color: 'var(--text-secondary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
             Cancelar
           </button>
-          <button
-            onClick={handleCreate}
-            disabled={saving}
-            className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 transition font-semibold text-sm flex items-center justify-center gap-2"
-          >
+          <button onClick={handleCreate} disabled={saving}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
+            style={{ background: 'var(--accent-blue)', color: '#fff' }}>
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Creando...</> : 'Crear sesión'}
           </button>
         </div>

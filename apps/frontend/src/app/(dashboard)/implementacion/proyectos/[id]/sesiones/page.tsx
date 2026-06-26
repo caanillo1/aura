@@ -104,6 +104,7 @@ interface Invitado {
   nombre: string;
   email: string;
   cargo?: string;
+  clientStaffId?: string;
   respuesta: 'pendiente' | 'confirmado' | 'cancelado';
   confirmadoAt?: string;
   entroSalaAt?: string;
@@ -403,6 +404,7 @@ export default function SesionesPage() {
           companyId={company.id}
           modules={project?.modules ?? []}
           staff={staff}
+          sesiones={sesiones}
           defaultExpositorId={currentUser?.id ?? ''}
           onClose={() => setShowModal(false)}
           onCreated={() => { setShowModal(false); load(); }}
@@ -554,12 +556,13 @@ function SesionDetalle({
 // ── Modal nueva sesión ────────────────────────────────────────────────────────
 
 function NuevaSesionModal({
-  projectId, companyId, modules, staff, defaultExpositorId, onClose, onCreated,
+  projectId, companyId, modules, staff, sesiones, defaultExpositorId, onClose, onCreated,
 }: {
   projectId: string;
   companyId: string;
   modules: Array<{ id: string; name: string }>;
   staff: Staff[];
+  sesiones: Sesion[];
   defaultExpositorId: string;
   onClose: () => void;
   onCreated: () => void;
@@ -574,8 +577,9 @@ function NuevaSesionModal({
   const [selected,    setSelected]    = useState<Set<string>>(new Set());
   const [saving,      setSaving]      = useState(false);
   const [agents,      setAgents]      = useState<Array<{ id: string; firstName: string; lastName: string }>>([]);
-  const [staffSearch, setStaffSearch] = useState('');
-  const [cargoFilter, setCargoFilter] = useState('');
+  const [staffSearch,       setStaffSearch]       = useState('');
+  const [cargoFilter,       setCargoFilter]       = useState('');
+  const [capacitacionFilter, setCapacitacionFilter] = useState('');
 
   useEffect(() => {
     usersApi.listAgents({ limit: 200 })
@@ -583,15 +587,26 @@ function NuevaSesionModal({
       .catch(() => {});
   }, []);
 
+  // IDs de staff que ya entraron a sala en alguna sesión previa
+  const staffCapacitadosIds = new Set(
+    sesiones.flatMap(s => s.invitados)
+      .filter(inv => inv.entroSalaAt && inv.clientStaffId)
+      .map(inv => inv.clientStaffId as string)
+  );
+
   // Cargos únicos del personal
   const cargosUnicos = Array.from(new Set(staff.map(s => s.jobTitle).filter(Boolean))) as string[];
 
-  // Staff filtrado por búsqueda y cargo
+  // Staff filtrado por búsqueda, cargo y estado de capacitación
   const staffFiltrado = staff.filter(s => {
     const nombre = `${s.firstName} ${s.lastName}`.toLowerCase();
     const matchSearch = !staffSearch || nombre.includes(staffSearch.toLowerCase());
     const matchCargo  = !cargoFilter || s.jobTitle === cargoFilter;
-    return matchSearch && matchCargo;
+    const esCap       = staffCapacitadosIds.has(s.id);
+    const matchCap    = !capacitacionFilter
+      || (capacitacionFilter === 'capacitado' && esCap)
+      || (capacitacionFilter === 'pendiente'  && !esCap);
+    return matchSearch && matchCargo && matchCap;
   });
 
   const staffConEmailFiltrado = staffFiltrado.filter(s => s.email);
@@ -781,7 +796,7 @@ function NuevaSesionModal({
               </div>
 
               {/* Filtros */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={mutedText} />
                   <input
@@ -798,6 +813,16 @@ function NuevaSesionModal({
                   options={[
                     { value: '', label: 'Todos los cargos' },
                     ...cargosUnicos.map(c => ({ value: c, label: c })),
+                  ]}
+                />
+                <CustomSelect
+                  value={capacitacionFilter}
+                  onChange={setCapacitacionFilter}
+                  placeholder="Todos"
+                  options={[
+                    { value: '',           label: 'Todos' },
+                    { value: 'pendiente',  label: 'Sin capacitar' },
+                    { value: 'capacitado', label: 'Ya capacitados' },
                   ]}
                 />
               </div>
@@ -827,8 +852,18 @@ function NuevaSesionModal({
                         <span className="text-xs ml-2" style={mutedText}>{s.jobTitle}</span>
                       )}
                     </div>
+                    {staffCapacitadosIds.has(s.id)
+                      ? <span className="text-xs shrink-0 px-1.5 py-0.5 rounded-full font-medium"
+                          style={{ background: 'var(--accent-green-bg)', color: 'var(--accent-green)' }}>
+                          Capacitado
+                        </span>
+                      : <span className="text-xs shrink-0 px-1.5 py-0.5 rounded-full"
+                          style={{ background: 'var(--accent-amber-bg)', color: 'var(--accent-amber)' }}>
+                          Pendiente
+                        </span>
+                    }
                     {s.email
-                      ? <span className="text-xs truncate max-w-[160px]" style={mutedText}>{s.email}</span>
+                      ? <span className="text-xs truncate max-w-[120px]" style={mutedText}>{s.email}</span>
                       : <span className="text-xs shrink-0" style={{ color: 'var(--accent-red)' }}>sin correo</span>
                     }
                   </label>

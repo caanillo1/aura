@@ -177,22 +177,25 @@ const primaryText: React.CSSProperties = { color: 'var(--text-primary)' };
 export default function SesionesPage() {
   const { id: projectId } = useParams() as { id: string };
 
-  const [sesiones,  setSesiones]  = useState<Sesion[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [project,   setProject]   = useState<any>(null);
-  const [company,   setCompany]   = useState<any>(null);
-  const [staff,     setStaff]     = useState<Staff[]>([]);
-  const [expandId,  setExpandId]  = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [sesiones,    setSesiones]    = useState<Sesion[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [project,     setProject]     = useState<any>(null);
+  const [company,     setCompany]     = useState<any>(null);
+  const [staff,       setStaff]       = useState<Staff[]>([]);
+  const [expandId,    setExpandId]    = useState<string | null>(null);
+  const [showModal,   setShowModal]   = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [sesionesList, proj, comp] = await Promise.all([
+      const [sesionesList, proj, comp, me] = await Promise.all([
         sesionesApi.list(projectId),
         projectsApi.get(projectId),
         companyApi.get(),
+        usersApi.getMe().catch(() => null),
       ]);
+      if (me) setCurrentUser({ id: me.id });
       setSesiones(sesionesList);
       setProject(proj);
       setCompany(comp);
@@ -400,6 +403,7 @@ export default function SesionesPage() {
           companyId={company.id}
           modules={project?.modules ?? []}
           staff={staff}
+          defaultExpositorId={currentUser?.id ?? ''}
           onClose={() => setShowModal(false)}
           onCreated={() => { setShowModal(false); load(); }}
         />
@@ -550,12 +554,13 @@ function SesionDetalle({
 // ── Modal nueva sesión ────────────────────────────────────────────────────────
 
 function NuevaSesionModal({
-  projectId, companyId, modules, staff, onClose, onCreated,
+  projectId, companyId, modules, staff, defaultExpositorId, onClose, onCreated,
 }: {
   projectId: string;
   companyId: string;
   modules: Array<{ id: string; name: string }>;
   staff: Staff[];
+  defaultExpositorId: string;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -563,7 +568,7 @@ function NuevaSesionModal({
   const [fecha,       setFecha]       = useState('');
   const [lugar,       setLugar]       = useState('');
   const [teamsLink,   setTeamsLink]   = useState('');
-  const [expositorId, setExpositorId] = useState('');
+  const [expositorId, setExpositorId] = useState(defaultExpositorId);
   const [temas,       setTemas]       = useState('');
   const [moduloId,    setModuloId]    = useState('');
   const [selected,    setSelected]    = useState<Set<string>>(new Set());

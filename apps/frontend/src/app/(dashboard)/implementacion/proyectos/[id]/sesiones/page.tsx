@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -9,6 +9,79 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sesionesApi, projectsApi, clientsApi, companyApi, usersApi, type CreateSesionPayload, type SesionInvitadoPayload } from '@/lib/api';
+
+// ── CustomSelect — reemplaza <select> nativo para soporte dark/light ──────────
+
+interface SelectOption { value: string; label: string }
+
+function CustomSelect({ value, onChange, options, placeholder = '— Seleccionar —' }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setOpen(p => !p)}
+        className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-left transition-colors"
+        style={{
+          background: 'var(--input-bg)',
+          border: `1px solid ${open ? 'var(--accent-blue)' : 'var(--input-border)'}`,
+          color: selected ? 'var(--input-color)' : 'var(--text-muted)',
+        }}
+      >
+        <span className="truncate">{selected ? selected.label : placeholder}</span>
+        <ChevronDown className="w-4 h-4 shrink-0 ml-2 transition-transform" style={{
+          color: 'var(--text-muted)',
+          transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+        }} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 w-full mt-1 rounded-lg overflow-hidden shadow-xl"
+          style={{
+            background: 'var(--card-bg)',
+            border: '1px solid var(--border-strong)',
+            boxShadow: 'var(--card-shadow)',
+            maxHeight: '220px',
+            overflowY: 'auto',
+          }}>
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-sm transition-colors"
+              style={{
+                color: opt.value === value ? 'var(--accent-blue)' : 'var(--text-primary)',
+                background: opt.value === value ? 'var(--accent-blue-bg)' : 'transparent',
+                fontWeight: opt.value === value ? 600 : 400,
+              }}
+              onMouseEnter={e => { if (opt.value !== value) e.currentTarget.style.background = 'var(--surface-2)'; }}
+              onMouseLeave={e => { if (opt.value !== value) e.currentTarget.style.background = 'transparent'; }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── tipos ─────────────────────────────────────────────────────────────────────
 
@@ -562,22 +635,6 @@ function NuevaSesionModal({
     }
   };
 
-  // Estilos para selects nativos con soporte dark/light
-  const selectStyle: React.CSSProperties = {
-    ...inputStyle,
-    borderRadius: '0.5rem',
-    padding: '0.625rem 2rem 0.625rem 0.75rem',
-    fontSize: '0.875rem',
-    width: '100%',
-    outline: 'none',
-    cursor: 'pointer',
-    appearance: 'none',
-    WebkitAppearance: 'none',
-    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 0.75rem center',
-  };
-
   const mInput: React.CSSProperties = {
     ...inputStyle,
     borderRadius: '0.5rem',
@@ -622,12 +679,15 @@ function NuevaSesionModal({
             </div>
             <div>
               <label className="block text-xs mb-1.5" style={mutedText}>Módulo</label>
-              <div className="relative">
-                <select value={moduloId} onChange={e => setModuloId(e.target.value)} style={selectStyle}>
-                  <option value="">— Sin módulo —</option>
-                  {modules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
-              </div>
+              <CustomSelect
+                value={moduloId}
+                onChange={setModuloId}
+                placeholder="— Sin módulo —"
+                options={[
+                  { value: '', label: '— Sin módulo —' },
+                  ...modules.map(m => ({ value: m.id, label: m.name })),
+                ]}
+              />
             </div>
           </div>
 
@@ -639,14 +699,15 @@ function NuevaSesionModal({
             </div>
             <div>
               <label className="block text-xs mb-1.5" style={mutedText}>Expositor</label>
-              <div className="relative">
-                <select value={expositorId} onChange={e => setExpositorId(e.target.value)} style={selectStyle}>
-                  <option value="">— Sin expositor —</option>
-                  {agents.map(a => (
-                    <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>
-                  ))}
-                </select>
-              </div>
+              <CustomSelect
+                value={expositorId}
+                onChange={setExpositorId}
+                placeholder="— Sin expositor —"
+                options={[
+                  { value: '', label: '— Sin expositor —' },
+                  ...agents.map(a => ({ value: a.id, label: `${a.firstName} ${a.lastName}` })),
+                ]}
+              />
             </div>
           </div>
 
@@ -711,15 +772,15 @@ function NuevaSesionModal({
                     style={{ ...mInput, paddingLeft: '2rem', fontSize: '0.8rem' }}
                   />
                 </div>
-                <div className="relative">
-                  <select
-                    value={cargoFilter}
-                    onChange={e => setCargoFilter(e.target.value)}
-                    style={{ ...selectStyle, fontSize: '0.8rem', padding: '0.55rem 2rem 0.55rem 0.75rem' }}>
-                    <option value="">Todos los cargos</option>
-                    {cargosUnicos.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+                <CustomSelect
+                  value={cargoFilter}
+                  onChange={setCargoFilter}
+                  placeholder="Todos los cargos"
+                  options={[
+                    { value: '', label: 'Todos los cargos' },
+                    ...cargosUnicos.map(c => ({ value: c, label: c })),
+                  ]}
+                />
               </div>
 
               {/* Lista filtrada */}

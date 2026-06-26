@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTheme } from 'next-themes';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -22,7 +23,25 @@ function CustomSelect({ value, onChange, options, placeholder = '— Seleccionar
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
+  const dark = theme !== 'light';
   const selected = options.find(o => o.value === value);
+
+  // Colores explícitos — no dependemos de variables semi-transparentes
+  const triggerBg    = dark ? '#0f1929'  : '#F8FAFC';
+  const triggerBdr   = open
+    ? (dark ? '#60a5fa' : '#2563EB')
+    : (dark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.12)');
+  const triggerColor = selected
+    ? (dark ? '#F1F5F9' : '#0F172A')
+    : (dark ? '#64748B' : '#94A3B8');
+  const dropBg       = dark ? '#101c2e' : '#FFFFFF';
+  const dropBdr      = dark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)';
+  const optColor     = dark ? '#F1F5F9' : '#0F172A';
+  const optHover     = dark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
+  const accentColor  = dark ? '#60a5fa' : '#2563EB';
+  const accentBg     = dark ? 'rgba(96,165,250,0.12)' : 'rgba(37,99,235,0.08)';
+  const mutedColor   = dark ? '#64748B' : '#94A3B8';
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -37,41 +56,36 @@ function CustomSelect({ value, onChange, options, placeholder = '— Seleccionar
       <button
         type="button"
         onClick={() => setOpen(p => !p)}
-        className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-left transition-colors"
-        style={{
-          background: 'var(--input-bg)',
-          border: `1px solid ${open ? 'var(--accent-blue)' : 'var(--input-border)'}`,
-          color: selected ? 'var(--input-color)' : 'var(--text-muted)',
-        }}
+        className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-left transition-all"
+        style={{ background: triggerBg, border: `1px solid ${triggerBdr}`, color: triggerColor }}
       >
         <span className="truncate">{selected ? selected.label : placeholder}</span>
-        <ChevronDown className="w-4 h-4 shrink-0 ml-2 transition-transform" style={{
-          color: 'var(--text-muted)',
-          transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-        }} />
+        <ChevronDown className="w-4 h-4 shrink-0 ml-2 transition-transform"
+          style={{ color: mutedColor, transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }} />
       </button>
 
       {open && (
-        <div className="absolute z-50 w-full mt-1 rounded-lg overflow-hidden shadow-xl"
+        <div className="absolute z-[200] w-full mt-1 rounded-lg overflow-auto"
           style={{
-            background: 'var(--card-bg)',
-            border: '1px solid var(--border-strong)',
-            boxShadow: 'var(--card-shadow)',
+            background: dropBg,
+            border: `1px solid ${dropBdr}`,
+            boxShadow: dark
+              ? '0 16px 48px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.4)'
+              : '0 8px 24px rgba(15,23,42,0.12), 0 2px 8px rgba(15,23,42,0.08)',
             maxHeight: '220px',
-            overflowY: 'auto',
           }}>
           {options.map(opt => (
             <button
               key={opt.value}
               type="button"
               onClick={() => { onChange(opt.value); setOpen(false); }}
-              className="w-full text-left px-3 py-2 text-sm transition-colors"
+              className="w-full text-left px-3 py-2.5 text-sm transition-colors"
               style={{
-                color: opt.value === value ? 'var(--accent-blue)' : 'var(--text-primary)',
-                background: opt.value === value ? 'var(--accent-blue-bg)' : 'transparent',
+                color:      opt.value === value ? accentColor : optColor,
+                background: opt.value === value ? accentBg    : 'transparent',
                 fontWeight: opt.value === value ? 600 : 400,
               }}
-              onMouseEnter={e => { if (opt.value !== value) e.currentTarget.style.background = 'var(--surface-2)'; }}
+              onMouseEnter={e => { if (opt.value !== value) e.currentTarget.style.background = optHover; }}
               onMouseLeave={e => { if (opt.value !== value) e.currentTarget.style.background = 'transparent'; }}
             >
               {opt.label}

@@ -143,7 +143,7 @@ export default function SesionesPage() {
   const frontendUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   return (
-    <div className="min-h-screen p-4 sm:p-6" style={{ background: 'var(--bg-base)' }}>
+    <div className="p-4 sm:p-6">
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">

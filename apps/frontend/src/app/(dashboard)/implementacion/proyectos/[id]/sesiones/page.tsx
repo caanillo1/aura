@@ -570,7 +570,7 @@ function NuevaSesionModal({
   const [teamsLink,   setTeamsLink]   = useState('');
   const [expositorId, setExpositorId] = useState(defaultExpositorId);
   const [temas,       setTemas]       = useState('');
-  const [moduloId,    setModuloId]    = useState('');
+  const [moduloId,    setModuloId]    = useState(modules.length === 1 ? modules[0].id : '');
   const [selected,    setSelected]    = useState<Set<string>>(new Set());
   const [saving,      setSaving]      = useState(false);
   const [agents,      setAgents]      = useState<Array<{ id: string; firstName: string; lastName: string }>>([]);

@@ -197,11 +197,13 @@ export default function InformeEjecutivoPage() {
   const [company,     setCompany]     = useState<any>(null);
   const [loading,     setLoading]     = useState(true);
   const [snapshots,   setSnapshots]   = useState<SnapshotMeta[]>([]);
-  const [snapId,      setSnapId]      = useState<string>('actual');
-  const [snapOpen,    setSnapOpen]    = useState(false);
-  const [showSave,    setShowSave]    = useState(false);
-  const [readOnly,    setReadOnly]    = useState(false);
-  const [generating,  setGenerating]  = useState(false);
+  const [snapId,        setSnapId]        = useState<string>('actual');
+  const [snapOpen,      setSnapOpen]      = useState(false);
+  const [showSave,      setShowSave]      = useState(false);
+  const [readOnly,      setReadOnly]      = useState(false);
+  const [generating,    setGenerating]    = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
   const snapRef = useRef<HTMLDivElement>(null);
 
   const [obs,  setObs]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('informe_obs')  ?? '' : '');
@@ -250,6 +252,52 @@ export default function InformeEjecutivoPage() {
   const save = async (id: string, field: string, value: string) => {
     await projectsApi.updateDatosInforme(id, { [field]: value });
     setFilas(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
+  };
+
+  const handleGenerarPDF = async () => {
+    if (!reportRef.current) return;
+    setGeneratingPDF(true);
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: dark ? '#0b1524' : '#f0f4f8',
+        windowWidth: reportRef.current.scrollWidth,
+        windowHeight: reportRef.current.scrollHeight,
+      });
+
+      const imgData   = canvas.toDataURL('image/jpeg', 0.92);
+      const pdf       = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageW     = pdf.internal.pageSize.getWidth();
+      const pageH     = pdf.internal.pageSize.getHeight();
+      const imgH      = (canvas.height * pageW) / canvas.width;
+      let   remaining = imgH;
+      let   offset    = 0;
+
+      pdf.addImage(imgData, 'JPEG', 0, offset, pageW, imgH);
+      remaining -= pageH;
+
+      while (remaining > 0) {
+        offset -= pageH;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, offset, pageW, imgH);
+        remaining -= pageH;
+      }
+
+      const snapTitle = snapId !== 'actual' ? (snapshots.find(s => s.id === snapId)?.titulo ?? 'Informe') : 'Actual';
+      pdf.save(`Informe_Ejecutivo_${snapTitle.replace(/\s+/g, '_')}.pdf`);
+      toast.success('PDF generado correctamente');
+    } catch {
+      toast.error('Error al generar el PDF');
+    } finally {
+      setGeneratingPDF(false);
+    }
   };
 
   const handleGenerarAnalisis = async () => {
@@ -395,10 +443,13 @@ export default function InformeEjecutivoPage() {
               <RefreshCw className="w-4 h-4" />
             </button>
 
-            <button onClick={() => window.print()}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
+            <button onClick={handleGenerarPDF} disabled={generatingPDF || loading}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-60"
               style={{ background: 'var(--accent-blue)', color: '#fff' }}>
-              <Printer className="w-4 h-4" /> Imprimir / PDF
+              {generatingPDF
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Generando...</>
+                : <><Printer className="w-4 h-4" /> Descargar PDF</>
+              }
             </button>
           </div>
         </div>
@@ -408,7 +459,7 @@ export default function InformeEjecutivoPage() {
             <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent-blue)' }} />
           </div>
         ) : (
-          <div className="rounded-2xl overflow-hidden"
+          <div ref={reportRef} className="rounded-2xl overflow-hidden"
             style={{ background: dark ? '#0b1524' : '#f0f4f8', border: '1px solid var(--card-border)', fontFamily: 'Arial, sans-serif' }}>
 
             {/* Título */}

@@ -569,6 +569,26 @@ export class ProjectsService {
     });
   }
 
+  // ── Eliminar fase ─────────────────────────────────────────────────────────
+
+  async deletePhase(companyId: string, phaseId: string) {
+    const phase = await this.prisma.phase.findFirst({
+      where: { id: phaseId, projectModule: { project: { serviceOrder: { companyId } } } },
+      select: { id: true, name: true, projectModuleId: true, _count: { select: { activities: true } } },
+    });
+    if (!phase) throw new NotFoundException('Fase no encontrada');
+
+    if (phase._count.activities > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar la fase "${phase.name}" porque tiene ${phase._count.activities} actividad${phase._count.activities !== 1 ? 'es' : ''}. Elimínalas primero.`,
+      );
+    }
+
+    await this.prisma.phase.delete({ where: { id: phaseId } });
+    await this.recalcModule(phase.projectModuleId);
+    return { message: 'Fase eliminada' };
+  }
+
   // ── Eliminar módulo ──────────────────────────────────────────────────────
 
   async deleteModule(companyId: string, moduleId: string) {

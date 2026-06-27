@@ -79,6 +79,13 @@ export class ProjectsController {
     return this.svc.addModules(user.companyId, id, dto);
   }
 
+  @Delete('phases/:phaseId')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Eliminar fase del proyecto (requiere 0 actividades)' })
+  deletePhase(@GetUser() user: JwtUser, @Param('phaseId') phaseId: string) {
+    return this.svc.deletePhase(user.companyId, phaseId);
+  }
+
   @Delete('modules/:moduleId')
   @Roles(...IMPL_ROLES)
   @ApiOperation({ summary: 'Eliminar módulo del proyecto' })

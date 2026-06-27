@@ -547,6 +547,8 @@ export const projectsApi = {
     phaseDates?: { templatePhaseId: string; startDate?: string; endDate?: string; agentLeaderId?: string; clientLeaderId?: string }[];
   }) =>
     api.post(`/projects/${id}/add-modules`, data).then((r) => r.data),
+  deletePhase: (phaseId: string) =>
+    api.delete(`/projects/phases/${phaseId}`).then((r) => r.data),
   deleteModule: (moduleId: string) =>
     api.delete(`/projects/modules/${moduleId}`).then((r) => r.data),
   deleteProject: (id: string) =>

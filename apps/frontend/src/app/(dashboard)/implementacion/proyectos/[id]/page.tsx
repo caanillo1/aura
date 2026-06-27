@@ -706,9 +706,52 @@ function ActivityDeleteButton({ activityId, onDeleted }: { activityId: string; o
   );
 }
 
+// ── Botón de borrado de fase (con confirmación inline) ────────────────────
+
+function PhaseDeleteButton({ phase, onDeleted }: { phase: ProjectPhase; onDeleted: () => void }) {
+  const [confirm, setConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  if (phase.activities.length > 0) return null;
+
+  if (confirm) {
+    return (
+      <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+        <button onClick={async () => {
+          setDeleting(true);
+          try { await projectsApi.deletePhase(phase.id); onDeleted(); }
+          catch (e: any) {
+            toast.error(e?.response?.data?.message ?? 'Error al eliminar la fase');
+            setDeleting(false); setConfirm(false);
+          }
+        }} disabled={deleting}
+          className="text-[10px] px-2 py-1 rounded-lg font-semibold"
+          style={{ background: 'rgba(248,113,113,0.20)', color: '#f87171', border: '1px solid rgba(248,113,113,0.40)' }}>
+          {deleting ? '...' : 'Confirmar'}
+        </button>
+        <button onClick={() => setConfirm(false)}
+          className="text-[10px] px-1.5 py-1 rounded-lg"
+          style={{ color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+      onClick={e => { e.stopPropagation(); setConfirm(true); }}
+      className="shrink-0 p-1.5 rounded-lg transition-colors"
+      style={{ color: '#f87171', border: '1px solid rgba(248,113,113,0.15)' }}
+      title="Eliminar fase">
+      <Trash2 className="w-3 h-3" />
+    </motion.button>
+  );
+}
+
 // ── Componente de fase ─────────────────────────────────────────────────────
 
-function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdate, onActivityAdded, bulkMode, bulkSelected, onBulkToggle }: {
+function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdate, onActivityAdded, onPhaseDeleted, bulkMode, bulkSelected, onBulkToggle }: {
   phase: ProjectPhase;
   tc: any;
   users: UserType[];
@@ -716,6 +759,7 @@ function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdat
   filterStatus: ActivityStatus | null;
   onActivityUpdate: () => void;
   onActivityAdded: () => void;
+  onPhaseDeleted: () => void;
   bulkMode: boolean;
   bulkSelected: Set<string>;
   onBulkToggle: (activityId: string) => void;
@@ -769,6 +813,9 @@ function PhaseRow({ phase, tc, users, clientStaff, filterStatus, onActivityUpdat
             <span className="text-xs font-mono" style={{ color: cfg.color }}>{pct.toFixed(0)}%</span>
           </div>
         </div>
+        {can('activities.manage') && (
+          <PhaseDeleteButton phase={phase} onDeleted={onPhaseDeleted} />
+        )}
         <ChevronDown className={`w-4 h-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
           style={{ color: tc.m }} />
       </button>
@@ -1618,6 +1665,7 @@ export default function ProjectDetailPage() {
                       filterStatus={filterStatus}
                       onActivityUpdate={load}
                       onActivityAdded={load}
+                      onPhaseDeleted={load}
                       bulkMode={bulkMode}
                       bulkSelected={bulkSelected}
                       onBulkToggle={(id) => setBulkSelected(prev => {

@@ -7,6 +7,10 @@ import {
   Save, History, ChevronDown, Trash2, Plus, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+} from 'recharts';
 import { projectsApi, companyApi, informesApi } from '@/lib/api';
 import type { SnapshotMeta } from '@/lib/api';
 
@@ -501,6 +505,147 @@ export default function InformeEjecutivoPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* ── Gráficas ── */}
+            {filas.length > 0 && (
+              <div className="mx-4 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+
+                {/* 1. Semáforo */}
+                <div className="rounded-xl p-4" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#e8edf3', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <p className="text-xs font-bold uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--text-muted)' }}>Estado semáforo</p>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'En fecha',        value: filas.filter(f => getSemaforo(f.endDate, f.progressPercent, f.status) === 'verde').length,    color: '#22c55e' },
+                          { name: 'Riesgo',          value: filas.filter(f => getSemaforo(f.endDate, f.progressPercent, f.status) === 'amarillo').length, color: '#eab308' },
+                          { name: 'Retraso crítico', value: filas.filter(f => getSemaforo(f.endDate, f.progressPercent, f.status) === 'rojo').length,     color: '#ef4444' },
+                        ].filter(d => d.value > 0)}
+                        cx="50%" cy="50%" innerRadius={45} outerRadius={70}
+                        dataKey="value" paddingAngle={3}
+                      >
+                        {[
+                          { color: '#22c55e' }, { color: '#eab308' }, { color: '#ef4444' },
+                        ].map((c, i) => <Cell key={i} fill={c.color} />)}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: dark ? '#101c2e' : '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px' }}
+                        formatter={(v: any, n: any) => [`${v} proyecto${v !== 1 ? 's' : ''}`, n]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex justify-center gap-3 mt-1">
+                    {[{ label: 'Verde', color: '#22c55e' }, { label: 'Amarillo', color: '#eab308' }, { label: 'Rojo', color: '#ef4444' }].map(l => (
+                      <div key={l.label} className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full" style={{ background: l.color }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{l.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Avance por cliente */}
+                <div className="rounded-xl p-4" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#e8edf3', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <p className="text-xs font-bold uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--text-muted)' }}>% Avance por cliente</p>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart
+                      layout="vertical"
+                      data={filas.map(f => ({
+                        name: f.clienteNombre.split(' ').slice(0, 2).join(' '),
+                        avance: f.progressPercent,
+                        color: SEMAFORO_COLOR[getSemaforo(f.endDate, f.progressPercent, f.status)],
+                      }))}
+                      margin={{ left: 0, right: 20, top: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke={dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'} horizontal={false} />
+                      <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 9, fill: dark ? '#64748b' : '#94a3b8' }} tickFormatter={v => `${v}%`} />
+                      <YAxis type="category" dataKey="name" width={70} tick={{ fontSize: 9, fill: dark ? '#94a3b8' : '#64748b' }} />
+                      <Tooltip
+                        contentStyle={{ background: dark ? '#101c2e' : '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px' }}
+                        formatter={(v: any) => [`${v}%`, 'Avance']}
+                      />
+                      <Bar dataKey="avance" radius={[0, 4, 4, 0]}>
+                        {filas.map((f, i) => (
+                          <Cell key={i} fill={SEMAFORO_COLOR[getSemaforo(f.endDate, f.progressPercent, f.status)]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* 3. Proyectos por estado */}
+                <div className="rounded-xl p-4" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#e8edf3', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <p className="text-xs font-bold uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--text-muted)' }}>Proyectos por estado</p>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'En curso',    value: enCurso,     color: '#60a5fa' },
+                          { name: 'Completados', value: completados,  color: '#34d399' },
+                          { name: 'Pausados',    value: pausados,     color: '#fbbf24' },
+                        ].filter(d => d.value > 0)}
+                        cx="50%" cy="50%" innerRadius={45} outerRadius={70}
+                        dataKey="value" paddingAngle={3}
+                      >
+                        {[{ color: '#60a5fa' }, { color: '#34d399' }, { color: '#fbbf24' }].map((c, i) => (
+                          <Cell key={i} fill={c.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: dark ? '#101c2e' : '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px' }}
+                        formatter={(v: any, n: any) => [`${v} proyecto${v !== 1 ? 's' : ''}`, n]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex justify-center gap-3 mt-1">
+                    {[{ label: 'En curso', color: '#60a5fa' }, { label: 'Completados', color: '#34d399' }, { label: 'Pausados', color: '#fbbf24' }].map(l => (
+                      <div key={l.label} className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full" style={{ background: l.color }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{l.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Retrasos por responsable */}
+                <div className="rounded-xl p-4" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#e8edf3', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <p className="text-xs font-bold uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--text-muted)' }}>Retrasos por responsable</p>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Cliente',      value: porResponsable['Cliente']    ?? 0, color: '#f87171' },
+                          { name: 'Implementador',value: porResponsable['IHCE']       ?? 0, color: '#fb923c' },
+                          { name: 'Compartido',   value: porResponsable['Compartido'] ?? 0, color: '#a78bfa' },
+                        ].filter(d => d.value > 0)}
+                        cx="50%" cy="50%" innerRadius={45} outerRadius={70}
+                        dataKey="value" paddingAngle={3}
+                      >
+                        {[{ color: '#f87171' }, { color: '#fb923c' }, { color: '#a78bfa' }].map((c, i) => (
+                          <Cell key={i} fill={c.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: dark ? '#101c2e' : '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '11px' }}
+                        formatter={(v: any, n: any) => [`${v} proyecto${v !== 1 ? 's' : ''}`, n]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {Object.values(porResponsable).every(v => v === 0) ? (
+                    <p className="text-xs text-center mt-1" style={{ color: 'var(--text-muted)' }}>Sin responsables asignados</p>
+                  ) : (
+                    <div className="flex justify-center gap-3 mt-1">
+                      {[{ label: 'Cliente', color: '#f87171' }, { label: 'Implementador', color: '#fb923c' }, { label: 'Compartido', color: '#a78bfa' }].map(l => (
+                        <div key={l.label} className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full" style={{ background: l.color }} />
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{l.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Sección inferior */}
             <div className="mx-4 mb-4 grid grid-cols-1 sm:grid-cols-4 gap-3">

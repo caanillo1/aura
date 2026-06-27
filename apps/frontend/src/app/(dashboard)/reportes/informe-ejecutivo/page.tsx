@@ -99,16 +99,14 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
 }
 
 // ── celda de fecha ─────────────────────────────────────────────────────────────
+// Usa <label> envolviendo el input: mecanismo HTML puro que funciona en todos
+// los navegadores sin JS. El navegador dispara click en el input al hacer clic
+// en el label, lo que siempre abre el date picker nativo.
 function DateCell({ value, color, onSave, readOnly = false }: {
   value: string | null; color: string;
   onSave: (iso: string) => Promise<void>; readOnly?: boolean;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [saving,  setSaving] = useState(false);
-
-  // showPicker() debe llamarse sincrónicamente dentro del click handler
-  // para que Chrome/Edge lo traten como gesto directo del usuario
-  const openPicker = () => { try { inputRef.current?.showPicker(); } catch { /* fallback silencioso */ } };
+  const [saving, setSaving] = useState(false);
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const iso = e.target.value;
@@ -124,36 +122,45 @@ function DateCell({ value, color, onSave, readOnly = false }: {
     </span>
   );
 
-  if (saving) return <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" style={{ color: 'var(--accent-blue)' }} />;
+  if (saving) return (
+    <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" style={{ color: 'var(--accent-blue)' }} />
+  );
 
   return (
-    <div className="flex items-center justify-center gap-1">
-      {/* Fecha formateada (si existe) */}
+    <div className="flex items-center justify-center gap-1.5">
       {value && (
         <span className="text-xs font-bold" style={{ color }}>{fmt(value)}</span>
       )}
 
-      {/* Botón que dispara showPicker() sincrónicamente */}
-      <button
-        type="button"
-        onClick={openPicker}
+      {/* label envuelve el input directamente: clic en label = clic en input
+          El input tiene dimensiones reales (20×20) y opacity:0 para ser invisible
+          pero sigue siendo interactivo — el browser siempre abre el picker */}
+      <label
         title="Seleccionar fecha"
-        className="p-0.5 rounded transition-opacity hover:opacity-100"
-        style={{ color: 'var(--accent-blue)', opacity: value ? 0.4 : 0.6, lineHeight: 0 }}
-        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-        onMouseLeave={e => (e.currentTarget.style.opacity = value ? '0.4' : '0.6')}
+        style={{ position: 'relative', display: 'inline-flex', width: 20, height: 20, cursor: 'pointer', flexShrink: 0 }}
       >
-        <CalendarDays className="w-3.5 h-3.5" />
-      </button>
-
-      {/* Input montado pero invisible — showPicker() requiere que esté en el DOM */}
-      <input
-        ref={inputRef}
-        type="date"
-        value={value ?? ''}
-        onChange={handleChange}
-        style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }}
-      />
+        <CalendarDays
+          className="w-3.5 h-3.5"
+          style={{
+            color: 'var(--accent-blue)',
+            opacity: value ? 0.45 : 0.65,
+            position: 'absolute',
+            top: '50%', left: '50%',
+            transform: 'translate(-50%,-50%)',
+            pointerEvents: 'none',
+          }}
+        />
+        <input
+          type="date"
+          value={value ?? ''}
+          onChange={handleChange}
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%',
+            opacity: 0, cursor: 'pointer',
+          }}
+        />
+      </label>
     </div>
   );
 }

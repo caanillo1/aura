@@ -99,16 +99,19 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
 }
 
 // ── celda de fecha ─────────────────────────────────────────────────────────────
-// input[type=date] transparente superpuesto sobre la visualización.
-// Cubre toda la celda → cualquier clic abre el calendar nativo del browser.
 function DateCell({ value, color, onSave, readOnly = false }: {
   value: string | null; color: string;
   onSave: (iso: string) => Promise<void>; readOnly?: boolean;
 }) {
-  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [saving,  setSaving] = useState(false);
+
+  // showPicker() debe llamarse sincrónicamente dentro del click handler
+  // para que Chrome/Edge lo traten como gesto directo del usuario
+  const openPicker = () => { try { inputRef.current?.showPicker(); } catch { /* fallback silencioso */ } };
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const iso = e.target.value; // yyyy-mm-dd
+    const iso = e.target.value;
     if (!iso) return;
     setSaving(true);
     await onSave(iso);
@@ -124,27 +127,32 @@ function DateCell({ value, color, onSave, readOnly = false }: {
   if (saving) return <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" style={{ color: 'var(--accent-blue)' }} />;
 
   return (
-    <div className="relative inline-flex items-center justify-center" style={{ minWidth: 72, minHeight: 24 }}>
-      {/* Capa visual (pointer-events:none para no bloquear el input) */}
-      {value ? (
-        <span className="text-xs font-bold pointer-events-none select-none" style={{ color }}>
-          {fmt(value)}
-        </span>
-      ) : (
-        <CalendarDays className="w-4 h-4 pointer-events-none" style={{ color: 'var(--accent-blue)', opacity: 0.55 }} />
+    <div className="flex items-center justify-center gap-1">
+      {/* Fecha formateada (si existe) */}
+      {value && (
+        <span className="text-xs font-bold" style={{ color }}>{fmt(value)}</span>
       )}
 
-      {/* Input real transparente que captura todos los clics */}
+      {/* Botón que dispara showPicker() sincrónicamente */}
+      <button
+        type="button"
+        onClick={openPicker}
+        title="Seleccionar fecha"
+        className="p-0.5 rounded transition-opacity hover:opacity-100"
+        style={{ color: 'var(--accent-blue)', opacity: value ? 0.4 : 0.6, lineHeight: 0 }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = value ? '0.4' : '0.6')}
+      >
+        <CalendarDays className="w-3.5 h-3.5" />
+      </button>
+
+      {/* Input montado pero invisible — showPicker() requiere que esté en el DOM */}
       <input
+        ref={inputRef}
         type="date"
         value={value ?? ''}
         onChange={handleChange}
-        title="Seleccionar fecha"
-        style={{
-          position: 'absolute', inset: 0,
-          opacity: 0, cursor: 'pointer',
-          width: '100%', height: '100%',
-        }}
+        style={{ position: 'absolute', opacity: 0, width: 1, height: 1, pointerEvents: 'none' }}
       />
     </div>
   );

@@ -70,8 +70,8 @@ export class InformesService {
   // ── Análisis IA ─────────────────────────────────────────────────────────────
 
   async generarAnalisis(companyId: string) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new InternalServerErrorException('ANTHROPIC_API_KEY no configurada');
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new InternalServerErrorException('GEMINI_API_KEY no configurada');
 
     // Recopilar datos reales de todos los proyectos activos
     const projects = await this.prisma.project.findMany({
@@ -148,28 +148,24 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin texto a
 }`;
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1024,
-          messages: [{ role: 'user', content: prompt }],
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
         }),
       });
 
       if (!response.ok) {
         const err = await response.text();
-        this.logger.error(`Anthropic API error: ${err}`);
+        this.logger.error(`Gemini API error: ${err}`);
         throw new InternalServerErrorException('Error al consultar la IA');
       }
 
       const data: any = await response.json();
-      const text = data?.content?.[0]?.text ?? '';
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
       // Extraer JSON de la respuesta
       const jsonMatch = text.match(/\{[\s\S]*\}/);

@@ -253,6 +253,7 @@ export interface TemplateModule {
   code: string;
   name: string;
   description?: string;
+  tipo?: string | null;
   order: number;
   estimatedDays: number;
   days: number;

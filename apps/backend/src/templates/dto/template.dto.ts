@@ -41,6 +41,7 @@ export class CreateStandaloneModuleDto {
 export class UpdateTemplateModuleDto {
   @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['asistencial','financiero','mixto']) tipo?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Type(() => Number) estimatedDays?: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Type(() => Number) days?: number;
   @ApiPropertyOptional() @IsOptional() @IsDateString() startDate?: string;

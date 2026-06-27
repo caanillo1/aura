@@ -252,6 +252,7 @@ model TemplateModule {
   code           String          @db.NVarChar(20)
   name           String          @db.NVarChar(200)
   description    String?         @db.NVarChar(500)
+  tipo           String?         @db.NVarChar(20)
   order          Int             @default(0)
   estimatedDays  Int             @default(0)
   days           Int             @default(0)

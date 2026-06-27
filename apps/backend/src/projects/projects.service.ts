@@ -440,7 +440,7 @@ export class ProjectsService {
         ? new Date(modPhaseDates.filter(d => d?.endDate).map(d => d!.endDate!).sort().reverse()[0])
         : null;
 
-      moduleRows.push({ id: modId, projectId, name: tMod.name, order: tMod.order, startDate: modStart, endDate: modEnd });
+      moduleRows.push({ id: modId, projectId, name: tMod.name, tipo: (tMod as any).tipo ?? null, order: tMod.order, startDate: modStart, endDate: modEnd });
 
       for (const tPhase of tMod.phases) {
         const phaseId = randomUUID();
@@ -526,7 +526,7 @@ export class ProjectsService {
         ? new Date(modPhaseDates.filter(d => d?.endDate).map(d => d!.endDate!).sort().reverse()[0])
         : null;
 
-      moduleRows.push({ id: modId, projectId, name: tMod.name, order: nextOrder++, startDate: modStart, endDate: modEnd });
+      moduleRows.push({ id: modId, projectId, name: tMod.name, tipo: (tMod as any).tipo ?? null, order: nextOrder++, startDate: modStart, endDate: modEnd });
 
       for (const tPhase of tMod.phases) {
         const phaseId = randomUUID();
@@ -759,7 +759,7 @@ export class ProjectsService {
         ? new Date(modPhaseDates.filter(d => d?.endDate).map(d => d!.endDate!).sort().reverse()[0])
         : undefined;
 
-      modulesData.push({ id: modId, projectId, name: tMod.name, order: tMod.order, startDate: modStart, endDate: modEnd });
+      modulesData.push({ id: modId, projectId, name: tMod.name, tipo: (tMod as any).tipo ?? null, order: tMod.order, startDate: modStart, endDate: modEnd });
 
       for (const tPhase of tMod.phases) {
         const phaseId = randomUUID();

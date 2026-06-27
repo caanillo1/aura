@@ -198,7 +198,70 @@ function parseModulesExcel(file: File): Promise<ParseResult> {
 const fmt = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—';
 
-const EMPTY_FORM = { name: '', description: '' };
+const EMPTY_FORM = { name: '', description: '', tipo: '' };
+
+const TIPO_CFG: Record<string, { label: string; bg: string; color: string }> = {
+  asistencial: { label: 'Asistencial', bg: 'rgba(52,211,153,0.15)', color: '#34d399' },
+  financiero:  { label: 'Financiero',  bg: 'rgba(251,191, 36,0.15)', color: '#fbbf24' },
+  mixto:       { label: 'Mixto',       bg: 'rgba(167,139,250,0.15)', color: '#a78bfa' },
+};
+
+function TipoBadge({ moduleId, tipo, onChanged }: { moduleId: string; tipo?: string | null; onChanged: (t: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  const set = async (val: string | null) => {
+    setLoading(true);
+    setOpen(false);
+    try {
+      await templatesApi.updateModuleById(moduleId, { tipo: val });
+      onChanged(val);
+    } catch { /* silently ignore */ }
+    finally { setLoading(false); }
+  };
+
+  const cfg = tipo ? TIPO_CFG[tipo] : null;
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+        disabled={loading}
+        className="text-xs font-semibold px-2 py-0.5 rounded-full transition-opacity disabled:opacity-50"
+        style={cfg ? { background: cfg.bg, color: cfg.color } : { background: 'rgba(100,116,139,0.15)', color: '#94a3b8' }}>
+        {cfg ? cfg.label : '— tipo'}
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 left-0 rounded-xl overflow-hidden shadow-lg"
+          style={{ minWidth: 120, background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)' }}>
+          {Object.entries(TIPO_CFG).map(([k, c]) => (
+            <button key={k} onClick={e => { e.stopPropagation(); set(k); }}
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 transition-colors flex items-center gap-2"
+              style={{ color: c.color }}>
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
+              {c.label}
+            </button>
+          ))}
+          {tipo && (
+            <button onClick={e => { e.stopPropagation(); set(null); }}
+              className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 transition-colors border-t border-white/10"
+              style={{ color: '#94a3b8' }}>
+              Quitar tipo
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ModulosPage() {
   const { theme } = useTheme();
@@ -331,7 +394,7 @@ export default function ModulosPage() {
   // ── Edit ──────────────────────────────────────────────────────────────────
   const openEdit = (mod: TemplateModule) => {
     setEditTarget(mod);
-    setEditForm({ name: mod.name, description: mod.description ?? '' });
+    setEditForm({ name: mod.name, description: mod.description ?? '', tipo: mod.tipo ?? '' });
     setEditModal(true);
   };
 
@@ -344,6 +407,7 @@ export default function ModulosPage() {
       await templatesApi.updateModuleById(editTarget.id, {
         name: editForm.name,
         description: editForm.description || undefined,
+        tipo: editForm.tipo || null,
       });
       toast.success('Módulo actualizado');
       setEditModal(false);
@@ -513,7 +577,7 @@ export default function ModulosPage() {
                       : <Square className="w-4 h-4" style={{ color: tc.m }} />}
                 </button>
               </th>
-              {['Código', 'Módulo', 'Plantilla', 'Estado', 'Fases', 'Acciones'].map(h => (
+              {['Código', 'Módulo', 'Plantilla', 'Tipo', 'Estado', 'Fases', 'Acciones'].map(h => (
                 <th key={h} className="text-left px-4 py-3.5 text-xs font-semibold uppercase tracking-wide"
                   style={{ color: tc.m }}>{h}</th>
               ))}
@@ -577,6 +641,15 @@ export default function ModulosPage() {
                       ) : (
                         <span className="text-xs italic" style={{ color: tc.m }}>Independiente</span>
                       )}
+                    </td>
+
+                    {/* Tipo */}
+                    <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                      <TipoBadge
+                        moduleId={mod.id}
+                        tipo={mod.tipo}
+                        onChanged={newTipo => setModules(prev => prev.map(m => m.id === mod.id ? { ...m, tipo: newTipo } : m))}
+                      />
                     </td>
 
                     {/* Estado */}
@@ -727,6 +800,24 @@ export default function ModulosPage() {
             <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Detalle</label>
             <textarea className="input-glass w-full rounded-xl px-3 py-2 text-sm resize-none" rows={3}
               value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Tipo de módulo</label>
+            <div className="flex gap-2 flex-wrap">
+              {(['asistencial', 'financiero', 'mixto'] as const).map(t => {
+                const c = TIPO_CFG[t];
+                const active = editForm.tipo === t;
+                return (
+                  <button key={t} type="button"
+                    onClick={() => setEditForm(p => ({ ...p, tipo: active ? '' : t }))}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+                    style={{ background: active ? c.bg : 'rgba(100,116,139,0.10)', color: active ? c.color : '#94a3b8',
+                      border: `1px solid ${active ? c.color + '40' : 'transparent'}` }}>
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={() => setEditModal(false)}

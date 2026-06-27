@@ -98,67 +98,25 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
   );
 }
 
-// ── celda de fecha con máscara DD/MM/AAAA ─────────────────────────────────────
-// Solo acepta dígitos; inserta barras automáticamente; guarda al completar
-// los 8 dígitos; restaura el valor anterior si se abandona incompleto.
-function DateCell({ value, color, onSave, readOnly = false }: {
+// ── celda de fecha ─────────────────────────────────────────────────────────────
+// input[type="date"] — buenas prácticas semánticas.
+// Solo guarda cuando el año ya es ≥ 2000, ignorando estados intermedios del
+// teclado (ej. "0002" mientras el usuario escribe "2026" dígito a dígito).
+function DateCell({ value, color, onSave, readOnly = false, dark = false }: {
   value: string | null; color: string;
-  onSave: (iso: string) => Promise<void>; readOnly?: boolean;
+  onSave: (iso: string) => Promise<void>; readOnly?: boolean; dark?: boolean;
 }) {
-  const [draft,  setDraft]  = useState(value ? fmt(value) : '');
   const [saving, setSaving] = useState(false);
-  const [error,  setError]  = useState(false);
-
-  useEffect(() => { setDraft(value ? fmt(value) : ''); }, [value]);
-
-  // Convierte 8 dígitos a ISO yyyy-mm-dd y valida que la fecha sea real
-  const digitsToISO = (d: string): string | null => {
-    if (d.length !== 8) return null;
-    const day = d.slice(0, 2), mon = d.slice(2, 4), yr = d.slice(4, 8);
-    const iso  = `${yr}-${mon}-${day}`;
-    const date = new Date(`${iso}T12:00:00Z`);
-    if (
-      isNaN(date.getTime()) ||
-      date.getUTCFullYear() !== +yr ||
-      date.getUTCMonth() + 1 !== +mon ||
-      date.getUTCDate()  !== +day
-    ) return null;
-    return iso;
-  };
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Extraer solo dígitos (máx 8: DDMMAAAA)
-    const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
-
-    // Construir máscara DD/MM/AAAA
-    let masked = digits;
-    if (digits.length > 4) masked = `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
-    else if (digits.length > 2) masked = `${digits.slice(0,2)}/${digits.slice(2)}`;
-
-    setDraft(masked);
-    setError(false);
-
-    // Auto-guardar al completar los 8 dígitos
-    if (digits.length === 8) {
-      const iso = digitsToISO(digits);
-      if (iso) {
-        setSaving(true);
-        await onSave(iso);
-        setSaving(false);
-      } else {
-        setError(true);
-      }
-    }
-  };
-
-  const handleBlur = () => {
-    if (saving) return;
-    const digits = draft.replace(/\D/g, '');
-    if (digits.length < 8) {
-      // Incompleto → restaurar valor anterior
-      setDraft(value ? fmt(value) : '');
-      setError(false);
-    }
+    const iso = e.target.value; // yyyy-mm-dd
+    if (!iso) return;
+    const year = parseInt(iso.split('-')[0], 10);
+    // Ignorar mientras el año esté incompleto (estados intermedios: 0002, 0020…)
+    if (year < 2000 || year > 2099) return;
+    setSaving(true);
+    await onSave(iso);
+    setSaving(false);
   };
 
   if (readOnly) return (
@@ -173,24 +131,21 @@ function DateCell({ value, color, onSave, readOnly = false }: {
 
   return (
     <input
-      type="text"
-      inputMode="numeric"
-      value={draft}
-      placeholder="DD/MM/AAAA"
+      type="date"
+      value={value ?? ''}
+      min="2000-01-01"
+      max="2099-12-31"
       onChange={handleChange}
-      onBlur={handleBlur}
-      onKeyDown={e => {
-        if (e.key === 'Escape') { setDraft(value ? fmt(value) : ''); setError(false); }
-      }}
-      className="text-xs rounded-lg outline-none text-center"
+      className="text-xs rounded-lg outline-none"
       style={{
-        width: 90,
+        width: 120,
         padding: '3px 6px',
         background: 'var(--input-bg)',
-        border: `1px solid ${error ? '#ef4444' : 'var(--border-subtle)'}`,
-        color: error ? '#ef4444' : (value ? color : 'var(--input-color)'),
+        border: '1px solid var(--border-subtle)',
+        color: value ? color : 'var(--text-muted)',
         fontWeight: value ? 700 : 400,
-        letterSpacing: '0.3px',
+        cursor: 'pointer',
+        colorScheme: dark ? 'dark' : 'light',
       }}
     />
   );
@@ -638,6 +593,7 @@ export default function InformeEjecutivoPage() {
                             value={f.nuevaFechaEstimada}
                             color={newDateColor}
                             readOnly={readOnly}
+                            dark={dark}
                             onSave={iso => save(f.id, 'nuevaFechaEstimada', iso)}
                           />
                         </td>

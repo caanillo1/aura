@@ -173,7 +173,7 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
   const downloadPdf = async () => {
     setDownloading(true);
     try {
-      const osNum = (data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
+      const osName = (data?.os?.product ?? data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
       // Use pre-generated blob if ready; else await the pending promise; else generate now
       const blob = pdfBlobRef.current
         ?? await pdfPromiseRef.current
@@ -181,7 +181,7 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
         ?? await pdf(React.createElement(InformeDocument, { data: transformForPdf(data), includeActas: true }) as any).toBlob();
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
-      a.href = url; a.download = `Informe_Ejecutivo_${osNum}.pdf`;
+      a.href = url; a.download = `Informe_Ejecutivo_${osName}.pdf`;
       document.body.appendChild(a); a.click();
       document.body.removeChild(a); URL.revokeObjectURL(url);
     } catch (err) {
@@ -979,6 +979,46 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
                   </div>
                 ))}
               </div>
+
+              {/* Avance por tipo de módulo */}
+              {(() => {
+                const mods = data?.project?.modules ?? [];
+                const byTipo: Record<string, number[]> = {};
+                for (const m of mods) {
+                  if (!m.tipo) continue;
+                  (byTipo[m.tipo] = byTipo[m.tipo] ?? []).push(Number(m.progressPercent) || 0);
+                }
+                const avg = (arr: number[]) => Math.round(arr.reduce((s, n) => s + n, 0) / arr.length);
+                const rows = [
+                  { key: 'asistencial', label: 'Asistencial', color: '#2563eb', bg: '#dbeafe' },
+                  { key: 'financiero',  label: 'Financiero',  color: '#059669', bg: '#d1fae5' },
+                  { key: 'mixto',       label: 'Mixto',       color: '#7c3aed', bg: '#ede9fe' },
+                ].filter(r => byTipo[r.key]?.length);
+                if (!rows.length) return null;
+                return (
+                  <div style={{ marginTop: 10, padding: '14px 18px', background: '#fafbfc',
+                    border: '1px solid #e9ecef', borderRadius: 8 }}>
+                    <div style={{ fontSize: 7.5, fontWeight: 700, textTransform: 'uppercase',
+                      letterSpacing: '0.12em', color: '#9ca3af', marginBottom: 10, fontFamily: F }}>
+                      Avance por Tipo de Módulo
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      {rows.map(({ key, label, color, bg }) => {
+                        const pct = avg(byTipo[key]);
+                        return (
+                          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 72, fontSize: 9, fontWeight: 700, color, fontFamily: F }}>{label}</div>
+                            <div style={{ flex: 1, height: 6, background: '#e9ecef', borderRadius: 4, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 4 }} />
+                            </div>
+                            <div style={{ width: 32, fontSize: 9, fontWeight: 800, color, textAlign: 'right', fontFamily: F }}>{pct}%</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ── OS Data ── */}

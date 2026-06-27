@@ -4,6 +4,8 @@ import { F, FS, LH } from '../design/typography';
 import { N, alpha, lighten } from '../design/colors';
 import { SectionTitle } from './SectionTitle';
 
+interface TipoProgress { asistencial?: number | null; financiero?: number | null; mixto?: number | null; }
+
 interface Props {
   pc: string;
   onPc: string;
@@ -18,6 +20,7 @@ interface Props {
   personalCapacitado: any[];
   personalEnProceso: any[];
   os: any;
+  tipoProgress?: TipoProgress;
 }
 
 const fmt = (s?: string | null) => {
@@ -64,7 +67,7 @@ function KpiCard({ label, value, sub, color, bg }: {
 
 export function ProjectSummarySection({
   pc, onPc, sectionNum, progressPct, totalActs, doneActs, inProgActs, blockedActs,
-  pendActs, actas, personalCapacitado, personalEnProceso, os,
+  pendActs, actas, personalCapacitado, personalEnProceso, os, tipoProgress,
 }: Props) {
   const firmadas = actas.filter((a: any) => a.status === 'firmada').length;
   return (
@@ -112,6 +115,37 @@ export function ProjectSummarySection({
           </View>
         ))}
       </View>
+
+      {/* Avance por tipo */}
+      {tipoProgress && (() => {
+        const rows = [
+          { key: 'asistencial', label: 'Asistencial', color: '#2563eb' },
+          { key: 'financiero',  label: 'Financiero',  color: '#059669' },
+          { key: 'mixto',       label: 'Mixto',       color: '#7c3aed' },
+        ].filter(r => tipoProgress[r.key as keyof TipoProgress] != null);
+        if (!rows.length) return null;
+        return (
+          <View style={{ marginTop: 10, padding: 10, backgroundColor: N.gray50,
+            borderRadius: 6, borderWidth: 0.5, borderColor: N.gray200 }}>
+            <Text style={{ fontSize: FS.caption, fontFamily: F.bold, textTransform: 'uppercase',
+              letterSpacing: 0.5, color: N.gray500, marginBottom: 8 }}>
+              Avance por Tipo de Módulo
+            </Text>
+            {rows.map(({ key, label, color }) => {
+              const pct = tipoProgress[key as keyof TipoProgress] ?? 0;
+              return (
+                <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                  <Text style={{ fontSize: FS.small, fontFamily: F.bold, color, width: 62 }}>{label}</Text>
+                  <View style={{ flex: 1, height: 5, backgroundColor: N.gray200, borderRadius: 3 }}>
+                    <View style={{ height: 5, width: `${Math.min(pct, 100)}%`, backgroundColor: color, borderRadius: 3 }} />
+                  </View>
+                  <Text style={{ fontSize: FS.small, fontFamily: F.bold, color, width: 28, textAlign: 'right' }}>{pct}%</Text>
+                </View>
+              );
+            })}
+          </View>
+        );
+      })()}
     </View>
   );
 }

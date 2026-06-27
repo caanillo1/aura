@@ -100,11 +100,22 @@ export function InformeDocument({ data, includeActas = false }: Props) {
   const tasks             = os.projectTasks ?? [];
   const { total: totalActs, done: doneActs, inProg: inProgActs,
           blocked: blockedActs, pend: pendActs, pct: countPct } = deriveActivityStats(tasks);
-  // Use the stored project.progressPercent (average-of-averages) so the gauge
-  // matches what the service order tab shows. Fall back to count-based if unavailable.
   const progressPct = project?.progressPercent != null
     ? Math.round(Number(project.progressPercent))
     : countPct;
+
+  // Avance por tipo de módulo
+  const _byTipo: Record<string, number[]> = {};
+  for (const m of (project?.modules ?? [])) {
+    if (!m.tipo) continue;
+    (_byTipo[m.tipo] = _byTipo[m.tipo] ?? []).push(Number(m.progressPercent) || 0);
+  }
+  const _avg = (arr?: number[]) => arr?.length ? Math.round(arr.reduce((s, n) => s + n, 0) / arr.length) : null;
+  const tipoProgress = {
+    asistencial: _avg(_byTipo['asistencial']),
+    financiero:  _avg(_byTipo['financiero']),
+    mixto:       _avg(_byTipo['mixto']),
+  };
 
   const reportTitle = includeActas ? 'Informe Ejecutivo con Actas' : 'Informe Ejecutivo';
 
@@ -144,6 +155,7 @@ export function InformeDocument({ data, includeActas = false }: Props) {
           inProgActs={inProgActs} blockedActs={blockedActs} pendActs={pendActs}
           actas={actas} personalCapacitado={personalCapacitado}
           personalEnProceso={personalEnProceso} os={os}
+          tipoProgress={tipoProgress}
         />
 
         {/* 2 — Service order */}

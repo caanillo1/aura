@@ -118,6 +118,19 @@ export function PlanTrabajoDocument({ data }: { data: PlanTrabajoData }) {
     ? Math.round(Number(project.progressPercent))
     : (total ? Math.round((done / total) * 100) : 0);
 
+  // Avance por tipo
+  const _byTipo: Record<string, number[]> = {};
+  for (const m of (project?.modules ?? [])) {
+    if (!m.tipo) continue;
+    (_byTipo[m.tipo] = _byTipo[m.tipo] ?? []).push(Number(m.progressPercent) || 0);
+  }
+  const _avgTipo = (arr?: number[]) => arr?.length ? Math.round(arr.reduce((s, n) => s + n, 0) / arr.length) : null;
+  const tipoRows = [
+    { key: 'asistencial', label: 'Asistencial', color: '#2563eb' },
+    { key: 'financiero',  label: 'Financiero',  color: '#059669' },
+    { key: 'mixto',       label: 'Mixto',       color: '#7c3aed' },
+  ].map(r => ({ ...r, pct: _avgTipo(_byTipo[r.key]) })).filter(r => r.pct != null);
+
   const genDate = data.generatedAt
     ? new Date(data.generatedAt).toLocaleDateString('es-CO',
         { day: '2-digit', month: 'long', year: 'numeric' })
@@ -217,6 +230,30 @@ export function PlanTrabajoDocument({ data }: { data: PlanTrabajoData }) {
             </View>
           ))}
         </View>
+
+        {/* Avance por tipo */}
+        {tipoRows.length > 0 && (
+          <View style={{ marginBottom: 14, padding: 10, backgroundColor: N.gray50,
+            borderRadius: 6, borderWidth: 0.5, borderColor: N.gray200 }}>
+            <Text style={{ fontSize: 7, fontFamily: F.bold, textTransform: 'uppercase',
+              letterSpacing: 0.5, color: N.gray500, marginBottom: 8 }}>
+              Avance por Tipo de Módulo
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {tipoRows.map(({ key, label, color, pct: tPct }) => (
+                <View key={key} style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <Text style={{ fontSize: 7.5, fontFamily: F.bold, color }}>{label}</Text>
+                    <Text style={{ fontSize: 7.5, fontFamily: F.bold, color }}>{tPct}%</Text>
+                  </View>
+                  <View style={{ height: 5, backgroundColor: N.gray200, borderRadius: 3 }}>
+                    <View style={{ height: 5, width: `${Math.min(tPct ?? 0, 100)}%`, backgroundColor: color, borderRadius: 3 }} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Activities section */}
         <SectionTitle n="1" text="Actividades del Plan de Trabajo" pc={pc} onPc={onPc} />

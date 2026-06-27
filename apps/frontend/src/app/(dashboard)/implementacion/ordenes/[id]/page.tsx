@@ -618,7 +618,7 @@ export default function OrdenDetailPage() {
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `plan-trabajo-${os.osNumber ?? 'doc'}.pdf`;
+      a.download = `Plan_Trabajo_${(os.product ?? os.osNumber ?? 'doc').replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {

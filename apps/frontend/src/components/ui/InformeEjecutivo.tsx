@@ -1,13 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
+import React from 'react';
 import { X, Printer, Loader2, BarChart3, Download, RefreshCw, Mail } from 'lucide-react';
 import { toast } from 'sonner';
+import { pdf } from '@react-pdf/renderer';
 import { serviceOrdersApi } from '@/lib/api';
-
-const hexToRgb = (hex: string): [number, number, number] => {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [30, 58, 95];
-};
+import { InformeDocument } from '@/lib/pdf/InformeDocument';
+import { transformForPdf } from '@/lib/pdf/transformForPdf';
 
 const fmt = (s: string | null | undefined) => {
   if (!s) return '—';
@@ -84,10 +83,11 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
     setAutoSending(true);
     (async () => {
       try {
-        const pdf   = await buildPdf();
-        const bytes = pdf.output('arraybuffer');
-        const b64   = btoa(String.fromCharCode(...Array.from(new Uint8Array(bytes))));
-        const osName = (data?.os?.product ?? data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
+        const osName  = (data?.os?.product ?? data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
+        const pdfData = transformForPdf(data);
+        const blob    = await pdf(React.createElement(InformeDocument, { data: pdfData, includeActas: false }) as any).toBlob();
+        const bytes   = await blob.arrayBuffer();
+        const b64     = btoa(String.fromCharCode(...Array.from(new Uint8Array(bytes))));
         await serviceOrdersApi.sendPdf(osId, {
           destinatarios: autoEmail.destinatarios,
           asunto: autoEmail.asunto,
@@ -104,165 +104,18 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  const buildPdf = async () => {
-      const { default: html2canvas } = await import('html2canvas');
-      const { default: jsPDF }       = await import('jspdf');
-
-      const paperEl = document.getElementById('ie-paper');
-      const theadEl = document.getElementById('ie-thead');
-      const sigsEl  = document.getElementById('ie-print-sigs');
-      if (!paperEl || !theadEl) throw new Error('No se pudo generar el PDF');
-
-      // ── Spec: A4, márgenes 18/18, área segura 10mm ────────────────────────
-      const A4_W = 210, A4_H = 297;  // mm
-      const ML   = 18, MR  = 18;     // interior / exterior mm
-      const CW   = A4_W - ML - MR;   // 174 mm content width
-      // Layout zones (mm from top)
-      const HEADER_TOP    = 6;   // top padding
-      const LOGO_H        = 10;  // logo height mm
-      const FOOTER_LINE_Y = A4_H - 20;          // 277mm — 0.5pt line
-      const FOOTER_TEXT_Y = FOOTER_LINE_Y + 8;  // 285mm — footer text baseline
-      const CONTENT_BOT   = FOOTER_LINE_Y - 8;  // 269mm — 8mm safety before footer
-
-      // Pre-compute header height so CONTENT_TOP is known before pagination.
-      // Must mirror the exact same increments used in drawHeader below.
-      const metaLine = [
-        company?.nit ? `NIT: ${company.nit}` : null,
-        company?.city ?? company?.address ?? null,
-        company?.phone ? `Tel: ${company.phone}` : null,
-      ].filter(Boolean).join('  ·  ');
-      let _y = HEADER_TOP;
-      if (company?.logoData) _y += LOGO_H + 3; else _y += 2;
-      _y += 6;                    // company name
-      if (metaLine) _y += 5;     // NIT / city / phone
-      _y += 6;                    // title
-      _y += 4;                    // subtitle
-      _y += 6;                    // date line (3 text + 3 gap below)
-      const HEADER_LINE_Y = _y;   // line sits right after date text
-      const CONTENT_TOP   = HEADER_LINE_Y + 12; // 12 mm gap below line
-      // Resolution: scale 3 ≈ 288 DPI; quality 0.72 keeps typical doc ≤ 2MB
-      const SCALE   = 3;
-      const MM_PX96 = 25.4 / 96;  // mm per screen px
-      const Q       = 0.72;
-
-      // ── Capture ONLY the body content (thead hidden, sigs shown) ──────────
-      const prevSigs = sigsEl?.style.display ?? 'none';
-      if (sigsEl) sigsEl.style.display = 'block';
-      theadEl.style.display = 'none';
-      const cwPx = Math.round(CW / MM_PX96);
-      const saved = {
-        borderRadius: paperEl.style.borderRadius, boxShadow: paperEl.style.boxShadow,
-        maxWidth: paperEl.style.maxWidth, width: paperEl.style.width,
-        overflow: paperEl.style.overflow, position: paperEl.style.position,
-        top: paperEl.style.top, left: paperEl.style.left,
-      };
-      Object.assign(paperEl.style, {
-        borderRadius: '0', boxShadow: 'none', overflow: 'visible',
-        width: `${cwPx}px`, maxWidth: 'none',
-        position: 'fixed', top: '-9999px', left: '0',
-      });
-      await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-      const cvs = await html2canvas(paperEl, { scale: SCALE, useCORS: true, backgroundColor: '#ffffff', logging: false });
-      Object.assign(paperEl.style, saved);
-      theadEl.style.display = '';
-      if (sigsEl) sigsEl.style.display = prevSigs;
-
-      // ── Pagination ────────────────────────────────────────────────────────
-      const pxPerMm   = cvs.width / CW;
-      const pageHpx   = Math.round((CONTENT_BOT - CONTENT_TOP) * pxPerMm);
-      const totalPages = Math.ceil(cvs.height / pageHpx);
-      const pdf       = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      const [pr, pg, pb] = hexToRgb(primaryColor);
-      const dateStr   = new Date(generatedAt).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
-
-      // ── drawHeader ────────────────────────────────────────────────────────
-      const drawHeader = () => {
-        let y = HEADER_TOP;
-
-        // Logo (si existe)
-        if (company?.logoData) {
-          try {
-            const fmt = company.logoData.startsWith('data:image/png') ? 'PNG'
-                      : company.logoData.startsWith('data:image/gif') ? 'GIF' : 'JPEG';
-            // ancho proporcional estimado: máx 32mm a LOGO_H mm de alto
-            pdf.addImage(company.logoData, fmt, ML, y, 32, LOGO_H);
-          } catch { /* continuar sin logo si falla */ }
-          y += LOGO_H + 3;
-        } else {
-          y += 2;
-        }
-
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(12); pdf.setTextColor(17, 24, 39);
-        pdf.text(companyName, ML, y + 4); y += 6;
-
-        if (metaLine) {
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(7); pdf.setTextColor(107, 114, 128);
-          pdf.text(metaLine, ML, y + 3); y += 5;
-        }
-
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(11); pdf.setTextColor(31, 41, 55);
-        pdf.text('Informe Ejecutivo de Implementación', ML, y + 4); y += 6;
-
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(8); pdf.setTextColor(55, 65, 81);
-        pdf.text(`${os.client?.businessName}  ·  OS: ${os.osNumber}`, ML, y + 3); y += 4;
-
-        pdf.setFontSize(7); pdf.setTextColor(107, 114, 128);
-        pdf.text(`Fecha: ${dateStr}  ·  v1.0  ·  Confidencial`, ML, y + 3);
-        y += 6; // avanzar más allá del texto (espeja: _y += 6 en pre-cálculo)
-
-        // Línea separadora 0.5 pt — posición dinámica, siempre bajo el texto de fecha
-        pdf.setDrawColor(55, 65, 81); pdf.setLineWidth(0.18);
-        pdf.line(ML, y, A4_W - MR, y);
-      };
-
-      // ── drawFooter: texto puro, sin imágenes, sin fondos (por spec) ───────
-      const drawFooter = (page: number) => {
-        pdf.setDrawColor(107, 114, 128); pdf.setLineWidth(0.18);
-        pdf.line(ML, FOOTER_LINE_Y, A4_W - MR, FOOTER_LINE_Y);
-
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(7.5); pdf.setTextColor(107, 114, 128);
-        pdf.text('Informe Ejecutivo  ·  Confidencial', ML, FOOTER_TEXT_Y);
-
-        pdf.setFontSize(7);
-        pdf.text(`Versión 1.0  ·  OS ${os.osNumber}`, A4_W / 2, FOOTER_TEXT_Y, { align: 'center' });
-
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(8); pdf.setTextColor(pr, pg, pb);
-        pdf.text(`Página ${page} de ${totalPages}`, A4_W - MR, FOOTER_TEXT_Y, { align: 'right' });
-      };
-
-      // ── Render pages ──────────────────────────────────────────────────────
-      for (let i = 0; i < totalPages; i++) {
-        if (i > 0) pdf.addPage();
-        drawHeader();
-        drawFooter(i + 1);
-
-        const curY   = i * pageHpx;
-        const sliceH = Math.min(pageHpx, cvs.height - curY);
-        if (sliceH > 0) {
-          const sc = document.createElement('canvas');
-          sc.width = cvs.width; sc.height = sliceH;
-          const ctx = sc.getContext('2d')!;
-          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, sc.width, sc.height);
-          ctx.drawImage(cvs, 0, curY, cvs.width, sliceH, 0, 0, sc.width, sliceH);
-          pdf.addImage(sc.toDataURL('image/jpeg', Q), 'JPEG', ML, CONTENT_TOP, CW, sliceH / pxPerMm);
-        }
-      }
-
-      return pdf;
-  };
-
   const downloadPdf = async () => {
     setDownloading(true);
     try {
-      const pdf   = await buildPdf();
-      const osName = (data?.os?.product ?? data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
-      pdf.save(`Informe_Ejecutivo_${osName}.pdf`);
+      const osName  = (data?.os?.product ?? data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
+      const pdfData = transformForPdf(data);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blob    = await pdf(React.createElement(InformeDocument, { data: pdfData, includeActas: false }) as any).toBlob();
+      const url     = URL.createObjectURL(blob);
+      const a       = document.createElement('a');
+      a.href = url; a.download = `Informe_Ejecutivo_${osName}.pdf`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
     } catch (err) {
       console.error(err);
       toast.error('Error al generar el PDF');
@@ -276,10 +129,12 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
     if (!dest.length) { toast.error('Ingresa al menos un destinatario'); return; }
     setSending(true);
     try {
-      const pdf     = await buildPdf();
-      const bytes   = pdf.output('arraybuffer');
-      const b64     = btoa(String.fromCharCode(...Array.from(new Uint8Array(bytes))));
       const osName  = (data?.os?.product ?? data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
+      const pdfData = transformForPdf(data);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blob    = await pdf(React.createElement(InformeDocument, { data: pdfData, includeActas: false }) as any).toBlob();
+      const bytes   = await blob.arrayBuffer();
+      const b64     = btoa(String.fromCharCode(...Array.from(new Uint8Array(bytes))));
       await serviceOrdersApi.sendPdf(osId, {
         destinatarios: dest,
         asunto: emailAsunto.trim() || undefined,

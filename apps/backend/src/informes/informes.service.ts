@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { GoogleGenAI } from '@google/genai';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -148,24 +149,13 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin texto a
 }`;
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
-        }),
+      const ai = new GoogleGenAI({ apiKey });
+      const result = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: prompt,
+        config: { temperature: 0.4, maxOutputTokens: 1024 },
       });
-
-      if (!response.ok) {
-        const err = await response.text();
-        this.logger.error(`Gemini API error: ${err}`);
-        throw new InternalServerErrorException('Error al consultar la IA');
-      }
-
-      const data: any = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      const text = result.text ?? '';
 
       // Extraer JSON de la respuesta
       const jsonMatch = text.match(/\{[\s\S]*\}/);

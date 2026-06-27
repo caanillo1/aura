@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import {
   ArrowLeft, Printer, RefreshCw, Loader2, Pencil, Check, X,
-  Save, History, ChevronDown, Trash2, Plus, Sparkles,
+  Save, History, ChevronDown, Trash2, Plus, Sparkles, CalendarDays,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -98,29 +98,29 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
   );
 }
 
-// ── celda de fecha ─────────────────────────────────────────────────────────────
-// input[type="date"] semántico. Estado local desacoplado del guardado:
-// - onChange → solo actualiza el estado local (sin guardar)
-// - onBlur   → guarda cuando el usuario termina y sale del campo
-// Así el usuario puede editar día/mes/año libremente sin guardados parciales.
+// ── celda de fecha con confirmar / cancelar ────────────────────────────────────
 function DateCell({ value, color, onSave, readOnly = false, dark = false }: {
   value: string | null; color: string;
   onSave: (iso: string) => Promise<void>; readOnly?: boolean; dark?: boolean;
 }) {
-  const [local,  setLocal]  = useState(value ?? '');
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [local,   setLocal]   = useState(value ?? '');
+  const [saving,  setSaving]  = useState(false);
 
-  // Sincronizar cuando el valor externo cambia (después de guardar)
   useEffect(() => { setLocal(value ?? ''); }, [value]);
 
-  const commitSave = async (iso: string) => {
-    if (!iso || iso === value) return;            // sin cambio
-    const year = parseInt(iso.split('-')[0], 10);
-    if (year < 2000 || year > 2099) return;       // año incompleto/inválido
+  const handleConfirm = async () => {
+    const year = parseInt(local.split('-')[0], 10);
+    if (!local || local === value || year < 2000 || year > 2099) {
+      setEditing(false); return;
+    }
     setSaving(true);
-    await onSave(iso);
+    await onSave(local);
     setSaving(false);
+    setEditing(false);
   };
+
+  const handleCancel = () => { setLocal(value ?? ''); setEditing(false); };
 
   if (readOnly) return (
     <span className="text-xs font-bold" style={{ color: value ? color : 'var(--text-muted)' }}>
@@ -128,30 +128,39 @@ function DateCell({ value, color, onSave, readOnly = false, dark = false }: {
     </span>
   );
 
-  if (saving) return (
-    <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" style={{ color: 'var(--accent-blue)' }} />
+  if (editing) return (
+    <div className="flex items-center gap-1">
+      <input
+        type="date" autoFocus
+        value={local}
+        min="2000-01-01" max="2099-12-31"
+        onChange={e => setLocal(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') handleConfirm(); if (e.key === 'Escape') handleCancel(); }}
+        className="text-xs rounded outline-none"
+        style={{ width: 112, padding: '2px 4px', background: 'var(--input-bg)', border: '1px solid var(--accent-blue)', color: 'var(--input-color)', colorScheme: dark ? 'dark' : 'light' }}
+      />
+      {saving ? (
+        <Loader2 className="w-3 h-3 animate-spin shrink-0" style={{ color: 'var(--accent-blue)' }} />
+      ) : (
+        <>
+          <button onClick={handleConfirm} className="p-0.5 rounded text-green-500 hover:bg-green-500/10 shrink-0"><Check className="w-3 h-3" /></button>
+          <button onClick={handleCancel}  className="p-0.5 rounded text-red-400  hover:bg-red-400/10  shrink-0"><X     className="w-3 h-3" /></button>
+        </>
+      )}
+    </div>
   );
 
   return (
-    <input
-      type="date"
-      value={local}
-      min="2000-01-01"
-      max="2099-12-31"
-      onChange={e => setLocal(e.target.value)}
-      onBlur={e  => commitSave(e.target.value)}
-      className="text-xs rounded-lg outline-none"
-      style={{
-        width: 120,
-        padding: '3px 6px',
-        background: 'var(--input-bg)',
-        border: '1px solid var(--border-subtle)',
-        color: local ? color : 'var(--text-muted)',
-        fontWeight: local ? 700 : 400,
-        cursor: 'pointer',
-        colorScheme: dark ? 'dark' : 'light',
-      }}
-    />
+    <div className="group flex items-center justify-center gap-1 cursor-pointer" onClick={() => setEditing(true)}>
+      {value ? (
+        <>
+          <span className="text-xs font-bold" style={{ color }}>{fmt(value)}</span>
+          <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" style={{ color: 'var(--accent-blue)' }} />
+        </>
+      ) : (
+        <CalendarDays className="w-4 h-4 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: 'var(--accent-blue)' }} />
+      )}
+    </div>
   );
 }
 
@@ -328,6 +337,7 @@ export default function InformeEjecutivoPage() {
       const pdfFilas = filas.map(f => ({
         id:                  f.id,
         clienteNombre:       f.clienteNombre,
+        osNumber:            f.osNumber ?? '',
         startDate:           f.startDate,
         endDate:             f.endDate,
         status:              f.status,
@@ -548,7 +558,7 @@ export default function InformeEjecutivoPage() {
               <table className="w-full border-collapse text-xs" style={{ minWidth: '900px' }}>
                 <thead>
                   <tr style={{ background: dark ? '#0d1e36' : '#0a2240', color: '#fff' }}>
-                    {['Semáforo','Cliente','Fecha inicio','Fecha compromiso','Estado actual','% Avance','Motivo de retraso','Responsable','Acción requerida','Nueva fecha'].map(h => (
+                    {['Semáforo','Cliente','N° OS','Fecha inicio','Fecha compromiso','Estado actual','% Avance','Motivo de retraso','Responsable','Acción requerida','Nueva fecha'].map(h => (
                       <th key={h} className="text-center font-semibold py-2.5 px-3 text-xs" style={{ whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -568,6 +578,7 @@ export default function InformeEjecutivoPage() {
                           </div>
                         </td>
                         <td className="py-3 px-3 font-semibold" style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{f.clienteNombre}</td>
+                        <td className="py-3 px-3 text-center text-xs" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{f.osNumber || '—'}</td>
                         <td className="py-3 px-3 text-center" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmt(f.startDate)}</td>
                         <td className="py-3 px-3 text-center" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmt(f.endDate)}</td>
                         <td className="py-3 px-3 text-center" style={{ color: 'var(--text-secondary)' }}>{STATUS_LABEL[f.status] ?? f.status}</td>

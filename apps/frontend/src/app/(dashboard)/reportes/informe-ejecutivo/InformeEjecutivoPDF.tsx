@@ -136,7 +136,7 @@ const s = StyleSheet.create({
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 export interface FilaPDF {
-  id: string; clienteNombre: string; startDate: string; endDate: string;
+  id: string; clienteNombre: string; osNumber: string; startDate: string; endDate: string;
   status: string; progressPercent: number; motivoRetraso: string;
   responsableRetraso: string; accionRequerida: string; nuevaFechaEstimada: string | null;
 }
@@ -162,7 +162,7 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
     return a;
   }, {} as Record<string, number>);
 
-  const W = { sem:'5%', cli:'16%', fi:'7%', fe:'7%', est:'7%', av:'5%', mot:'17%', re:'7%', acc:'17%', nf:'7%' };
+  const W = { sem:'5%', cli:'14%', os:'7%', fi:'7%', fe:'7%', est:'7%', av:'5%', mot:'15%', re:'7%', acc:'14%', nf:'7%' };
 
   return (
     <Document title="Informe Ejecutivo" author={co}>
@@ -307,7 +307,7 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
 
         <View style={{ margin: '10 24 0 24' }}>
           <View style={s.tblHdr}>
-            {([ ['SEM', W.sem], ['CLIENTE', W.cli], ['INICIO', W.fi], ['COMPROMISO', W.fe], ['ESTADO', W.est], ['%', W.av], ['MOTIVO RETRASO', W.mot], ['RESPONSABLE', W.re], ['ACCIÓN REQUERIDA', W.acc], ['NUEVA FECHA', W.nf] ] as [string, string][]).map(([lbl, w]) =>
+            {([ ['SEM', W.sem], ['CLIENTE', W.cli], ['N° OS', W.os], ['INICIO', W.fi], ['COMPROMISO', W.fe], ['ESTADO', W.est], ['%', W.av], ['MOTIVO RETRASO', W.mot], ['RESPONSABLE', W.re], ['ACCIÓN REQUERIDA', W.acc], ['NUEVA FECHA', W.nf] ] as [string, string][]).map(([lbl, w]) =>
               <Text key={lbl} style={{ ...s.th, width: w as any }}>{lbl}</Text>
             )}
           </View>
@@ -322,6 +322,7 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
                   <Svg width={10} height={10}><Circle cx={5} cy={5} r={5} fill={color} /></Svg>
                 </View>
                 <Text style={{ ...s.tdB,  width: W.cli as any }}>{f.clienteNombre}</Text>
+                <Text style={{ ...s.td,   width: W.os  as any }}>{f.osNumber || '—'}</Text>
                 <Text style={{ ...s.td,   width: W.fi  as any }}>{fmt(f.startDate)}</Text>
                 <Text style={{ ...s.td,   width: W.fe  as any }}>{fmt(f.endDate)}</Text>
                 <Text style={{ ...s.td,   width: W.est as any }}>{STATUS_LABEL[f.status] ?? f.status}</Text>

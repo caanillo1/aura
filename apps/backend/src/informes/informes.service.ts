@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
-import { GoogleGenAI } from '@google/genai';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -71,8 +70,8 @@ export class InformesService {
   // ── Análisis IA ─────────────────────────────────────────────────────────────
 
   async generarAnalisis(companyId: string) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new InternalServerErrorException('GEMINI_API_KEY no configurada');
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new InternalServerErrorException('GROQ_API_KEY no configurada');
 
     // Recopilar datos reales de todos los proyectos activos
     const projects = await this.prisma.project.findMany({
@@ -149,13 +148,28 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta (sin texto a
 }`;
 
     try {
-      const ai = new GoogleGenAI({ apiKey });
-      const result = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: prompt,
-        config: { temperature: 0.4, maxOutputTokens: 1024 },
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.4,
+          max_tokens: 1024,
+        }),
       });
-      const text = result.text ?? '';
+
+      if (!response.ok) {
+        const err = await response.text();
+        this.logger.error(`Groq API error: ${err}`);
+        throw new InternalServerErrorException('Error al consultar la IA');
+      }
+
+      const data: any = await response.json();
+      const text: string = data?.choices?.[0]?.message?.content ?? '';
 
       // Extraer JSON de la respuesta
       const jsonMatch = text.match(/\{[\s\S]*\}/);

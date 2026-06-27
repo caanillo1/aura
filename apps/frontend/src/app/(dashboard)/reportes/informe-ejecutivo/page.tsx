@@ -98,19 +98,49 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
   );
 }
 
-// ── celda de fecha con calendario ─────────────────────────────────────────────
+// ── celda de fecha con texto manual + calendario ──────────────────────────────
 function DateCell({ value, color, onSave, readOnly = false }: {
   value: string | null; color: string;
   onSave: (iso: string) => Promise<void>; readOnly?: boolean;
 }) {
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft,   setDraft]   = useState('');
+  const [saving,  setSaving]  = useState(false);
+  const textRef = useRef<HTMLInputElement>(null);
 
-  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const iso = e.target.value;
+  const startEdit = () => {
+    // Pre-fill con la fecha actual en formato DD/MM/AAAA para edición manual
+    setDraft(value ? fmt(value) : '');
+    setEditing(true);
+  };
+
+  useEffect(() => { if (editing) textRef.current?.focus(); }, [editing]);
+
+  const parseAndSave = async (raw: string) => {
+    // Acepta DD/MM/AAAA o AAAA-MM-DD
+    let iso = '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      iso = raw;
+    } else {
+      const parts = raw.split('/');
+      if (parts.length === 3 && parts[2].length === 4) {
+        iso = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+    if (!iso) { setEditing(false); return; }
+    setSaving(true);
+    await onSave(iso);
+    setSaving(false);
+    setEditing(false);
+  };
+
+  const handlePickerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const iso = e.target.value; // ya viene en AAAA-MM-DD
     if (!iso) return;
     setSaving(true);
     await onSave(iso);
     setSaving(false);
+    setEditing(false);
   };
 
   if (readOnly) return (
@@ -119,27 +149,68 @@ function DateCell({ value, color, onSave, readOnly = false }: {
     </span>
   );
 
+  if (editing) return (
+    <div className="flex items-center gap-1">
+      {/* Campo de texto para escritura manual */}
+      <input
+        ref={textRef}
+        type="text"
+        value={draft}
+        placeholder="DD/MM/AAAA"
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); parseAndSave(draft); }
+          if (e.key === 'Escape') setEditing(false);
+        }}
+        className="w-24 text-xs rounded px-1.5 py-1 outline-none"
+        style={{ background: 'var(--input-bg)', color: 'var(--input-color)', border: '1px solid var(--accent-blue)' }}
+      />
+
+      {/* Ícono de calendario con input[type=date] transparente encima */}
+      <span className="relative shrink-0" title="Abrir calendario">
+        <CalendarDays className="w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--accent-blue)' }} />
+        <input
+          type="date"
+          value={value ?? ''}
+          onChange={handlePickerChange}
+          style={{
+            position: 'absolute', inset: 0, opacity: 0,
+            width: '100%', height: '100%', cursor: 'pointer',
+          }}
+        />
+      </span>
+
+      {saving ? (
+        <Loader2 className="w-3 h-3 animate-spin shrink-0" style={{ color: 'var(--accent-blue)' }} />
+      ) : (
+        <>
+          <button onClick={() => parseAndSave(draft)}
+            className="p-0.5 rounded text-green-500 hover:bg-green-500/10 shrink-0">
+            <Check className="w-3 h-3" />
+          </button>
+          <button onClick={() => setEditing(false)}
+            className="p-0.5 rounded text-red-400 hover:bg-red-400/10 shrink-0">
+            <X className="w-3 h-3" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  // Estado cerrado: muestra la fecha (o ícono) y abre el editor al hacer clic
   return (
-    <label className="group cursor-pointer flex items-center justify-center gap-1.5">
+    <div className="group flex items-center justify-center gap-1.5 cursor-pointer" onClick={startEdit}>
       {value ? (
         <>
           <span className="text-xs font-bold" style={{ color }}>{fmt(value)}</span>
-          <CalendarDays className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-70 transition-opacity"
+          <Pencil className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
             style={{ color: 'var(--accent-blue)' }} />
         </>
       ) : (
-        saving
-          ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--accent-blue)' }} />
-          : <CalendarDays className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity"
-              style={{ color: 'var(--accent-blue)' }} />
+        <CalendarDays className="w-4 h-4 opacity-40 group-hover:opacity-90 transition-opacity"
+          style={{ color: 'var(--accent-blue)' }} />
       )}
-      <input
-        type="date"
-        className="sr-only"
-        value={value ?? ''}
-        onChange={handleChange}
-      />
-    </label>
+    </div>
   );
 }
 

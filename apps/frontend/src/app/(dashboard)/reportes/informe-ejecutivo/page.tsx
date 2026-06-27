@@ -99,18 +99,43 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
 }
 
 // ── celda de fecha ─────────────────────────────────────────────────────────────
-// Usa <label> envolviendo el input: mecanismo HTML puro que funciona en todos
-// los navegadores sin JS. El navegador dispara click en el input al hacer clic
-// en el label, lo que siempre abre el date picker nativo.
+// Campo de texto para escritura manual (DD/MM/AAAA) + ícono de calendario
+// para selección con mouse. Ambas formas guardan automáticamente.
 function DateCell({ value, color, onSave, readOnly = false }: {
   value: string | null; color: string;
   onSave: (iso: string) => Promise<void>; readOnly?: boolean;
 }) {
+  const [draft,  setDraft]  = useState(value ? fmt(value) : '');
   const [saving, setSaving] = useState(false);
 
-  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Sincroniza el texto cuando el valor externo cambia (p. ej. tras guardar)
+  useEffect(() => { setDraft(value ? fmt(value) : ''); }, [value]);
+
+  const parseAndSave = async (raw: string) => {
+    const t = raw.trim();
+    const current = value ? fmt(value) : '';
+    if (!t || t === current) return; // vacío o sin cambio, no guardar
+
+    let iso = '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+      iso = t; // ya en formato ISO
+    } else {
+      const p = t.split('/');
+      if (p.length === 3 && p[2].length === 4)
+        iso = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+    }
+    if (!iso) return; // formato inválido
+
+    setSaving(true);
+    await onSave(iso);
+    setSaving(false);
+  };
+
+  // Selección desde el calendario nativo
+  const handlePickerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const iso = e.target.value;
     if (!iso) return;
+    setDraft(fmt(iso)); // muestra la fecha formateada en el campo de texto
     setSaving(true);
     await onSave(iso);
     setSaving(false);
@@ -122,45 +147,49 @@ function DateCell({ value, color, onSave, readOnly = false }: {
     </span>
   );
 
-  if (saving) return (
-    <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" style={{ color: 'var(--accent-blue)' }} />
-  );
-
   return (
-    <div className="flex items-center justify-center gap-1.5">
-      {value && (
-        <span className="text-xs font-bold" style={{ color }}>{fmt(value)}</span>
-      )}
+    <div className="flex items-center gap-1">
+      {/* Campo de texto — teclado */}
+      <input
+        type="text"
+        value={draft}
+        placeholder="DD/MM/AAAA"
+        onChange={e => setDraft(e.target.value)}
+        onBlur={() => parseAndSave(draft)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); parseAndSave(draft); }
+          if (e.key === 'Escape') setDraft(value ? fmt(value) : '');
+        }}
+        className="text-xs rounded px-1.5 py-0.5 outline-none"
+        style={{
+          width: 82,
+          background: 'var(--input-bg)',
+          border: '1px solid var(--border-subtle)',
+          color: value ? color : 'var(--input-color)',
+          fontWeight: value ? 700 : 400,
+        }}
+      />
 
-      {/* label envuelve el input directamente: clic en label = clic en input
-          El input tiene dimensiones reales (20×20) y opacity:0 para ser invisible
-          pero sigue siendo interactivo — el browser siempre abre el picker */}
-      <label
-        title="Seleccionar fecha"
-        style={{ position: 'relative', display: 'inline-flex', width: 20, height: 20, cursor: 'pointer', flexShrink: 0 }}
-      >
-        <CalendarDays
-          className="w-3.5 h-3.5"
-          style={{
-            color: 'var(--accent-blue)',
-            opacity: value ? 0.45 : 0.65,
-            position: 'absolute',
-            top: '50%', left: '50%',
-            transform: 'translate(-50%,-50%)',
-            pointerEvents: 'none',
-          }}
-        />
-        <input
-          type="date"
-          value={value ?? ''}
-          onChange={handleChange}
-          style={{
-            position: 'absolute', inset: 0,
-            width: '100%', height: '100%',
-            opacity: 0, cursor: 'pointer',
-          }}
-        />
-      </label>
+      {/* Ícono de calendario — mouse */}
+      {saving ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: 'var(--accent-blue)' }} />
+      ) : (
+        <label
+          title="Abrir calendario"
+          style={{ position: 'relative', display: 'inline-flex', width: 20, height: 20, cursor: 'pointer', flexShrink: 0 }}
+        >
+          <CalendarDays
+            className="w-3.5 h-3.5"
+            style={{ color: 'var(--accent-blue)', opacity: 0.6, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none' }}
+          />
+          <input
+            type="date"
+            value={value ?? ''}
+            onChange={handlePickerChange}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+          />
+        </label>
+      )}
     </div>
   );
 }

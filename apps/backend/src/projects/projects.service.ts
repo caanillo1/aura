@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate, buildMeta } from '../common/dto/pagination.dto';
-import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto, SendActivityReportDto } from './dto/project.dto';
+import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto, SendActivityReportDto, UpdateDatosInformeDto } from './dto/project.dto';
 import { EventsGateway } from '../gateway/events.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MailService } from '../mail/mail.service';
@@ -1079,5 +1079,52 @@ export class ProjectsService {
     }
 
     return { enviados: totalSent, destinatarios: dto.recipients.length };
+  }
+
+  async getInformeEjecutivo(companyId: string) {
+    const projects = await this.prisma.project.findMany({
+      where: { serviceOrder: { companyId }, status: { not: 'cancelado' } },
+      select: {
+        id: true, name: true, status: true, progressPercent: true,
+        startDate: true, endDate: true,
+        motivoRetraso: true, responsableRetraso: true,
+        accionRequerida: true, nuevaFechaEstimada: true,
+        serviceOrder: {
+          select: {
+            osNumber: true,
+            client: { select: { id: true, businessName: true } },
+          },
+        },
+      },
+      orderBy: { endDate: 'asc' },
+    });
+    return projects.map(p => ({
+      id: p.id,
+      nombre: p.name,
+      clienteId: p.serviceOrder.client?.id ?? null,
+      clienteNombre: p.serviceOrder.client?.businessName ?? 'Sin cliente',
+      osNumber: p.serviceOrder.osNumber,
+      startDate: p.startDate,
+      endDate: p.endDate,
+      status: p.status,
+      progressPercent: Number(p.progressPercent),
+      motivoRetraso: p.motivoRetraso ?? '',
+      responsableRetraso: p.responsableRetraso ?? '',
+      accionRequerida: p.accionRequerida ?? '',
+      nuevaFechaEstimada: p.nuevaFechaEstimada ?? null,
+    }));
+  }
+
+  async updateDatosInforme(id: string, companyId: string, dto: UpdateDatosInformeDto) {
+    await this.prisma.project.update({
+      where: { id },
+      data: {
+        motivoRetraso:      dto.motivoRetraso      ?? undefined,
+        responsableRetraso: dto.responsableRetraso ?? undefined,
+        accionRequerida:    dto.accionRequerida    ?? undefined,
+        nuevaFechaEstimada: dto.nuevaFechaEstimada ? new Date(dto.nuevaFechaEstimada) : undefined,
+      },
+    });
+    return { ok: true };
   }
 }

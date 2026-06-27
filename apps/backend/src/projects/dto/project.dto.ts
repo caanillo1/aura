@@ -51,6 +51,13 @@ export class UpdateProjectStatusDto {
   @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
 }
 
+export class UpdateDatosInformeDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() motivoRetraso?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['Cliente','IHCE','Compartido','']) responsableRetraso?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() accionRequerida?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() nuevaFechaEstimada?: string;
+}
+
 export class UpdatePhaseDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['pendiente','en_progreso','completado','bloqueado']) status?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() startDate?: string;

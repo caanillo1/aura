@@ -422,9 +422,13 @@ model Project {
   novelties        Novelty[]
   serviceOrder     ServiceOrder      @relation(fields: [serviceOrderId], references: [id], onUpdate: NoAction)
   templateFlow     TemplateFlow?     @relation(fields: [templateFlowId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  risks            Risk[]
-  visits           Visit[]
-  sesiones         SesionCapacitacion[]
+  risks              Risk[]
+  visits             Visit[]
+  sesiones           SesionCapacitacion[]
+  motivoRetraso      String?  @db.NVarChar(Max)
+  responsableRetraso String?  @db.NVarChar(30)
+  accionRequerida    String?  @db.NVarChar(Max)
+  nuevaFechaEstimada DateTime? @db.Date
 
   @@map("Proyectos")
 }

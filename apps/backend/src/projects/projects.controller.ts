@@ -9,7 +9,7 @@ import { GetUser } from '../common/decorators/get-user.decorator';
 import type { JwtUser } from '../common/decorators/get-user.decorator';
 import { ProjectsService } from './projects.service';
 import { ActivityReportSchedulerService } from './activity-report-scheduler.service';
-import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto, SendActivityReportDto, SaveActivityScheduleDto } from './dto/project.dto';
+import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto, SendActivityReportDto, SaveActivityScheduleDto, UpdateDatosInformeDto } from './dto/project.dto';
 
 const IMPL_ROLES = ['admin', 'coordinator', 'implementer_clinical', 'implementer_financial', 'implementer_support'] as const;
 
@@ -37,6 +37,13 @@ export class ProjectsController {
     return this.svc.modulesByServiceOrder(user.companyId, serviceOrderId);
   }
 
+  @Get('informe-ejecutivo')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Informe ejecutivo general de todos los proyectos' })
+  informeEjecutivo(@GetUser() user: JwtUser) {
+    return this.svc.getInformeEjecutivo(user.companyId);
+  }
+
   @Get(':id')
   @Roles(...IMPL_ROLES, 'client')
   @ApiOperation({ summary: 'Detalle de proyecto con jerarquía completa' })
@@ -49,6 +56,13 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Cambiar estado del proyecto' })
   updateStatus(@GetUser() user: JwtUser, @Param('id') id: string, @Body() dto: UpdateProjectStatusDto) {
     return this.svc.updateProjectStatus(user.companyId, id, dto);
+  }
+
+  @Patch(':id/datos-informe')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Actualizar campos editoriales del informe ejecutivo' })
+  updateDatosInforme(@GetUser() user: JwtUser, @Param('id') id: string, @Body() dto: UpdateDatosInformeDto) {
+    return this.svc.updateDatosInforme(id, user.companyId, dto);
   }
 
   @Post(':id/load-template')

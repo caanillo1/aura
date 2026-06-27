@@ -544,9 +544,18 @@ export default function ReportesPage() {
   return (
     <div className="space-y-5 max-w-7xl">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold" style={{ color: tc.text }}>Reportes</h1>
-        <p className="text-sm mt-0.5" style={{ color: tc.muted }}>Consulta y exporta información operativa en Excel</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: tc.text }}>Reportes</h1>
+          <p className="text-sm mt-0.5" style={{ color: tc.muted }}>Consulta y exporta información operativa en Excel</p>
+        </div>
+        <a href="/reportes/informe-ejecutivo"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
+          style={{ background: 'rgba(14,165,233,0.12)', color: '#0ea5e9', border: '1px solid rgba(14,165,233,0.25)' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.20)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(14,165,233,0.12)'; }}>
+          <BarChart3 className="w-4 h-4" /> Informe Ejecutivo General
+        </a>
       </div>
 
       {/* Tabs */}

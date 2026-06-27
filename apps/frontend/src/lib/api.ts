@@ -527,6 +527,14 @@ export const projectsApi = {
     api.patch('/projects/activities/report-schedule', body).then((r) => r.data),
   runActivityReportNow: () =>
     api.post('/projects/activities/report-schedule/run-now').then((r) => r.data) as Promise<{ enviados: number; destinatarios: number }>,
+  getInformeEjecutivo: (): Promise<Array<{
+    id: string; nombre: string; clienteId: string | null; clienteNombre: string; osNumber: string;
+    startDate: string; endDate: string; status: string; progressPercent: number;
+    motivoRetraso: string; responsableRetraso: string; accionRequerida: string; nuevaFechaEstimada: string | null;
+  }>> =>
+    api.get('/projects/informe-ejecutivo').then((r) => r.data),
+  updateDatosInforme: (id: string, data: { motivoRetraso?: string; responsableRetraso?: string; accionRequerida?: string; nuevaFechaEstimada?: string }) =>
+    api.patch(`/projects/${id}/datos-informe`, data).then((r) => r.data),
   loadTemplate: (id: string, data: {
     templateFlowId: string;
     phaseDates?: { templatePhaseId: string; startDate?: string; endDate?: string }[];

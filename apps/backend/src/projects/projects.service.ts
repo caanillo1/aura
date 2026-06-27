@@ -1091,7 +1091,7 @@ export class ProjectsService {
         accionRequerida: true, nuevaFechaEstimada: true,
         serviceOrder: {
           select: {
-            osNumber: true,
+            osNumber: true, product: true,
             client: { select: { id: true, businessName: true } },
           },
         },
@@ -1103,7 +1103,7 @@ export class ProjectsService {
       nombre: p.name,
       clienteId: p.serviceOrder.client?.id ?? null,
       clienteNombre: p.serviceOrder.client?.businessName ?? 'Sin cliente',
-      osNumber: p.serviceOrder.osNumber,
+      osName: p.serviceOrder.product,
       startDate: p.startDate,
       endDate: p.endDate,
       status: p.status,

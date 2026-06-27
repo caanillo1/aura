@@ -18,7 +18,7 @@ import type { SnapshotMeta } from '@/lib/api';
 interface FilaInforme {
   id: string;
   clienteNombre: string;
-  osNumber: string;
+  osName: string;
   startDate: string;
   endDate: string;
   status: string;
@@ -337,7 +337,7 @@ export default function InformeEjecutivoPage() {
       const pdfFilas = filas.map(f => ({
         id:                  f.id,
         clienteNombre:       f.clienteNombre,
-        osNumber:            f.osNumber ?? '',
+        osName:            f.osName ?? '',
         startDate:           f.startDate,
         endDate:             f.endDate,
         status:              f.status,
@@ -558,7 +558,7 @@ export default function InformeEjecutivoPage() {
               <table className="w-full border-collapse text-xs" style={{ minWidth: '900px' }}>
                 <thead>
                   <tr style={{ background: dark ? '#0d1e36' : '#0a2240', color: '#fff' }}>
-                    {['Semáforo','Cliente','N° OS','Fecha inicio','Fecha compromiso','Estado actual','% Avance','Motivo de retraso','Responsable','Acción requerida','Nueva fecha'].map(h => (
+                    {['Semáforo','Cliente','Orden de servicio','Fecha inicio','Fecha compromiso','Estado actual','% Avance','Motivo de retraso','Responsable','Acción requerida','Nueva fecha'].map(h => (
                       <th key={h} className="text-center font-semibold py-2.5 px-3 text-xs" style={{ whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -578,7 +578,7 @@ export default function InformeEjecutivoPage() {
                           </div>
                         </td>
                         <td className="py-3 px-3 font-semibold" style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{f.clienteNombre}</td>
-                        <td className="py-3 px-3 text-center text-xs" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{f.osNumber || '—'}</td>
+                        <td className="py-3 px-3 text-center text-xs" style={{ color: 'var(--text-secondary)', minWidth: 120, maxWidth: 180 }}>{f.osName || '—'}</td>
                         <td className="py-3 px-3 text-center" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmt(f.startDate)}</td>
                         <td className="py-3 px-3 text-center" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmt(f.endDate)}</td>
                         <td className="py-3 px-3 text-center" style={{ color: 'var(--text-secondary)' }}>{STATUS_LABEL[f.status] ?? f.status}</td>

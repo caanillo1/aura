@@ -528,7 +528,7 @@ export const projectsApi = {
   runActivityReportNow: () =>
     api.post('/projects/activities/report-schedule/run-now').then((r) => r.data) as Promise<{ enviados: number; destinatarios: number }>,
   getInformeEjecutivo: (): Promise<Array<{
-    id: string; nombre: string; clienteId: string | null; clienteNombre: string; osNumber: string;
+    id: string; nombre: string; clienteId: string | null; clienteNombre: string; osName: string;
     startDate: string; endDate: string; status: string; progressPercent: number;
     motivoRetraso: string; responsableRetraso: string; accionRequerida: string; nuevaFechaEstimada: string | null;
   }>> =>

@@ -98,6 +98,57 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
   );
 }
 
+// ── celda de fecha con calendario ─────────────────────────────────────────────
+function DateCell({ value, color, onSave, readOnly = false }: {
+  value: string | null; color: string;
+  onSave: (iso: string) => Promise<void>; readOnly?: boolean;
+}) {
+  const [open,   setOpen]   = useState(false);
+  const [saving, setSaving] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (open) ref.current?.showPicker?.(); }, [open]);
+
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const iso = e.target.value; // yyyy-mm-dd
+    if (!iso) { setOpen(false); return; }
+    setSaving(true);
+    await onSave(iso);
+    setSaving(false);
+    setOpen(false);
+  };
+
+  if (readOnly) return (
+    <span className="text-xs font-bold" style={{ color: value ? color : 'var(--text-muted)' }}>
+      {value ? fmt(value) : '—'}
+    </span>
+  );
+
+  return (
+    <div className="relative flex justify-center">
+      {value ? (
+        <div className="group flex items-center gap-1 cursor-pointer" onClick={() => setOpen(true)}>
+          <span className="text-xs font-bold" style={{ color }}>{fmt(value)}</span>
+          <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60" style={{ color: 'var(--accent-blue)' }} />
+        </div>
+      ) : (
+        <button onClick={() => setOpen(true)}
+          className="text-xs px-2 py-0.5 rounded"
+          style={{ color: 'var(--accent-blue)', border: '1px dashed var(--accent-blue)', opacity: 0.7 }}>
+          {saving ? '...' : 'Fecha'}
+        </button>
+      )}
+      {open && (
+        <input
+          ref={ref} type="date" defaultValue={value ?? ''}
+          onChange={handleChange} onBlur={() => setOpen(false)}
+          className="absolute z-20 opacity-0 w-0 h-0 pointer-events-none"
+        />
+      )}
+    </div>
+  );
+}
+
 function EditableSelect({ value, options, onSave, readOnly = false }: {
   value: string; options: { value: string; label: string }[];
   onSave: (v: string) => Promise<void>; readOnly?: boolean;
@@ -536,20 +587,12 @@ export default function InformeEjecutivoPage() {
                             onSave={v => save(f.id, 'accionRequerida', v)} />
                         </td>
                         <td className="py-3 px-3 text-center" style={{ minWidth: '100px' }}>
-                          {f.nuevaFechaEstimada ? (
-                            <span className="text-xs font-bold" style={{ color: newDateColor }}>{fmt(f.nuevaFechaEstimada)}</span>
-                          ) : (
-                            !readOnly && (
-                              <EditableCell value="" placeholder="DD/MM/AAAA" readOnly={false}
-                                onSave={async v => {
-                                  const parts = v.split('/');
-                                  if (parts.length === 3) {
-                                    const iso = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-                                    await save(f.id, 'nuevaFechaEstimada', iso);
-                                  }
-                                }} />
-                            )
-                          )}
+                          <DateCell
+                            value={f.nuevaFechaEstimada}
+                            color={newDateColor}
+                            readOnly={readOnly}
+                            onSave={iso => save(f.id, 'nuevaFechaEstimada', iso)}
+                          />
                         </td>
                       </tr>
                     );

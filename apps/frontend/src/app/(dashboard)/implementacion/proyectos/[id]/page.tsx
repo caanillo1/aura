@@ -706,6 +706,75 @@ function ActivityDeleteButton({ activityId, onDeleted }: { activityId: string; o
   );
 }
 
+// ── Badge de tipo de módulo ───────────────────────────────────────────────
+
+const TIPO_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  asistencial: { label: 'Asistencial', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  border: 'rgba(96,165,250,0.30)'  },
+  financiero:  { label: 'Financiero',  color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.30)'  },
+  mixto:       { label: 'Mixto',       color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.30)' },
+};
+const TIPOS = ['asistencial', 'financiero', 'mixto'] as const;
+
+function ModuloTipoBadge({ moduleId, tipo, onChange }: {
+  moduleId: string; tipo?: string | null; onChange: (t: string | null) => void;
+}) {
+  const [open, setOpen]     = useState(false);
+  const [saving, setSaving] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { can } = usePermission();
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  const select = async (t: string) => {
+    setSaving(true); setOpen(false);
+    try {
+      await projectsApi.updateModule(moduleId, { tipo: t });
+      onChange(t);
+    } catch { toast.error('Error al actualizar tipo'); }
+    finally { setSaving(false); }
+  };
+
+  const cfg = tipo ? TIPO_CFG[tipo] : null;
+
+  return (
+    <div ref={ref} className="relative" onClick={e => e.stopPropagation()}>
+      <button
+        disabled={saving || !can('activities.manage')}
+        onClick={() => can('activities.manage') && setOpen(o => !o)}
+        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-opacity"
+        style={cfg
+          ? { color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}` }
+          : { color: '#64748b', background: 'rgba(100,116,139,0.08)', border: '1px dashed rgba(100,116,139,0.30)' }
+        }
+        title="Tipo de módulo">
+        {saving ? '...' : (cfg ? cfg.label : 'Sin tipo')}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 rounded-lg shadow-xl overflow-hidden"
+          style={{ background: 'var(--surface-1)', border: '1px solid rgba(255,255,255,0.10)', minWidth: 110 }}>
+          {TIPOS.map(t => {
+            const c = TIPO_CFG[t];
+            return (
+              <button key={t} onClick={() => select(t)}
+                className="w-full text-left px-3 py-2 text-xs font-semibold transition-colors"
+                style={{ color: c.color, background: tipo === t ? c.bg : 'transparent' }}
+                onMouseEnter={e => (e.currentTarget.style.background = c.bg)}
+                onMouseLeave={e => (e.currentTarget.style.background = tipo === t ? c.bg : 'transparent')}>
+                {c.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Botón de borrado de fase (con confirmación inline) ────────────────────
 
 function PhaseDeleteButton({ phase, onDeleted }: { phase: ProjectPhase; onDeleted: () => void }) {
@@ -1012,6 +1081,9 @@ export default function ProjectDetailPage() {
   const [clientStaff, setClientStaff]   = useState<ClientStaff[]>([]);
 
   // Status modal
+  // Tipo de módulo (local para optimistic update)
+  const [moduloTipos, setModuloTipos] = useState<Record<string, string | null>>({});
+
   const [statusModal, setStatusModal]       = useState(false);
   const [newStatus, setNewStatus]           = useState<ProjectStatus>('activo');
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -1075,6 +1147,9 @@ export default function ProjectDetailPage() {
     try {
       const data = await projectsApi.get(id);
       setProject(data);
+      const tipoInit: Record<string, string | null> = {};
+      (data.modules ?? []).forEach((m: any) => { tipoInit[m.id] = m.tipo ?? null; });
+      setModuloTipos(tipoInit);
 
       // Cargar usuarios, staff del cliente y conteo de actas en paralelo
       const [usersRes, staffRes, actasRes] = await Promise.all([
@@ -1515,16 +1590,25 @@ export default function ProjectDetailPage() {
                 return (
                   <button key={mod.id}
                     onClick={() => setActiveModIdx(idx)}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                    className="shrink-0 flex flex-col gap-1 px-3 py-2 rounded-xl text-xs font-medium transition-all"
                     style={{
                       background: isActive ? 'rgba(96,165,250,0.15)' : (isLight ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.04)'),
                       border: `1px solid ${isActive ? 'rgba(96,165,250,0.35)' : 'rgba(255,255,255,0.08)'}`,
                       color: isActive ? '#60a5fa' : tc.s,
                     }}>
-                    <span className="max-w-[120px] truncate">{mod.name}</span>
-                    <span className="font-mono text-[10px] shrink-0" style={{ color: isActive ? '#60a5fa' : tc.m }}>
-                      {modPct.toFixed(0)}%
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="max-w-[120px] truncate">{mod.name}</span>
+                      <span className="font-mono text-[10px] shrink-0" style={{ color: isActive ? '#60a5fa' : tc.m }}>
+                        {modPct.toFixed(0)}%
+                      </span>
+                    </div>
+                    <div onClick={e => e.stopPropagation()}>
+                      <ModuloTipoBadge
+                        moduleId={mod.id}
+                        tipo={moduloTipos[mod.id]}
+                        onChange={t => setModuloTipos(prev => ({ ...prev, [mod.id]: t }))}
+                      />
+                    </div>
                   </button>
                 );
               })}
@@ -1562,9 +1646,16 @@ export default function ProjectDetailPage() {
                         </span>
                       </div>
                       <ProgressBar pct={modPct} color={isActive ? '#60a5fa' : '#6b82a0'} height={3} />
-                      <p className="text-[10px] mt-1.5" style={{ color: tc.m }}>
-                        {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
-                      </p>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <p className="text-[10px]" style={{ color: tc.m }}>
+                          {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
+                        </p>
+                        <ModuloTipoBadge
+                          moduleId={mod.id}
+                          tipo={moduloTipos[mod.id]}
+                          onChange={t => setModuloTipos(prev => ({ ...prev, [mod.id]: t }))}
+                        />
+                      </div>
                     </div>
                   </motion.div>
                 );

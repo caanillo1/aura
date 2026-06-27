@@ -58,6 +58,10 @@ export class UpdateDatosInformeDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() nuevaFechaEstimada?: string;
 }
 
+export class UpdateModuleDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['asistencial','financiero','mixto']) tipo?: string;
+}
+
 export class UpdatePhaseDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @IsIn(['pendiente','en_progreso','completado','bloqueado']) status?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() startDate?: string;

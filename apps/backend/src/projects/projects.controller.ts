@@ -9,7 +9,7 @@ import { GetUser } from '../common/decorators/get-user.decorator';
 import type { JwtUser } from '../common/decorators/get-user.decorator';
 import { ProjectsService } from './projects.service';
 import { ActivityReportSchedulerService } from './activity-report-scheduler.service';
-import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto, SendActivityReportDto, SaveActivityScheduleDto, UpdateDatosInformeDto } from './dto/project.dto';
+import { GenerateProjectDto, LoadTemplateDto, AddModulesDto, ProjectFilterDto, UpdateProjectStatusDto, UpdateModuleDto, UpdatePhaseDto, UpdateActivityDto, CreateProjectActivityDto, GlobalActivitiesFilterDto, SendActivityReportDto, SaveActivityScheduleDto, UpdateDatosInformeDto } from './dto/project.dto';
 
 const IMPL_ROLES = ['admin', 'coordinator', 'implementer_clinical', 'implementer_financial', 'implementer_support'] as const;
 
@@ -77,6 +77,13 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Agregar módulos desde una plantilla sin borrar los existentes' })
   addModules(@GetUser() user: JwtUser, @Param('id') id: string, @Body() dto: AddModulesDto) {
     return this.svc.addModules(user.companyId, id, dto);
+  }
+
+  @Patch('modules/:moduleId')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Actualizar tipo de módulo (asistencial/financiero/mixto)' })
+  updateModule(@GetUser() user: JwtUser, @Param('moduleId') moduleId: string, @Body() dto: UpdateModuleDto) {
+    return this.svc.updateModule(user.companyId, moduleId, dto);
   }
 
   @Delete('phases/:phaseId')

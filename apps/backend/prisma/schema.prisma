@@ -439,6 +439,7 @@ model ProjectModule {
   id              String           @id @default(uuid()) @db.UniqueIdentifier
   projectId       String           @db.UniqueIdentifier
   name            String           @db.NVarChar(200)
+  tipo            String?          @db.NVarChar(20)
   order           Int              @default(0)
   progressPercent Decimal          @default(0) @db.Decimal(5, 2)
   isActive        Boolean          @default(true)

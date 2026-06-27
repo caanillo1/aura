@@ -341,6 +341,7 @@ export interface ProjectPhase {
 export interface ProjectModule {
   id: string;
   name: string;
+  tipo?: string | null;
   order: number;
   progressPercent: number;
   isActive: boolean;

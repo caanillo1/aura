@@ -569,6 +569,21 @@ export class ProjectsService {
     });
   }
 
+  // ── Actualizar módulo ────────────────────────────────────────────────────
+
+  async updateModule(companyId: string, moduleId: string, dto: { tipo?: string }) {
+    const mod = await this.prisma.projectModule.findFirst({
+      where: { id: moduleId, project: { serviceOrder: { companyId } } },
+      select: { id: true },
+    });
+    if (!mod) throw new NotFoundException('Módulo no encontrado');
+    return this.prisma.projectModule.update({
+      where: { id: moduleId },
+      data: { ...(dto.tipo !== undefined && { tipo: dto.tipo }) },
+      select: { id: true, tipo: true },
+    });
+  }
+
   // ── Eliminar fase ─────────────────────────────────────────────────────────
 
   async deletePhase(companyId: string, phaseId: string) {

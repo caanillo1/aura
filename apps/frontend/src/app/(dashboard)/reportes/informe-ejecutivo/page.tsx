@@ -255,45 +255,46 @@ export default function InformeEjecutivoPage() {
   };
 
   const handleGenerarPDF = async () => {
-    if (!reportRef.current) return;
     setGeneratingPDF(true);
     try {
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ]);
+      const { pdf }                 = await import('@react-pdf/renderer');
+      const { InformeEjecutivoPDF } = await import('./InformeEjecutivoPDF');
 
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: dark ? '#0b1524' : '#f0f4f8',
-        windowWidth: reportRef.current.scrollWidth,
-        windowHeight: reportRef.current.scrollHeight,
-      });
+      const snapTitle = snapId !== 'actual'
+        ? (snapshots.find(s => s.id === snapId)?.titulo ?? 'Informe')
+        : 'Actual';
 
-      const imgData   = canvas.toDataURL('image/jpeg', 0.92);
-      const pdf       = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const pageW     = pdf.internal.pageSize.getWidth();
-      const pageH     = pdf.internal.pageSize.getHeight();
-      const imgH      = (canvas.height * pageW) / canvas.width;
-      let   remaining = imgH;
-      let   offset    = 0;
+      const fechaPDF = snapActual
+        ? new Date(snapActual.fechaCorte).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+        : new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
 
-      pdf.addImage(imgData, 'JPEG', 0, offset, pageW, imgH);
-      remaining -= pageH;
+      const pdfFilas = filas.map(f => ({
+        id:                  f.id,
+        clienteNombre:       f.clienteNombre,
+        startDate:           f.startDate,
+        endDate:             f.endDate,
+        status:              f.status,
+        progressPercent:     f.progressPercent,
+        motivoRetraso:       f.motivoRetraso      ?? '',
+        responsableRetraso:  f.responsableRetraso ?? '',
+        accionRequerida:     f.accionRequerida    ?? '',
+        nuevaFechaEstimada:  f.nuevaFechaEstimada ?? null,
+      }));
 
-      while (remaining > 0) {
-        offset -= pageH;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, offset, pageW, imgH);
-        remaining -= pageH;
-      }
+      const { createElement } = await import('react');
+      const element = createElement(InformeEjecutivoPDF as any, { filas: pdfFilas, company, obs, recs, fecha: fechaPDF });
+      const blob = await pdf(element as any).toBlob();
 
-      const snapTitle = snapId !== 'actual' ? (snapshots.find(s => s.id === snapId)?.titulo ?? 'Informe') : 'Actual';
-      pdf.save(`Informe_Ejecutivo_${snapTitle.replace(/\s+/g, '_')}.pdf`);
-      toast.success('PDF generado correctamente');
-    } catch {
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement('a');
+      a.href     = url;
+      a.download = `Informe_Ejecutivo_${snapTitle.replace(/\s+/g, '_')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast.success('PDF ejecutivo generado');
+    } catch (err) {
+      console.error(err);
       toast.error('Error al generar el PDF');
     } finally {
       setGeneratingPDF(false);

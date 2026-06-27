@@ -164,29 +164,49 @@ function DateCell({ value, color, onSave, readOnly = false, dark = false }: {
   );
 }
 
-function EditableSelect({ value, options, onSave, readOnly = false }: {
+function EditableSelect({ value, options, onSave, readOnly = false, dark = false }: {
   value: string; options: { value: string; label: string }[];
-  onSave: (v: string) => Promise<void>; readOnly?: boolean;
+  onSave: (v: string) => Promise<void>; readOnly?: boolean; dark?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
   const label = options.find(o => o.value === value)?.label ?? '—';
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   if (readOnly) return <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{label}</span>;
 
-  if (open) return (
-    <select autoFocus value={value}
-      onChange={e => { onSave(e.target.value); setOpen(false); }}
-      onBlur={() => setOpen(false)}
-      className="text-xs rounded px-1 py-0.5 outline-none"
-      style={{ background: 'var(--input-bg)', color: 'var(--input-color)', border: '1px solid var(--accent-blue)' }}>
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  );
+  const bg   = dark ? '#1e293b' : '#ffffff';
+  const text = dark ? '#e2e8f0' : '#1e293b';
+  const border = dark ? '#334155' : '#cbd5e1';
+  const hoverBg = dark ? '#334155' : '#f1f5f9';
 
   return (
-    <div className="group flex items-center gap-1 cursor-pointer" onClick={() => setOpen(true)}>
-      <span className="text-xs" style={{ color: value ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{label}</span>
-      <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60" style={{ color: 'var(--accent-blue)' }} />
+    <div ref={ref} className="relative inline-block">
+      <div className="group flex items-center gap-1 cursor-pointer" onClick={() => setOpen(o => !o)}>
+        <span className="text-xs" style={{ color: value ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{label}</span>
+        <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60" style={{ color: 'var(--accent-blue)' }} />
+      </div>
+      {open && (
+        <div className="absolute z-50 mt-1 rounded shadow-lg overflow-hidden"
+          style={{ background: bg, border: `1px solid ${border}`, minWidth: 120, left: '50%', transform: 'translateX(-50%)' }}>
+          {options.map(o => (
+            <div key={o.value}
+              className="px-3 py-1.5 text-xs cursor-pointer transition-colors"
+              style={{ color: o.value === value ? 'var(--accent-blue)' : text, background: 'transparent', fontWeight: o.value === value ? 600 : 400 }}
+              onMouseEnter={e => (e.currentTarget.style.background = hoverBg)}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              onMouseDown={e => { e.preventDefault(); onSave(o.value); setOpen(false); }}>
+              {o.label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -590,7 +610,7 @@ export default function InformeEjecutivoPage() {
                             onSave={v => save(f.id, 'motivoRetraso', v)} />
                         </td>
                         <td className="py-3 px-3 text-center">
-                          <EditableSelect value={f.responsableRetraso} readOnly={readOnly}
+                          <EditableSelect value={f.responsableRetraso} readOnly={readOnly} dark={dark}
                             options={[
                               { value: '', label: '—' },
                               { value: 'Cliente', label: 'Cliente' },

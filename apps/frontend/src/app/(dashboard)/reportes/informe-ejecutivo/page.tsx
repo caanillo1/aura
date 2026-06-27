@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import {
   ArrowLeft, Printer, RefreshCw, Loader2, Pencil, Check, X,
-  Save, History, ChevronDown, Trash2, Plus,
+  Save, History, ChevronDown, Trash2, Plus, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectsApi, companyApi, informesApi } from '@/lib/api';
@@ -197,6 +197,7 @@ export default function InformeEjecutivoPage() {
   const [snapOpen,    setSnapOpen]    = useState(false);
   const [showSave,    setShowSave]    = useState(false);
   const [readOnly,    setReadOnly]    = useState(false);
+  const [generating,  setGenerating]  = useState(false);
   const snapRef = useRef<HTMLDivElement>(null);
 
   const [obs,  setObs]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('informe_obs')  ?? '' : '');
@@ -245,6 +246,22 @@ export default function InformeEjecutivoPage() {
   const save = async (id: string, field: string, value: string) => {
     await projectsApi.updateDatosInforme(id, { [field]: value });
     setFilas(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
+  };
+
+  const handleGenerarAnalisis = async () => {
+    setGenerating(true);
+    try {
+      const result = await informesApi.generarAnalisis();
+      setObs(result.observaciones);
+      setRecs(result.recomendaciones);
+      localStorage.setItem('informe_obs',  result.observaciones);
+      localStorage.setItem('informe_recs', result.recomendaciones);
+      toast.success('Análisis generado con IA');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Error al generar el análisis');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleDelete = async (id: string, titulo: string) => {
@@ -347,6 +364,16 @@ export default function InformeEjecutivoPage() {
                 </div>
               )}
             </div>
+
+            {/* Generar análisis IA (solo en actual) */}
+            {!readOnly && (
+              <button onClick={handleGenerarAnalisis} disabled={generating}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors disabled:opacity-60"
+                style={{ background: 'rgba(167,139,250,0.12)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.25)' }}>
+                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {generating ? 'Analizando...' : 'Generar con IA'}
+              </button>
+            )}
 
             {/* Guardar versión (solo en actual) */}
             {!readOnly && (
@@ -509,22 +536,28 @@ export default function InformeEjecutivoPage() {
 
               {/* Observaciones */}
               <div className="rounded-xl p-4" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#e8edf3', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Observaciones</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Observaciones</p>
+                  {generating && <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#a78bfa' }} />}
+                </div>
                 <textarea value={obs} readOnly={readOnly} rows={7}
                   onChange={e => { setObs(e.target.value); localStorage.setItem('informe_obs', e.target.value); }}
                   className="w-full text-xs resize-none outline-none rounded p-1"
                   style={{ background: 'transparent', color: 'var(--text-secondary)', border: 'none', cursor: readOnly ? 'default' : undefined }}
-                  placeholder="Escribe las observaciones generales..." />
+                  placeholder={generating ? 'Generando...' : 'Haz clic en "Generar con IA" o escribe manualmente...'} />
               </div>
 
               {/* Recomendaciones */}
               <div className="rounded-xl p-4" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#e8edf3', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Recomendaciones</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Recomendaciones</p>
+                  {generating && <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#a78bfa' }} />}
+                </div>
                 <textarea value={recs} readOnly={readOnly} rows={7}
                   onChange={e => { setRecs(e.target.value); localStorage.setItem('informe_recs', e.target.value); }}
                   className="w-full text-xs resize-none outline-none rounded p-1"
                   style={{ background: 'transparent', color: 'var(--text-secondary)', border: 'none', cursor: readOnly ? 'default' : undefined }}
-                  placeholder="Escribe las recomendaciones..." />
+                  placeholder={generating ? 'Generando...' : 'Haz clic en "Generar con IA" o escribe manualmente...'} />
               </div>
             </div>
 

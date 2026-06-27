@@ -45,4 +45,10 @@ export class InformesController {
   remove(@GetUser() user: JwtUser, @Param('id') id: string) {
     return this.svc.deleteSnapshot(id, user.companyId);
   }
+
+  @Post('generar-analisis')
+  @Roles(...IMPL_ROLES)
+  generarAnalisis(@GetUser() user: JwtUser) {
+    return this.svc.generarAnalisis(user.companyId);
+  }
 }

@@ -841,6 +841,8 @@ export const informesApi = {
     api.post('/informes/snapshots', body).then(r => r.data) as Promise<{ id: string; titulo: string; createdAt: string }>,
   deleteSnapshot: (id: string) =>
     api.delete(`/informes/snapshots/${id}`).then(r => r.data),
+  generarAnalisis: (): Promise<{ observaciones: string; recomendaciones: string }> =>
+    api.post('/informes/generar-analisis').then(r => r.data),
 };
 
 export const publicSesionesApi = {

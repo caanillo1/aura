@@ -829,6 +829,20 @@ export const sesionesApi = {
     api.post(`/sesiones/${id}/generar-acta`).then(r => r.data),
 };
 
+export type SnapshotMeta = { id: string; titulo: string; fechaCorte: string; createdAt: string; creadoPor: string };
+export type SnapshotFull = SnapshotMeta & { datos: any[]; observaciones: string; recomendaciones: string };
+
+export const informesApi = {
+  listSnapshots: (): Promise<SnapshotMeta[]> =>
+    api.get('/informes/snapshots').then(r => r.data),
+  getSnapshot: (id: string): Promise<SnapshotFull> =>
+    api.get(`/informes/snapshots/${id}`).then(r => r.data),
+  createSnapshot: (body: { titulo: string; fechaCorte: string; datos: any[]; observaciones?: string; recomendaciones?: string }) =>
+    api.post('/informes/snapshots', body).then(r => r.data) as Promise<{ id: string; titulo: string; createdAt: string }>,
+  deleteSnapshot: (id: string) =>
+    api.delete(`/informes/snapshots/${id}`).then(r => r.data),
+};
+
 export const publicSesionesApi = {
   getRsvp: (token: string) =>
     fetch(`${PUBLIC_API}/public/sesiones/rsvp/${token}`).then(r => r.json()),

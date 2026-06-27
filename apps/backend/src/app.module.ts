@@ -24,6 +24,7 @@ import { ComercialModule } from './comercial/comercial.module';
 import { VisitsModule } from './visits/visits.module';
 import { FaqModule }       from './faq/faq.module';
 import { SesionesModule }  from './sesiones/sesiones.module';
+import { InformesModule }  from './informes/informes.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './health/health.module';
@@ -53,6 +54,7 @@ import { HealthModule } from './health/health.module';
     VisitsModule,
     FaqModule,
     SesionesModule,
+    InformesModule,
     HealthModule,
   ],
   controllers: [AppController],

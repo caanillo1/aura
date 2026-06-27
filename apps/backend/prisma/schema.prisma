@@ -54,6 +54,7 @@ model Company {
   faqTipos          FaqTipo[]
   faqs              Faq[]
   sesiones          SesionCapacitacion[]
+  informesSnapshots InformeEjecutivoSnapshot[]
 
   @@map("Empresas")
 }
@@ -114,6 +115,7 @@ model User {
   actaCompromisosAgent   ActaCompromiso[]          @relation("ActaCompromisoAgent")
   actasCreated           Acta[]                    @relation("ActaCreatedBy")
   sesionesCreadas        SesionCapacitacion[]      @relation("SesionCreatedBy")
+  informesCreados        InformeEjecutivoSnapshot[]
   actaActividadesAgent   ActaActividad[]           @relation("ActaActividadAgent")
   activitiesAssigned     Activity[]                @relation("ActivityAssignedTo")
   archivosSubidos        Archivo[]                 @relation("ArchivoSubidoPor")
@@ -1250,4 +1252,22 @@ model SesionInvitado {
 
   @@index([sesionId])
   @@map("SesionesInvitados")
+}
+
+model InformeEjecutivoSnapshot {
+  id          String   @id @default(uuid()) @db.UniqueIdentifier
+  companyId   String   @db.UniqueIdentifier
+  creadoPorId String   @db.UniqueIdentifier
+  titulo      String   @db.NVarChar(100)
+  fechaCorte  DateTime @db.Date
+  datos       String   @db.NVarChar(Max)
+  observaciones String? @db.NVarChar(Max)
+  recomendaciones String? @db.NVarChar(Max)
+  createdAt   DateTime @default(now())
+
+  company    Company @relation(fields: [companyId], references: [id])
+  creadoPor  User    @relation(fields: [creadoPorId], references: [id])
+
+  @@index([companyId])
+  @@map("InformesEjecutivosSnapshots")
 }

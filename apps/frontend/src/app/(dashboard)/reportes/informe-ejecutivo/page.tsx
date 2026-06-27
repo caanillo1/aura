@@ -98,21 +98,67 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
   );
 }
 
-// ── celda de fecha ─────────────────────────────────────────────────────────────
-// input[type=date] visible y estilizado: soporta teclado y calendario nativo
-// en todos los navegadores, restringe el formato automáticamente.
+// ── celda de fecha con máscara DD/MM/AAAA ─────────────────────────────────────
+// Solo acepta dígitos; inserta barras automáticamente; guarda al completar
+// los 8 dígitos; restaura el valor anterior si se abandona incompleto.
 function DateCell({ value, color, onSave, readOnly = false }: {
   value: string | null; color: string;
   onSave: (iso: string) => Promise<void>; readOnly?: boolean;
 }) {
+  const [draft,  setDraft]  = useState(value ? fmt(value) : '');
   const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState(false);
+
+  useEffect(() => { setDraft(value ? fmt(value) : ''); }, [value]);
+
+  // Convierte 8 dígitos a ISO yyyy-mm-dd y valida que la fecha sea real
+  const digitsToISO = (d: string): string | null => {
+    if (d.length !== 8) return null;
+    const day = d.slice(0, 2), mon = d.slice(2, 4), yr = d.slice(4, 8);
+    const iso  = `${yr}-${mon}-${day}`;
+    const date = new Date(`${iso}T12:00:00Z`);
+    if (
+      isNaN(date.getTime()) ||
+      date.getUTCFullYear() !== +yr ||
+      date.getUTCMonth() + 1 !== +mon ||
+      date.getUTCDate()  !== +day
+    ) return null;
+    return iso;
+  };
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const iso = e.target.value;
-    if (!iso) return;
-    setSaving(true);
-    await onSave(iso);
-    setSaving(false);
+    // Extraer solo dígitos (máx 8: DDMMAAAA)
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+
+    // Construir máscara DD/MM/AAAA
+    let masked = digits;
+    if (digits.length > 4) masked = `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+    else if (digits.length > 2) masked = `${digits.slice(0,2)}/${digits.slice(2)}`;
+
+    setDraft(masked);
+    setError(false);
+
+    // Auto-guardar al completar los 8 dígitos
+    if (digits.length === 8) {
+      const iso = digitsToISO(digits);
+      if (iso) {
+        setSaving(true);
+        await onSave(iso);
+        setSaving(false);
+      } else {
+        setError(true);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    if (saving) return;
+    const digits = draft.replace(/\D/g, '');
+    if (digits.length < 8) {
+      // Incompleto → restaurar valor anterior
+      setDraft(value ? fmt(value) : '');
+      setError(false);
+    }
   };
 
   if (readOnly) return (
@@ -127,20 +173,24 @@ function DateCell({ value, color, onSave, readOnly = false }: {
 
   return (
     <input
-      type="date"
-      value={value ?? ''}
+      type="text"
+      inputMode="numeric"
+      value={draft}
+      placeholder="DD/MM/AAAA"
       onChange={handleChange}
-      min="2000-01-01"
-      max="2099-12-31"
-      className="text-xs rounded-lg outline-none"
+      onBlur={handleBlur}
+      onKeyDown={e => {
+        if (e.key === 'Escape') { setDraft(value ? fmt(value) : ''); setError(false); }
+      }}
+      className="text-xs rounded-lg outline-none text-center"
       style={{
-        width: 120,
+        width: 90,
         padding: '3px 6px',
         background: 'var(--input-bg)',
-        border: '1px solid var(--border-subtle)',
-        color: value ? color : 'var(--text-muted)',
+        border: `1px solid ${error ? '#ef4444' : 'var(--border-subtle)'}`,
+        color: error ? '#ef4444' : (value ? color : 'var(--input-color)'),
         fontWeight: value ? 700 : 400,
-        cursor: 'pointer',
+        letterSpacing: '0.3px',
       }}
     />
   );

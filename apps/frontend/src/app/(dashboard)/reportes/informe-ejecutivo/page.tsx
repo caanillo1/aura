@@ -169,45 +169,61 @@ function EditableSelect({ value, options, onSave, readOnly = false, dark = false
   onSave: (v: string) => Promise<void>; readOnly?: boolean; dark?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos]   = useState({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLDivElement>(null);
   const label = options.find(o => o.value === value)?.label ?? '—';
+
+  const handleOpen = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const dropW = 160;
+    let left = rect.left;
+    if (left + dropW > window.innerWidth - 8) left = window.innerWidth - dropW - 8;
+    if (left < 8) left = 8;
+    setPos({ top: rect.bottom + 4, left });
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const close = () => setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('touchstart', close); };
   }, [open]);
 
   if (readOnly) return <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{label}</span>;
 
-  const bg   = dark ? '#1e293b' : '#ffffff';
-  const text = dark ? '#e2e8f0' : '#1e293b';
-  const border = dark ? '#334155' : '#cbd5e1';
+  const bg      = dark ? '#1e293b' : '#ffffff';
+  const text    = dark ? '#e2e8f0' : '#1e293b';
+  const border  = dark ? '#334155' : '#cbd5e1';
   const hoverBg = dark ? '#334155' : '#f1f5f9';
 
   return (
-    <div ref={ref} className="relative inline-block">
-      <div className="group flex items-center gap-1 cursor-pointer" onClick={() => setOpen(o => !o)}>
+    <>
+      <div ref={triggerRef} className="group inline-flex items-center gap-1 cursor-pointer" onClick={handleOpen}>
         <span className="text-xs" style={{ color: value ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{label}</span>
         <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60" style={{ color: 'var(--accent-blue)' }} />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 rounded shadow-lg overflow-hidden"
-          style={{ background: bg, border: `1px solid ${border}`, minWidth: 120, left: '50%', transform: 'translateX(-50%)' }}>
+        <div className="fixed z-[200] rounded-lg shadow-xl overflow-hidden"
+          style={{ top: pos.top, left: pos.left, width: 160, background: bg, border: `1px solid ${border}` }}
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}>
           {options.map(o => (
             <div key={o.value}
-              className="px-3 py-1.5 text-xs cursor-pointer transition-colors"
-              style={{ color: o.value === value ? 'var(--accent-blue)' : text, background: 'transparent', fontWeight: o.value === value ? 600 : 400 }}
+              className="px-4 py-2.5 text-sm cursor-pointer"
+              style={{ color: o.value === value ? 'var(--accent-blue)' : text, background: 'transparent', fontWeight: o.value === value ? 600 : 400, whiteSpace: 'nowrap' }}
               onMouseEnter={e => (e.currentTarget.style.background = hoverBg)}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              onMouseDown={e => { e.preventDefault(); onSave(o.value); setOpen(false); }}>
+              onMouseDown={e => { e.stopPropagation(); onSave(o.value); setOpen(false); }}
+              onTouchEnd={e => { e.preventDefault(); onSave(o.value); setOpen(false); }}>
               {o.label}
             </div>
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
 

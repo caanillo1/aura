@@ -175,9 +175,10 @@ export default function InformeEjecutivoPage() {
   };
 
   // Resumen ejecutivo
-  const total        = filas.length;
-  const enProduccion = filas.filter(f => f.status === 'completado').length;
-  const pendientes   = total - enProduccion;
+  const total       = filas.length;
+  const enCurso     = filas.filter(f => f.status === 'activo').length;
+  const completados = filas.filter(f => f.status === 'completado').length;
+  const pausados    = filas.filter(f => f.status === 'pausado').length;
   const porResponsable = filas.reduce((acc, f) => {
     if (!f.responsableRetraso) return acc;
     acc[f.responsableRetraso] = (acc[f.responsableRetraso] ?? 0) + 1;
@@ -381,12 +382,13 @@ export default function InformeEjecutivoPage() {
               <div className="rounded-xl p-4" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#e8edf3', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Resumen Ejecutivo</p>
                 {[
-                  { label: 'Total proyectos activos', val: total },
-                  { label: 'En producción', val: enProduccion },
-                  { label: 'Pendientes de salida', val: pendientes },
-                  { label: 'Retrasos — Cliente', val: porResponsable['Cliente'] ?? 0 },
+                  { label: 'Total proyectos',      val: total },
+                  { label: 'En curso',             val: enCurso },
+                  { label: 'Completados',           val: completados },
+                  { label: 'Pausados',              val: pausados },
+                  { label: 'Retrasos — Cliente',    val: porResponsable['Cliente'] ?? 0 },
                   { label: 'Retrasos — Implementador', val: porResponsable['IHCE'] ?? 0 },
-                  { label: 'Retrasos — Compartidos', val: porResponsable['Compartido'] ?? 0 },
+                  { label: 'Retrasos — Compartidos',val: porResponsable['Compartido'] ?? 0 },
                 ].map(r => (
                   <div key={r.label} className="flex justify-between items-center mb-1.5">
                     <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r.label}:</span>

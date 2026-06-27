@@ -1,7 +1,7 @@
 import React from 'react';
-import { Document, Page, View, Text, Image, Font } from '@react-pdf/renderer';
+import { Document, Page, View, Text, Image, Svg, Circle, Font } from '@react-pdf/renderer';
 import { F, FS } from './design/typography';
-import { N, alpha, textOn, statusColor, STATUS_LABEL } from './design/colors';
+import { N, alpha, textOn, lighten, statusColor, STATUS_LABEL } from './design/colors';
 import { PAGE, CELL } from './design/spacing';
 import { Table, TR, TC } from './components/Table';
 import { PageHeader } from './components/PageHeader';
@@ -81,6 +81,21 @@ const BAR: Record<string, string> = {
   bloqueado:   '#DC2626',
   pendiente:   '#9CA3AF',
 };
+
+// ─── Cover page helpers ───────────────────────────────────────────────────────
+function ProgressRing({ pct, color, size = 72 }: { pct: number; color: string; size?: number }) {
+  const r = (size - 14) / 2, circ = 2 * Math.PI * r, dash = circ - (Math.min(pct, 100) / 100) * circ, c = size / 2;
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Circle cx={c} cy={c} r={r} fill="none" stroke={alpha(color, 0.2)} strokeWidth={10} />
+      <Circle cx={c} cy={c} r={r} fill="none" stroke={color} strokeWidth={10}
+        strokeLinecap="round" strokeDasharray={`${circ}`}
+        {...({ strokeDashoffset: `${dash}`, transform: `rotate(-90,${c},${c})` } as any)} />
+      <Text {...({ x: c, y: c + 1, textAnchor: 'middle', dominantBaseline: 'middle',
+        fill: color, fontSize: size * 0.21, fontWeight: 'bold' } as any)}>{pct}%</Text>
+    </Svg>
+  );
+}
 
 // ─── Public interface ─────────────────────────────────────────────────────────
 export interface PlanTrabajoData {
@@ -183,10 +198,161 @@ export function PlanTrabajoDocument({ data }: { data: PlanTrabajoData }) {
 
   let rowIdx = 0;
 
+  const fmtLong = (s?: string | null) => s
+    ? new Date(s).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' })
+    : '—';
+
   return (
     <Document title="Plan de Trabajo" author={compName}>
 
-      {/* ══════════════════════════ PAGE 1+: ACTIVITIES TABLE (Portrait) ═══════════════════════ */}
+      {/* ══════════════════════ PORTADA EJECUTIVA ══════════════════════ */}
+      <Page size="A4" style={{ fontFamily: F.regular, backgroundColor: '#ffffff' }}>
+
+        {/* Header band con logo */}
+        <View style={{ backgroundColor: pc, paddingVertical: 28, paddingHorizontal: 44,
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View>
+            {company.logoData
+              ? <Image src={company.logoData} style={{ height: 36, maxWidth: 130, objectFit: 'contain',
+                  filter: onPc === '#ffffff' ? 'brightness(0) invert(1)' : 'none' } as any} />
+              : <Text style={{ fontSize: 15, fontFamily: F.bold, color: onPc }}>{compName}</Text>}
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 8, fontFamily: F.bold, color: onPc, opacity: 0.7,
+              textTransform: 'uppercase', letterSpacing: 1 }}>DOCUMENTO EJECUTIVO</Text>
+            <Text style={{ fontSize: 8, color: onPc, opacity: 0.55, marginTop: 3 }}>
+              {[company.nit ? `NIT: ${company.nit}` : null, company.city, company.phone].filter(Boolean).join('  ·  ')}
+            </Text>
+          </View>
+        </View>
+
+        {/* Color stripe */}
+        <View style={{ height: 5, flexDirection: 'row' }}>
+          <View style={{ flex: 3, backgroundColor: pc }} />
+          <View style={{ flex: 1, backgroundColor: sc }} />
+          <View style={{ flex: 0.4, backgroundColor: N.gray200 }} />
+        </View>
+
+        {/* Main content */}
+        <View style={{ flex: 1, paddingHorizontal: 44, paddingTop: 48, paddingBottom: 36,
+          flexDirection: 'column', justifyContent: 'space-between' }}>
+
+          {/* Title block */}
+          <View>
+            <Text style={{ fontSize: 8, fontFamily: F.bold, textTransform: 'uppercase',
+              letterSpacing: 2.5, color: N.gray400, marginBottom: 12 }}>
+              DOCUMENTO EJECUTIVO CONFIDENCIAL
+            </Text>
+            <Text style={{ fontSize: 48, fontFamily: F.bold, color: N.gray900, lineHeight: 1.05,
+              letterSpacing: -1 }}>Plan de{'\n'}Trabajo</Text>
+            <View style={{ flexDirection: 'row', gap: 6, marginTop: 14 }}>
+              <View style={{ width: 56, height: 5, backgroundColor: pc, borderRadius: 3 }} />
+              <View style={{ width: 24, height: 5, backgroundColor: sc, borderRadius: 3 }} />
+              <View style={{ width: 12, height: 5, backgroundColor: N.gray200, borderRadius: 3 }} />
+            </View>
+
+            {/* Cliente block */}
+            <View style={{ marginTop: 32, borderLeftWidth: 5, borderLeftColor: pc,
+              paddingLeft: 20, paddingVertical: 16, backgroundColor: lighten(pc, 0.96),
+              borderRadius: '0 8 8 0' as any }}>
+              <Text style={{ fontSize: 8, fontFamily: F.bold, textTransform: 'uppercase',
+                letterSpacing: 1.5, color: N.gray400, marginBottom: 8 }}>PREPARADO PARA</Text>
+              <Text style={{ fontSize: 26, fontFamily: F.bold, color: pc, lineHeight: 1.2 }}>
+                {client.businessName ?? '—'}
+              </Text>
+              {client.nit && (
+                <Text style={{ fontSize: 9, color: N.gray500, marginTop: 4 }}>NIT: {client.nit}</Text>
+              )}
+            </View>
+          </View>
+
+          {/* Progress + KPIs */}
+          <View>
+            {/* Global progress card */}
+            <View style={{ flexDirection: 'row', gap: 14, marginBottom: 16,
+              padding: '16 20', backgroundColor: N.white, borderRadius: 10,
+              borderWidth: 0.5, borderColor: alpha(pc, 0.2), borderTopWidth: 3, borderTopColor: pc }}>
+              <ProgressRing pct={pct} color={pc} size={76} />
+              <View style={{ flex: 1, justifyContent: 'center' }}>
+                <Text style={{ fontSize: 11, fontFamily: F.bold, color: N.gray900 }}>Avance Global del Proyecto</Text>
+                <Text style={{ fontSize: 8, color: N.gray500, marginTop: 4 }}>
+                  {done} de {total} actividades completadas
+                </Text>
+                <View style={{ marginTop: 8, height: 5, backgroundColor: N.gray200, borderRadius: 3 }}>
+                  <View style={{ height: 5, width: `${Math.min(pct, 100)}%` as any,
+                    backgroundColor: pc, borderRadius: 3 }} />
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                {([
+                  { n: done,   label: 'Completadas', color: '#059669', bg: '#d1fae5' },
+                  { n: inProg, label: 'En Progreso',  color: '#2563eb', bg: '#dbeafe' },
+                  { n: pend,   label: 'Pendientes',   color: '#92400e', bg: '#fef3c7' },
+                ] as any[]).map(({ n, label, color, bg }) => (
+                  <View key={label} style={{ alignItems: 'center', paddingVertical: 8, paddingHorizontal: 10,
+                    backgroundColor: bg, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 18, fontFamily: F.bold, color }}>{n}</Text>
+                    <Text style={{ fontSize: 7, color, marginTop: 2 }}>{label}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Tipo breakdown */}
+            {tipoRows.length > 0 && (
+              <View style={{ marginBottom: 16, padding: '12 16', backgroundColor: N.gray50,
+                borderRadius: 8, borderWidth: 0.5, borderColor: N.gray200 }}>
+                <Text style={{ fontSize: 7, fontFamily: F.bold, textTransform: 'uppercase',
+                  letterSpacing: 0.8, color: N.gray500, marginBottom: 10 }}>
+                  Avance por Tipo de Módulo
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  {tipoRows.map(({ key, label, color, pct: tPct }) => (
+                    <View key={key} style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 8, fontFamily: F.bold, color }}>{label}</Text>
+                        <Text style={{ fontSize: 8, fontFamily: F.bold, color }}>{tPct ?? 0}%</Text>
+                      </View>
+                      <View style={{ height: 6, backgroundColor: N.gray200, borderRadius: 3 }}>
+                        <View style={{ height: 6, width: `${Math.min(tPct ?? 0, 100)}%` as any,
+                          backgroundColor: color, borderRadius: 3 }} />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Metadata grid */}
+            <View style={{ flexDirection: 'row', gap: 0, borderWidth: 0.5, borderColor: N.gray200,
+              borderRadius: 8, overflow: 'hidden' }}>
+              {([
+                { label: 'Orden de Servicio', value: os.product ?? os.osNumber ?? '—' },
+                { label: 'Fecha Inicio',       value: fmtLong(os.startDate ?? project?.startDate) },
+                { label: 'Fecha Fin',          value: fmtLong(os.endDate ?? project?.endDate) },
+                { label: 'Generado',           value: fmtLong(data.generatedAt) },
+              ] as any[]).map(({ label, value }, i, arr) => (
+                <View key={label} style={{ flex: 1, padding: '12 14',
+                  backgroundColor: i % 2 === 0 ? '#fafbfc' : N.white,
+                  borderRightWidth: i < arr.length - 1 ? 0.5 : 0, borderRightColor: N.gray100 }}>
+                  <Text style={{ fontSize: 6.5, fontFamily: F.bold, textTransform: 'uppercase',
+                    letterSpacing: 0.8, color: N.gray400, marginBottom: 5 }}>{label}</Text>
+                  <Text style={{ fontSize: 9, fontFamily: F.bold, color: N.gray900 }}>{value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Bottom stripe */}
+        <View style={{ height: 10, flexDirection: 'row' }}>
+          <View style={{ flex: 3, backgroundColor: pc }} />
+          <View style={{ flex: 1, backgroundColor: sc }} />
+          <View style={{ flex: 0.4, backgroundColor: N.gray200 }} />
+        </View>
+      </Page>
+
+      {/* ══════════════════════════ PAGE 2+: ACTIVITIES TABLE (Portrait) ═══════════════════════ */}
       <Page size="A4" style={{
         fontFamily:        F.regular,
         paddingTop:        PAGE.paddingTop,
@@ -365,7 +531,7 @@ export function PlanTrabajoDocument({ data }: { data: PlanTrabajoData }) {
                 Diagrama de Gantt — Plan de Trabajo
               </Text>
               <Text style={{ fontSize: 7, color: N.gray400, marginTop: 1 }}>
-                {compName} · OS {os.osNumber ?? '—'} · {client.businessName ?? '—'}
+                {compName} · {os.product ?? os.osNumber ?? '—'} · {client.businessName ?? '—'}
               </Text>
             </View>
             <View style={{ width: 140, alignItems: 'flex-end' }}>

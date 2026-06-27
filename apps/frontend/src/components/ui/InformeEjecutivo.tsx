@@ -87,12 +87,12 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
         const pdf   = await buildPdf();
         const bytes = pdf.output('arraybuffer');
         const b64   = btoa(String.fromCharCode(...Array.from(new Uint8Array(bytes))));
-        const osNum = (data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
+        const osName = (data?.os?.product ?? data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
         await serviceOrdersApi.sendPdf(osId, {
           destinatarios: autoEmail.destinatarios,
           asunto: autoEmail.asunto,
           pdfBase64: b64,
-          filename: `Informe_Ejecutivo_${osNum}.pdf`,
+          filename: `Informe_Ejecutivo_${osName}.pdf`,
         });
         toast.success(`Informe Ejecutivo enviado a ${autoEmail.destinatarios.length} destinatario(s)`);
       } catch {
@@ -261,8 +261,8 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
     setDownloading(true);
     try {
       const pdf   = await buildPdf();
-      const osNum = (data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
-      pdf.save(`Informe_Ejecutivo_${osNum}.pdf`);
+      const osName = (data?.os?.product ?? data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
+      pdf.save(`Informe_Ejecutivo_${osName}.pdf`);
     } catch (err) {
       console.error(err);
       toast.error('Error al generar el PDF');
@@ -279,12 +279,12 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
       const pdf     = await buildPdf();
       const bytes   = pdf.output('arraybuffer');
       const b64     = btoa(String.fromCharCode(...Array.from(new Uint8Array(bytes))));
-      const osNum   = (data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
+      const osName  = (data?.os?.product ?? data?.os?.osNumber ?? 'OS').replace(/[^a-zA-Z0-9-]/g, '_');
       await serviceOrdersApi.sendPdf(osId, {
         destinatarios: dest,
         asunto: emailAsunto.trim() || undefined,
         pdfBase64: b64,
-        filename: `Informe_Ejecutivo_${osNum}.pdf`,
+        filename: `Informe_Ejecutivo_${osName}.pdf`,
       });
       toast.success(`Informe enviado a ${dest.length} destinatario(s)`);
       setShowEmail(false); setEmailTo(''); setEmailAsunto('');
@@ -473,6 +473,7 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
   // Dynamic section numbering
   let _sn = 0;
   const sn = () => String(++_sn);
+  const snExec     = sn();
   const snOS       = sn();
   const snNotes    = (notes ?? []).length > 0 ? sn() : null;
   const snTeam     = sn();
@@ -481,6 +482,21 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
   const snActas    = sn();
   const snReqs     = requerimientos.length > 0 ? sn() : null;
   const snCap      = sn();
+
+  // Avance por tipo de módulo
+  const _byTipo: Record<string, number[]> = {};
+  for (const m of (project?.modules ?? [])) {
+    if (!m.tipo) continue;
+    (_byTipo[m.tipo] = _byTipo[m.tipo] ?? []).push(Number(m.progressPercent) || 0);
+  }
+  const tipoAvg = (k: string) => _byTipo[k]?.length
+    ? Math.round(_byTipo[k].reduce((s: number, n: number) => s + n, 0) / _byTipo[k].length)
+    : null;
+  const tipoProgress = {
+    asistencial: tipoAvg('asistencial'),
+    financiero:  tipoAvg('financiero'),
+    mixto:       tipoAvg('mixto'),
+  };
 
   const teamRows = [
     os.clinicalLeader  ? { rol: 'Líder Asistencial',  p: os.clinicalLeader }  : null,
@@ -605,13 +621,16 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
                           </div>
                         )}
                       </div>
-                      <div style={{ textAlign:'right', minWidth:160 }}>
+                      <div style={{ textAlign:'right', minWidth:180 }}>
                         <div style={{ fontSize:15, fontWeight:800, letterSpacing:'0.08em', textTransform:'uppercase' }}>
                           Informe Ejecutivo
                         </div>
-                        <div style={{ fontSize:11, opacity:0.85, marginTop:4 }}>OS: <b>{os.osNumber}</b></div>
-                        <div style={{ fontSize:10, opacity:0.7, marginTop:2 }}>
-                          Generado: {new Date(generatedAt).toLocaleDateString('es-CO')}
+                        <div style={{ fontSize:12, fontWeight:700, opacity:0.95, marginTop:4 }}>
+                          {os.product ?? os.osNumber}
+                        </div>
+                        <div style={{ fontSize:10, opacity:0.75, marginTop:2 }}>OS: {os.osNumber}</div>
+                        <div style={{ fontSize:10, opacity:0.65, marginTop:2 }}>
+                          {new Date(generatedAt).toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' })}
                         </div>
                       </div>
                     </div>
@@ -663,7 +682,126 @@ export function InformeEjecutivo({ osId, onClose, autoEmail }: Props) {
           {/* ── CONTENIDO ── */}
           <div style={{ padding:'26px 30px', display:'flex', flexDirection:'column', gap:24 }}>
 
-            {/* 1. DATOS DE LA ORDEN */}
+            {/* RESUMEN EJECUTIVO */}
+            <div className="ie-section">
+              <SecTitle num={snExec} text="Resumen Ejecutivo del Proyecto" />
+              <div style={{ border:'1px solid #e5e7eb', borderTop:'none', padding:'16px 14px' }}>
+
+                {/* Progreso global + KPIs */}
+                <div style={{ display:'flex', gap:12, marginBottom:14 }}>
+                  {/* Métrica de progreso */}
+                  <div style={{
+                    flexShrink:0, padding:'16px 22px',
+                    background:`${primaryColor}0d`, borderRadius:8,
+                    border:`2px solid ${primaryColor}`,
+                    display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                    minWidth:120,
+                  }}>
+                    <div style={{ fontSize:46, fontWeight:900, color:primaryColor, lineHeight:1 }}>
+                      {project ? Math.round(Number(project.progressPercent)) : 0}%
+                    </div>
+                    <div style={{ fontSize:9, fontWeight:700, textTransform:'uppercase',
+                      letterSpacing:'0.05em', color:'#6b7280', marginTop:6, textAlign:'center' }}>
+                      Avance Global
+                    </div>
+                    <div style={{ marginTop:8, height:6, width:80, background:'#e5e7eb', borderRadius:3, overflow:'hidden' }}>
+                      <div style={{ height:'100%', borderRadius:3, background:primaryColor,
+                        width:`${Math.min(project ? Number(project.progressPercent) : 0, 100)}%` }} />
+                    </div>
+                  </div>
+
+                  {/* KPI cards */}
+                  <div style={{ flex:1, display:'flex', gap:8 }}>
+                    {[
+                      {
+                        label:'Actividades', value:String(allActivities.length),
+                        sub:`${doneActivities} completadas`,
+                        color:primaryColor, bg:`${primaryColor}0d`,
+                      },
+                      {
+                        label:'Actas', value:String(actas.length),
+                        sub:`${(actas as any[]).filter((a:any) => a.status === 'firmada').length} firmadas`,
+                        color:'#059669', bg:'#f0fdf4',
+                      },
+                      {
+                        label:'Capacitados', value:String(personalCapacitado.length),
+                        sub:`${personalEnProceso.length} en proceso`,
+                        color:'#7c3aed', bg:'#faf5ff',
+                      },
+                      {
+                        label:'Duración', value:os.durationDays ? `${os.durationDays}d` : '—',
+                        sub:`${fmt(os.startDate)} – ${fmt(os.endDate)}`,
+                        color:'#d97706', bg:'#fffbeb',
+                      },
+                    ].map(({ label, value, sub, color, bg }) => (
+                      <div key={label} style={{
+                        flex:1, padding:'12px 10px', background:bg, borderRadius:8,
+                        border:`1px solid ${color}33`,
+                      }}>
+                        <div style={{ fontSize:30, fontWeight:900, color, lineHeight:1 }}>{value}</div>
+                        <div style={{ fontSize:9, fontWeight:700, textTransform:'uppercase',
+                          letterSpacing:'0.05em', color, marginTop:4 }}>{label}</div>
+                        <div style={{ fontSize:9, color:'#6b7280', marginTop:3 }}>{sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Estado de actividades */}
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+                  {(() => {
+                    const inProg  = activitiesWithCtx.filter((a:any) => ['en_progreso','en_curso','activo'].includes(a.status)).length;
+                    const blocked = activitiesWithCtx.filter((a:any) => a.status === 'bloqueado').length;
+                    return [
+                      { label:`${doneActivities} Completadas`,  color:'#065f46', bg:'#d1fae5' },
+                      { label:`${inProg} En Progreso`,          color:'#1e40af', bg:'#dbeafe' },
+                      { label:`${blocked} Bloqueadas`,          color:'#991b1b', bg:'#fee2e2' },
+                      { label:`${pendienteCount} Pendientes`,   color:'#92400e', bg:'#fef3c7' },
+                    ].map(({ label, color, bg }) => (
+                      <span key={label} style={{
+                        display:'inline-flex', alignItems:'center', gap:5,
+                        padding:'4px 10px', borderRadius:12, background:bg,
+                        fontSize:9, fontWeight:700, color,
+                      }}>
+                        <span style={{ width:5, height:5, borderRadius:'50%', background:color, display:'inline-block', flexShrink:0 }} />
+                        {label}
+                      </span>
+                    ));
+                  })()}
+                </div>
+
+                {/* Avance por tipo de módulo */}
+                {(() => {
+                  const rows = [
+                    { key:'asistencial', label:'Asistencial', color:'#2563eb' },
+                    { key:'financiero',  label:'Financiero',  color:'#059669' },
+                    { key:'mixto',       label:'Mixto',       color:'#7c3aed' },
+                  ].filter(r => tipoProgress[r.key as keyof typeof tipoProgress] != null);
+                  if (!rows.length) return null;
+                  return (
+                    <div style={{ background:'#f9fafb', borderRadius:6, padding:'10px 14px', border:'1px solid #e5e7eb' }}>
+                      <div style={{ fontSize:9, fontWeight:700, textTransform:'uppercase',
+                        letterSpacing:'0.05em', color:'#9ca3af', marginBottom:10 }}>
+                        Avance por Tipo de Módulo
+                      </div>
+                      {rows.map(({ key, label, color }) => {
+                        const pct = tipoProgress[key as keyof typeof tipoProgress] ?? 0;
+                        return (
+                          <div key={key} style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
+                            <span style={{ fontSize:9, fontWeight:700, color, width:72, flexShrink:0 }}>{label}</span>
+                            <div style={{ flex:1, height:8, background:'#e5e7eb', borderRadius:4, overflow:'hidden' }}>
+                              <div style={{ height:'100%', width:`${Math.min(pct, 100)}%`, background:color, borderRadius:4 }} />
+                            </div>
+                            <span style={{ fontSize:10, fontWeight:800, color, width:36, textAlign:'right', flexShrink:0 }}>{pct}%</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
             <div className="ie-section">
               <SecTitle num={snOS} text="Datos de la Orden de Servicio" />
               <table style={{ ...tbl, border:'1px solid #e5e7eb', borderTop:'none' }}>

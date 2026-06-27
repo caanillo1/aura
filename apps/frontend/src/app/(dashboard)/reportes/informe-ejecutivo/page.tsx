@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import {
   ArrowLeft, Printer, RefreshCw, Loader2, Pencil, Check, X,
-  Save, History, ChevronDown, Trash2, Plus, Sparkles, CalendarDays,
+  Save, History, ChevronDown, Trash2, Plus, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -99,43 +99,17 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
 }
 
 // ── celda de fecha ─────────────────────────────────────────────────────────────
-// Campo de texto para escritura manual (DD/MM/AAAA) + ícono de calendario
-// para selección con mouse. Ambas formas guardan automáticamente.
+// input[type=date] visible y estilizado: soporta teclado y calendario nativo
+// en todos los navegadores, restringe el formato automáticamente.
 function DateCell({ value, color, onSave, readOnly = false }: {
   value: string | null; color: string;
   onSave: (iso: string) => Promise<void>; readOnly?: boolean;
 }) {
-  const [draft,  setDraft]  = useState(value ? fmt(value) : '');
   const [saving, setSaving] = useState(false);
 
-  // Sincroniza el texto cuando el valor externo cambia (p. ej. tras guardar)
-  useEffect(() => { setDraft(value ? fmt(value) : ''); }, [value]);
-
-  const parseAndSave = async (raw: string) => {
-    const t = raw.trim();
-    const current = value ? fmt(value) : '';
-    if (!t || t === current) return; // vacío o sin cambio, no guardar
-
-    let iso = '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
-      iso = t; // ya en formato ISO
-    } else {
-      const p = t.split('/');
-      if (p.length === 3 && p[2].length === 4)
-        iso = `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
-    }
-    if (!iso) return; // formato inválido
-
-    setSaving(true);
-    await onSave(iso);
-    setSaving(false);
-  };
-
-  // Selección desde el calendario nativo
-  const handlePickerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const iso = e.target.value;
     if (!iso) return;
-    setDraft(fmt(iso)); // muestra la fecha formateada en el campo de texto
     setSaving(true);
     await onSave(iso);
     setSaving(false);
@@ -147,50 +121,28 @@ function DateCell({ value, color, onSave, readOnly = false }: {
     </span>
   );
 
-  return (
-    <div className="flex items-center gap-1">
-      {/* Campo de texto — teclado */}
-      <input
-        type="text"
-        value={draft}
-        placeholder="DD/MM/AAAA"
-        onChange={e => setDraft(e.target.value)}
-        onBlur={() => parseAndSave(draft)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') { e.preventDefault(); parseAndSave(draft); }
-          if (e.key === 'Escape') setDraft(value ? fmt(value) : '');
-        }}
-        className="text-xs rounded px-1.5 py-0.5 outline-none"
-        style={{
-          width: 82,
-          background: 'var(--input-bg)',
-          border: '1px solid var(--border-subtle)',
-          color: value ? color : 'var(--input-color)',
-          fontWeight: value ? 700 : 400,
-        }}
-      />
+  if (saving) return (
+    <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" style={{ color: 'var(--accent-blue)' }} />
+  );
 
-      {/* Ícono de calendario — mouse */}
-      {saving ? (
-        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" style={{ color: 'var(--accent-blue)' }} />
-      ) : (
-        <label
-          title="Abrir calendario"
-          style={{ position: 'relative', display: 'inline-flex', width: 20, height: 20, cursor: 'pointer', flexShrink: 0 }}
-        >
-          <CalendarDays
-            className="w-3.5 h-3.5"
-            style={{ color: 'var(--accent-blue)', opacity: 0.6, position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none' }}
-          />
-          <input
-            type="date"
-            value={value ?? ''}
-            onChange={handlePickerChange}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-          />
-        </label>
-      )}
-    </div>
+  return (
+    <input
+      type="date"
+      value={value ?? ''}
+      onChange={handleChange}
+      min="2000-01-01"
+      max="2099-12-31"
+      className="text-xs rounded-lg outline-none"
+      style={{
+        width: 120,
+        padding: '3px 6px',
+        background: 'var(--input-bg)',
+        border: '1px solid var(--border-subtle)',
+        color: value ? color : 'var(--text-muted)',
+        fontWeight: value ? 700 : 400,
+        cursor: 'pointer',
+      }}
+    />
   );
 }
 

@@ -1124,12 +1124,13 @@ export class ServiceOrdersService {
     const startLabel = fmt(dto.startDate.toISOString());
     const endLabel   = fmt(dto.endDate.toISOString());
     const pdfLabel   = reportType === 'completo' ? 'Informe con Actas' : 'Informe Ejecutivo';
+    const osName     = os.product ?? os.osNumber;
     const asunto = dto.asunto
-      ?? `${pdfLabel} – Semana ${startLabel}/${endLabel} · OS ${os.osNumber}`;
+      ?? `${pdfLabel} – ${osName} – Semana ${startLabel}/${endLabel}`;
 
     // Generate PDF via Puppeteer to match InformeConActas/InformeEjecutivo visual
     const pdf = await this.generatePdfPuppeteer(data, reportType === 'completo');
-    const filename = `${pdfLabel.replace(/ /g,'_')}_${os.osNumber.replace(/[^a-zA-Z0-9-]/g,'_')}_Semana_${startLabel.replace(/\//g,'-')}.pdf`;
+    const filename = `${pdfLabel.replace(/ /g,'_')}_${osName.replace(/[^a-zA-Z0-9-]/g,'_')}_Semana_${startLabel.replace(/\//g,'-')}.pdf`;
 
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f3f4f6;">
@@ -1137,7 +1138,7 @@ export class ServiceOrdersService {
 <table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e5e7eb;">
 <tr><td style="background:${pc};padding:20px 28px;color:#fff;border-radius:8px 8px 0 0;">
   <div style="font-size:16px;font-weight:800;">${nom}</div>
-  <div style="font-size:12px;opacity:0.85;margin-top:4px;">${pdfLabel} · OS: ${os.osNumber}</div>
+  <div style="font-size:12px;opacity:0.85;margin-top:4px;">${pdfLabel} · ${osName}</div>
   <div style="font-size:11px;opacity:0.7;margin-top:2px;">Semana ${startLabel} – ${endLabel}</div>
 </td></tr>
 <tr><td style="height:4px;background:linear-gradient(90deg,${pc},#60a5fa);"></td></tr>
@@ -1174,8 +1175,9 @@ export class ServiceOrdersService {
       const nom = company?.commercialName ?? company?.name ?? '';
 
       const pdf = await this.generatePdfPuppeteer(data, true);
-      const asunto = dto.asunto ?? `Informe con Actas – ${dto.periodLabel} · OS ${os.osNumber}`;
-      const filename = `Informe_con_Actas_${os.osNumber.replace(/[^a-zA-Z0-9-]/g, '_')}_${dto.periodLabel.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      const osNameM = os.product ?? os.osNumber;
+      const asunto = dto.asunto ?? `Informe con Actas – ${osNameM} – ${dto.periodLabel}`;
+      const filename = `Informe_con_Actas_${osNameM.replace(/[^a-zA-Z0-9-]/g, '_')}_${dto.periodLabel.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
 
       const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f3f4f6;">
@@ -1183,8 +1185,8 @@ export class ServiceOrdersService {
 <table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e5e7eb;">
 <tr><td style="background:${pc};padding:20px 28px;color:#fff;border-radius:8px 8px 0 0;">
   <div style="font-size:16px;font-weight:800;">${nom}</div>
-  <div style="font-size:12px;opacity:0.85;margin-top:4px;">Informe con Actas · ${dto.periodLabel}</div>
-  <div style="font-size:11px;opacity:0.7;margin-top:2px;">OS: ${os.osNumber}</div>
+  <div style="font-size:12px;opacity:0.85;margin-top:4px;">Informe con Actas · ${osNameM}</div>
+  <div style="font-size:11px;opacity:0.7;margin-top:2px;">${dto.periodLabel}</div>
 </td></tr>
 <tr><td style="height:4px;background:linear-gradient(90deg,${pc},#60a5fa);"></td></tr>
 <tr><td style="padding:24px 28px;">
@@ -1207,7 +1209,8 @@ export class ServiceOrdersService {
       const nom = company?.commercialName ?? company?.name ?? '';
 
       const pdf = await this.generatePdfPuppeteer(data, true);
-      const asunto = dto.asunto ?? `Informe con Actas – Quincenal ${dto.periodLabel} · OS ${os.osNumber}`;
+      const osNameQ = os.product ?? os.osNumber;
+      const asunto = dto.asunto ?? `Informe con Actas – Quincenal – ${osNameQ} – ${dto.periodLabel}`;
 
       const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f3f4f6;">
@@ -1215,8 +1218,8 @@ export class ServiceOrdersService {
 <table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e5e7eb;">
 <tr><td style="background:${pc};padding:20px 28px;color:#fff;border-radius:8px 8px 0 0;">
   <div style="font-size:16px;font-weight:800;">${nom}</div>
-  <div style="font-size:12px;opacity:0.85;margin-top:4px;">Informe con Actas – Quincenal · ${dto.periodLabel}</div>
-  <div style="font-size:11px;opacity:0.7;margin-top:2px;">OS: ${os.osNumber}</div>
+  <div style="font-size:12px;opacity:0.85;margin-top:4px;">Informe con Actas – Quincenal · ${osNameQ}</div>
+  <div style="font-size:11px;opacity:0.7;margin-top:2px;">${dto.periodLabel}</div>
 </td></tr>
 <tr><td style="height:4px;background:linear-gradient(90deg,${pc},#60a5fa);"></td></tr>
 <tr><td style="padding:24px 28px;">
@@ -1228,7 +1231,7 @@ export class ServiceOrdersService {
 </td></tr>
 </table></td></tr></table></body></html>`;
 
-      const filename = `Informe_con_Actas_Quincenal_${os.osNumber.replace(/[^a-zA-Z0-9-]/g, '_')}_${dto.periodLabel.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      const filename = `Informe_con_Actas_Quincenal_${osNameQ.replace(/[^a-zA-Z0-9-]/g, '_')}_${dto.periodLabel.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
       await this.mail.sendFromCompany(companyId, dto.destinatarios, asunto, html, [
         { filename, content: pdf, contentType: 'application/pdf' },
       ]);
@@ -2288,8 +2291,9 @@ table { border-collapse: collapse; width: 100%; }
     const nom = company?.commercialName ?? company?.name ?? '';
     const pc  = company?.primaryColor ?? '#1E3A5F';
 
-    const asunto   = dto.asunto ?? `Informe – OS ${os.osNumber}`;
-    const filename = dto.filename ?? `Informe_${os.osNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+    const osNameS  = os.product ?? os.osNumber;
+    const asunto   = dto.asunto ?? `Informe – ${osNameS}`;
+    const filename = dto.filename ?? `Informe_${osNameS.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
     const pdf      = Buffer.from(dto.pdfBase64, 'base64');
 
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
@@ -2299,7 +2303,6 @@ table { border-collapse: collapse; width: 100%; }
 <tr><td style="background:${pc};padding:20px 28px;color:#fff;border-radius:8px 8px 0 0;">
   <div style="font-size:16px;font-weight:800;">${nom}</div>
   <div style="font-size:12px;opacity:0.85;margin-top:4px;">${asunto}</div>
-  <div style="font-size:11px;opacity:0.7;margin-top:2px;">OS: ${os.osNumber}</div>
 </td></tr>
 <tr><td style="height:4px;background:linear-gradient(90deg,${pc},#60a5fa);"></td></tr>
 <tr><td style="padding:24px 28px;">
@@ -2331,8 +2334,9 @@ table { border-collapse: collapse; width: 100%; }
     const pc  = company?.primaryColor ?? '#1E3A5F';
 
     const reportLabel = isCompleto ? 'Informe con Actas' : 'Informe Ejecutivo';
-    const asunto      = dto.asunto ?? `${reportLabel} – OS ${os.osNumber}`;
-    const filename    = `${reportLabel.replace(/ /g, '_')}_${os.osNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+    const osNameR     = os.product ?? os.osNumber;
+    const asunto      = dto.asunto ?? `${reportLabel} – ${osNameR}`;
+    const filename    = `${reportLabel.replace(/ /g, '_')}_${osNameR.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
     const pdf         = await this.generatePdfPuppeteer(data, isCompleto);
 
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
@@ -2341,7 +2345,7 @@ table { border-collapse: collapse; width: 100%; }
 <table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;border:1px solid #e5e7eb;">
 <tr><td style="background:${pc};padding:20px 28px;color:#fff;border-radius:8px 8px 0 0;">
   <div style="font-size:16px;font-weight:800;">${nom}</div>
-  <div style="font-size:12px;opacity:0.85;margin-top:4px;">${reportLabel} · OS: ${os.osNumber}</div>
+  <div style="font-size:12px;opacity:0.85;margin-top:4px;">${reportLabel} · ${osNameR}</div>
 </td></tr>
 <tr><td style="height:4px;background:linear-gradient(90deg,${pc},#60a5fa);"></td></tr>
 <tr><td style="padding:24px 28px;">
@@ -2409,8 +2413,9 @@ table { border-collapse: collapse; width: 100%; }
     const pc  = company?.primaryColor ?? '#1E3A5F';
 
     const pdf      = await this.generateAnalysisPdfBuffer(companyId, osId);
-    const asunto   = dto.asunto ?? `Análisis de Implementación – OS ${os.osNumber} – ${os.client?.businessName ?? ''}`;
-    const filename = `Analisis_${os.osNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
+    const osNameA  = os.product ?? os.osNumber;
+    const asunto   = dto.asunto ?? `Análisis de Implementación – ${osNameA} – ${os.client?.businessName ?? ''}`;
+    const filename = `Analisis_${osNameA.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`;
 
     const riskLabel: Record<string, string> = { alto: 'RIESGO ALTO', medio: 'RIESGO MEDIO', normal: 'EN CONTROL' };
     const riskColor: Record<string, string> = { alto: '#dc2626', medio: '#d97706', normal: '#059669' };

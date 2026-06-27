@@ -99,21 +99,24 @@ function EditableCell({ value, onSave, multiline = false, placeholder = '—', r
 }
 
 // ── celda de fecha ─────────────────────────────────────────────────────────────
-// input[type="date"] — buenas prácticas semánticas.
-// Solo guarda cuando el año ya es ≥ 2000, ignorando estados intermedios del
-// teclado (ej. "0002" mientras el usuario escribe "2026" dígito a dígito).
+// input[type="date"] semántico. Estado local desacoplado del guardado:
+// - onChange → solo actualiza el estado local (sin guardar)
+// - onBlur   → guarda cuando el usuario termina y sale del campo
+// Así el usuario puede editar día/mes/año libremente sin guardados parciales.
 function DateCell({ value, color, onSave, readOnly = false, dark = false }: {
   value: string | null; color: string;
   onSave: (iso: string) => Promise<void>; readOnly?: boolean; dark?: boolean;
 }) {
+  const [local,  setLocal]  = useState(value ?? '');
   const [saving, setSaving] = useState(false);
 
-  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const iso = e.target.value; // yyyy-mm-dd
-    if (!iso) return;
+  // Sincronizar cuando el valor externo cambia (después de guardar)
+  useEffect(() => { setLocal(value ?? ''); }, [value]);
+
+  const commitSave = async (iso: string) => {
+    if (!iso || iso === value) return;            // sin cambio
     const year = parseInt(iso.split('-')[0], 10);
-    // Ignorar mientras el año esté incompleto (estados intermedios: 0002, 0020…)
-    if (year < 2000 || year > 2099) return;
+    if (year < 2000 || year > 2099) return;       // año incompleto/inválido
     setSaving(true);
     await onSave(iso);
     setSaving(false);
@@ -132,18 +135,19 @@ function DateCell({ value, color, onSave, readOnly = false, dark = false }: {
   return (
     <input
       type="date"
-      value={value ?? ''}
+      value={local}
       min="2000-01-01"
       max="2099-12-31"
-      onChange={handleChange}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={e  => commitSave(e.target.value)}
       className="text-xs rounded-lg outline-none"
       style={{
         width: 120,
         padding: '3px 6px',
         background: 'var(--input-bg)',
         border: '1px solid var(--border-subtle)',
-        color: value ? color : 'var(--text-muted)',
-        fontWeight: value ? 700 : 400,
+        color: local ? color : 'var(--text-muted)',
+        fontWeight: local ? 700 : 400,
         cursor: 'pointer',
         colorScheme: dark ? 'dark' : 'light',
       }}

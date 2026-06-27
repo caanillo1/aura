@@ -23,6 +23,12 @@ const PRIORITY_STYLE: Record<string, { color: string; bg: string }> = {
   baja:  { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)'  },
 };
 
+const TIPO_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  asistencial: { label: 'Asistencial', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  border: 'rgba(96,165,250,0.30)'  },
+  financiero:  { label: 'Financiero',  color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.30)'  },
+  mixto:       { label: 'Mixto',       color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.30)' },
+};
+
 const fmt = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit', timeZone: 'UTC' }) : null;
 
@@ -330,6 +336,12 @@ export default function TemplateConstructorPage() {
                               {(mod.days || mod.estimatedDays) > 0 && (
                                 <span className="text-[10px] font-mono" style={{ color: tc.m }}>
                                   {mod.days || mod.estimatedDays}d
+                                </span>
+                              )}
+                              {mod.tipo && TIPO_CFG[mod.tipo] && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                                  style={{ color: TIPO_CFG[mod.tipo].color, background: TIPO_CFG[mod.tipo].bg, border: `1px solid ${TIPO_CFG[mod.tipo].border}` }}>
+                                  {TIPO_CFG[mod.tipo].label}
                                 </span>
                               )}
                             </div>

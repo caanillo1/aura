@@ -573,8 +573,8 @@ export default function InformeEjecutivoPage() {
               el porcentaje de avance, las causas que han impedido el paso a producción y las acciones requeridas para el cierre de cada proyecto.
             </div>
 
-            {/* ── Tabla (md+) ── */}
-            <div className="hidden md:block mx-4 mb-4 overflow-x-auto rounded-xl">
+            {/* ── Tabla (lg+) ── */}
+            <div className="hidden lg:block mx-4 mb-4 overflow-x-auto rounded-xl">
               <table className="w-full border-collapse text-xs" style={{ minWidth: '900px' }}>
                 <thead>
                   <tr style={{ background: dark ? '#0d1e36' : '#0a2240', color: '#fff' }}>
@@ -634,8 +634,8 @@ export default function InformeEjecutivoPage() {
               </table>
             </div>
 
-            {/* ── Tarjetas (móvil) ── */}
-            <div className="md:hidden mx-4 mb-4 flex flex-col gap-3">
+            {/* ── Tarjetas (móvil + tablet) ── */}
+            <div className="lg:hidden mx-4 mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
               {filas.map(f => {
                 const sem = getSemaforo(f.endDate, f.progressPercent, f.status);
                 const semColor = SEMAFORO_COLOR[sem];

@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import {
   ArrowLeft, Printer, RefreshCw, Loader2, Pencil, Check, X,
-  Save, History, ChevronDown, Trash2, Plus, Sparkles,
+  Save, History, ChevronDown, Trash2, Plus, Sparkles, CalendarDays,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -103,19 +103,14 @@ function DateCell({ value, color, onSave, readOnly = false }: {
   value: string | null; color: string;
   onSave: (iso: string) => Promise<void>; readOnly?: boolean;
 }) {
-  const [open,   setOpen]   = useState(false);
   const [saving, setSaving] = useState(false);
-  const ref = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { if (open) ref.current?.showPicker?.(); }, [open]);
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const iso = e.target.value; // yyyy-mm-dd
-    if (!iso) { setOpen(false); return; }
+    const iso = e.target.value;
+    if (!iso) return;
     setSaving(true);
     await onSave(iso);
     setSaving(false);
-    setOpen(false);
   };
 
   if (readOnly) return (
@@ -125,27 +120,26 @@ function DateCell({ value, color, onSave, readOnly = false }: {
   );
 
   return (
-    <div className="relative flex justify-center">
+    <label className="group cursor-pointer flex items-center justify-center gap-1.5">
       {value ? (
-        <div className="group flex items-center gap-1 cursor-pointer" onClick={() => setOpen(true)}>
+        <>
           <span className="text-xs font-bold" style={{ color }}>{fmt(value)}</span>
-          <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-60" style={{ color: 'var(--accent-blue)' }} />
-        </div>
+          <CalendarDays className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-70 transition-opacity"
+            style={{ color: 'var(--accent-blue)' }} />
+        </>
       ) : (
-        <button onClick={() => setOpen(true)}
-          className="text-xs px-2 py-0.5 rounded"
-          style={{ color: 'var(--accent-blue)', border: '1px dashed var(--accent-blue)', opacity: 0.7 }}>
-          {saving ? '...' : 'Fecha'}
-        </button>
+        saving
+          ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--accent-blue)' }} />
+          : <CalendarDays className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity"
+              style={{ color: 'var(--accent-blue)' }} />
       )}
-      {open && (
-        <input
-          ref={ref} type="date" defaultValue={value ?? ''}
-          onChange={handleChange} onBlur={() => setOpen(false)}
-          className="absolute z-20 opacity-0 w-0 h-0 pointer-events-none"
-        />
-      )}
-    </div>
+      <input
+        type="date"
+        className="sr-only"
+        value={value ?? ''}
+        onChange={handleChange}
+      />
+    </label>
   );
 }
 

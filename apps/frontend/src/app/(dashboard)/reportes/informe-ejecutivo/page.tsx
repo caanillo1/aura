@@ -552,8 +552,8 @@ export default function InformeEjecutivoPage() {
 
             {/* Título */}
             <div className="text-center py-6 px-4" style={{ background: dark ? '#0d1e36' : '#0a2240', color: '#fff' }}>
-              <h1 className="text-2xl font-black tracking-wide uppercase">Informe Ejecutivo</h1>
-              <h2 className="text-sm font-semibold tracking-widest uppercase mt-1 opacity-80">
+              <h1 className="text-xl sm:text-2xl font-black tracking-wide uppercase">Informe Ejecutivo</h1>
+              <h2 className="text-xs sm:text-sm font-semibold tracking-widest uppercase mt-1 opacity-80">
                 Estado de Proyectos de Implementación — {company?.name ?? ''}
               </h2>
               <p className="text-xs mt-3 opacity-60">Fecha del informe: {reportDate}</p>
@@ -573,8 +573,8 @@ export default function InformeEjecutivoPage() {
               el porcentaje de avance, las causas que han impedido el paso a producción y las acciones requeridas para el cierre de cada proyecto.
             </div>
 
-            {/* Tabla */}
-            <div className="mx-4 mb-4 overflow-x-auto rounded-xl">
+            {/* ── Tabla (md+) ── */}
+            <div className="hidden md:block mx-4 mb-4 overflow-x-auto rounded-xl">
               <table className="w-full border-collapse text-xs" style={{ minWidth: '900px' }}>
                 <thead>
                   <tr style={{ background: dark ? '#0d1e36' : '#0a2240', color: '#fff' }}>
@@ -588,7 +588,6 @@ export default function InformeEjecutivoPage() {
                     const sem = getSemaforo(f.endDate, f.progressPercent, f.status);
                     const rowBg = i % 2 === 0 ? (dark ? 'rgba(255,255,255,0.02)' : '#ffffff') : (dark ? 'rgba(255,255,255,0.04)' : '#f8fafc');
                     const newDateColor = sem === 'rojo' ? '#ef4444' : sem === 'amarillo' ? '#eab308' : '#22c55e';
-
                     return (
                       <tr key={f.id} style={{ background: rowBg }}>
                         <td className="text-center py-3 px-3">
@@ -624,19 +623,91 @@ export default function InformeEjecutivoPage() {
                             onSave={v => save(f.id, 'accionRequerida', v)} />
                         </td>
                         <td className="py-3 px-3 text-center" style={{ minWidth: '100px' }}>
-                          <DateCell
-                            value={f.nuevaFechaEstimada}
-                            color={newDateColor}
-                            readOnly={readOnly}
-                            dark={dark}
-                            onSave={iso => save(f.id, 'nuevaFechaEstimada', iso)}
-                          />
+                          <DateCell value={f.nuevaFechaEstimada} color={newDateColor}
+                            readOnly={readOnly} dark={dark}
+                            onSave={iso => save(f.id, 'nuevaFechaEstimada', iso)} />
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* ── Tarjetas (móvil) ── */}
+            <div className="md:hidden mx-4 mb-4 flex flex-col gap-3">
+              {filas.map(f => {
+                const sem = getSemaforo(f.endDate, f.progressPercent, f.status);
+                const semColor = SEMAFORO_COLOR[sem];
+                const newDateColor = sem === 'rojo' ? '#ef4444' : sem === 'amarillo' ? '#eab308' : '#22c55e';
+                const cardBg  = dark ? '#111c2e' : '#ffffff';
+                const labelColor = dark ? '#64748b' : '#94a3b8';
+                const respOptions = [
+                  { value: '', label: '—' },
+                  { value: 'Cliente', label: 'Cliente' },
+                  { value: 'IHCE', label: company?.name?.split(' ')[0] ?? 'Implementador' },
+                  { value: 'Compartido', label: 'Compartido' },
+                ];
+                return (
+                  <div key={f.id} className="rounded-xl overflow-hidden"
+                    style={{ background: cardBg, border: `1.5px solid ${semColor}40`, boxShadow: `0 2px 12px ${semColor}18` }}>
+
+                    {/* Cabecera */}
+                    <div className="flex items-center gap-3 px-4 py-3"
+                      style={{ background: dark ? '#0d1e36' : '#0a2240', borderBottom: `2px solid ${semColor}` }}>
+                      <span className="w-3 h-3 rounded-full shrink-0"
+                        style={{ background: semColor, boxShadow: `0 0 6px ${semColor}` }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{f.clienteNombre}</p>
+                        <p className="text-xs opacity-60 text-white truncate">{f.osName || '—'}</p>
+                      </div>
+                      <span className="text-lg font-black shrink-0" style={{ color: semColor }}>{f.progressPercent}%</span>
+                    </div>
+
+                    {/* Cuerpo */}
+                    <div className="px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide mb-0.5" style={{ color: labelColor, fontSize: 10 }}>Estado</p>
+                        <p style={{ color: 'var(--text-primary)' }}>{STATUS_LABEL[f.status] ?? f.status}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide mb-0.5" style={{ color: labelColor, fontSize: 10 }}>Semáforo</p>
+                        <p style={{ color: semColor, fontWeight: 600 }}>{SEMAFORO_LABEL[sem]}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide mb-0.5" style={{ color: labelColor, fontSize: 10 }}>Fecha inicio</p>
+                        <p style={{ color: 'var(--text-secondary)' }}>{fmt(f.startDate)}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide mb-0.5" style={{ color: labelColor, fontSize: 10 }}>Compromiso</p>
+                        <p style={{ color: 'var(--text-secondary)' }}>{fmt(f.endDate)}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="font-semibold uppercase tracking-wide mb-0.5" style={{ color: labelColor, fontSize: 10 }}>Motivo de retraso</p>
+                        <EditableCell value={f.motivoRetraso} placeholder="Haz clic para editar..." multiline readOnly={readOnly}
+                          onSave={v => save(f.id, 'motivoRetraso', v)} />
+                      </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide mb-0.5" style={{ color: labelColor, fontSize: 10 }}>Responsable</p>
+                        <EditableSelect value={f.responsableRetraso} readOnly={readOnly} dark={dark}
+                          options={respOptions}
+                          onSave={v => save(f.id, 'responsableRetraso', v)} />
+                      </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide mb-0.5" style={{ color: labelColor, fontSize: 10 }}>Nueva fecha</p>
+                        <DateCell value={f.nuevaFechaEstimada} color={newDateColor}
+                          readOnly={readOnly} dark={dark}
+                          onSave={iso => save(f.id, 'nuevaFechaEstimada', iso)} />
+                      </div>
+                      <div className="col-span-2">
+                        <p className="font-semibold uppercase tracking-wide mb-0.5" style={{ color: labelColor, fontSize: 10 }}>Acción requerida</p>
+                        <EditableCell value={f.accionRequerida} placeholder="Haz clic para editar..." multiline readOnly={readOnly}
+                          onSave={v => save(f.id, 'accionRequerida', v)} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* ── Gráficas ── */}

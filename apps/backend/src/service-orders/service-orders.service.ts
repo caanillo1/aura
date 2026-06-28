@@ -2634,83 +2634,99 @@ ${team ? `
 
   // ── AI Analysis ─────────────────────────────────────────────────────────────
 
-  private async callGroq(messages: { role: string; content: string }[], maxTokens = 1200): Promise<string> {
+  private async callGroq(messages: { role: string; content: string }[], maxTokens = 1800): Promise<string> {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) throw new InternalServerErrorException('GROQ_API_KEY no configurada');
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        temperature: 0.4,
-        max_tokens: maxTokens,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 40_000);
 
-    if (!response.ok) {
-      const err = await response.text();
-      this.logger.error(`Groq API error: ${err}`);
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages,
+          temperature: 0.35,
+          max_tokens: maxTokens,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        this.logger.error(`Groq API error ${response.status}: ${err}`);
+        if (response.status === 429) throw new InternalServerErrorException('Límite de solicitudes alcanzado. Intenta de nuevo en unos segundos.');
+        throw new InternalServerErrorException('Error al consultar la IA');
+      }
+
+      const data: any = await response.json();
+      const content: string = data?.choices?.[0]?.message?.content ?? '';
+      const finishReason: string = data?.choices?.[0]?.finish_reason ?? '';
+      if (finishReason === 'length') {
+        this.logger.warn(`Groq finish_reason=length — respuesta truncada. max_tokens=${maxTokens}`);
+      }
+      return content;
+    } catch (e: any) {
+      if (e?.name === 'AbortError') throw new InternalServerErrorException('La IA tardó demasiado en responder. Intenta de nuevo.');
+      if (e instanceof InternalServerErrorException) throw e;
+      this.logger.error(e);
       throw new InternalServerErrorException('Error al consultar la IA');
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const data: any = await response.json();
-    return data?.choices?.[0]?.message?.content ?? '';
   }
 
   private buildOsContext(alertData: any): string {
     const { os, project, riskLevel, alerts, activitySummary, predictions, modules, visits, timeline, tickets, delayAttribution } = alertData;
-    return JSON.stringify({
-      os: { numero: os.osNumber, producto: os.product, cliente: os.client?.businessName, estado: os.status, inicio: os.startDate, fin: os.endDate },
+    const ctx = {
+      os: { num: os.osNumber, prod: os.product, cliente: os.client?.businessName, estado: os.status, inicio: os.startDate?.slice(0,10), fin: os.endDate?.slice(0,10) },
       riesgo: riskLevel,
-      alertas: (alerts ?? []).map((a: any) => ({ nivel: a.level, titulo: a.titulo, detalle: a.detalle })),
-      proyecto: project ? { nombre: project.name, avance: `${Number(project.progressPercent).toFixed(0)}%`, estado: project.status } : null,
-      actividades: activitySummary ?? null,
-      predicciones: predictions ?? null,
-      cronograma: timeline ? { diasTranscurridos: timeline.daysElapsed, diasRestantes: timeline.daysRemaining, avanceTiempo: `${timeline.timeProgressPercent}%` } : null,
-      modulos: (modules ?? []).map((m: any) => ({
-        nombre: m.name, avance: `${Math.round(m.progressPercent)}%`, salud: m.health,
-        bloqueadas: m.activities.blocked, vencidas: m.activities.overdue,
-      })),
-      visitas: visits ? { total: visits.total, canceladas: visits.cancelled, proximas: visits.upcoming } : null,
-      tickets: tickets ? { total: tickets.total, devueltos: tickets.devueltos, altaPrioridad: tickets.altaPrioridad } : null,
-      atribucionRetraso: delayAttribution ?? null,
-    }, null, 2);
+      alertas: (alerts ?? []).slice(0, 6).map((a: any) => `[${a.level}] ${a.titulo}`),
+      proyecto: project ? { avance: `${Number(project.progressPercent).toFixed(0)}%`, estado: project.status } : null,
+      actividades: activitySummary ? { total: activitySummary.total, done: activitySummary.done, prog: activitySummary.inProgress, bloq: activitySummary.blocked, venc: activitySummary.overdue } : null,
+      predicciones: predictions ? { ritmo: predictions.ritmoActividadesSemana, finEst: predictions.fechaEstimadaFin?.slice(0,10), retraso: predictions.diasDeRetraso, exito: predictions.probabilidadExito } : null,
+      cronograma: timeline ? { elapsed: timeline.daysElapsed, remaining: timeline.daysRemaining, timePct: timeline.timeProgressPercent } : null,
+      modulos: (modules ?? []).slice(0, 15).map((m: any) => ({ n: m.name, pct: Math.round(m.progressPercent), h: m.health, bloq: m.activities.blocked, venc: m.activities.overdue })),
+      visitas: visits ? { total: visits.total, cancel: visits.cancelled, prox: visits.upcoming } : null,
+      tickets: tickets ? { total: tickets.total, devueltos: tickets.devueltos, alta: tickets.altaPrioridad } : null,
+      retraso: delayAttribution ? { clientePct: delayAttribution.clientePct, implPct: delayAttribution.implementadorPct } : null,
+    };
+    return JSON.stringify(ctx);
   }
 
   async aiAnalyzeOs(companyId: string, osId: string): Promise<{ narrative: string; insights: string[]; nextActions: string[] }> {
     const alertData = await this.getAlerts(companyId, osId);
     const context = this.buildOsContext(alertData);
 
-    const systemPrompt = `Eres un consultor senior especializado en implementaciones de software hospitalario (HIS/ERP).
-Tu misión es analizar datos de una orden de servicio y entregar un análisis ejecutivo profundo, concreto y accionable.
-Responde ÚNICAMENTE en JSON válido, sin texto antes ni después.`;
+    const prompt = `Analiza esta orden de servicio de implementación HIS/ERP y responde SOLO con JSON válido (sin texto extra).
 
-    const userPrompt = `Analiza esta orden de servicio y responde con:
-1. narrative: párrafo ejecutivo de 4-6 oraciones en español que interprete el estado real del proyecto, mencionando datos concretos.
-2. insights: array de 5-7 hallazgos clave y no obvios (patrones de riesgo, correlaciones, anomalías detectadas).
-3. nextActions: array de 4-5 acciones específicas priorizadas para la semana, ordenadas por impacto.
+Datos: ${context}
 
-DATOS DE LA OS:
-${context}
+JSON requerido (sin texto antes ni después):
+{"narrative":"<párrafo ejecutivo 3-4 oraciones con datos concretos>","insights":["<hallazgo 1>","<hallazgo 2>","<hallazgo 3>","<hallazgo 4>","<hallazgo 5>"],"nextActions":["<acción 1>","<acción 2>","<acción 3>","<acción 4>"]}`;
 
-Responde SOLO con JSON:
-{"narrative":"...","insights":["...","..."],"nextActions":["...","..."]}`;
-
-    const text = await this.callGroq(
-      [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-      1400,
-    );
+    const text = await this.callGroq([{ role: 'user', content: prompt }], 1800);
 
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new InternalServerErrorException('Respuesta IA sin formato esperado');
+    if (!match) {
+      this.logger.error(`AI response without JSON: ${text.slice(0, 200)}`);
+      throw new InternalServerErrorException('La IA no devolvió el formato esperado. Intenta de nuevo.');
+    }
 
-    const parsed = JSON.parse(match[0]);
+    let parsed: any;
+    try {
+      parsed = JSON.parse(match[0]);
+    } catch {
+      this.logger.error(`AI JSON parse error: ${match[0].slice(0, 200)}`);
+      throw new InternalServerErrorException('Error procesando la respuesta de la IA. Intenta de nuevo.');
+    }
+
     return {
       narrative:   String(parsed.narrative ?? ''),
-      insights:    Array.isArray(parsed.insights)    ? parsed.insights    : [],
-      nextActions: Array.isArray(parsed.nextActions) ? parsed.nextActions : [],
+      insights:    Array.isArray(parsed.insights)    ? parsed.insights.slice(0, 7)    : [],
+      nextActions: Array.isArray(parsed.nextActions) ? parsed.nextActions.slice(0, 5) : [],
     };
   }
 
@@ -2720,24 +2736,20 @@ Responde SOLO con JSON:
     message: string,
     history: { role: 'user' | 'assistant'; content: string }[],
   ): Promise<{ reply: string }> {
+    // Build lightweight OS context for chat (reuse alert data structure)
     const alertData = await this.getAlerts(companyId, osId);
     const context = this.buildOsContext(alertData);
 
-    const systemPrompt = `Eres un consultor senior de implementaciones de software hospitalario (HIS/ERP).
-Tienes acceso a los datos en tiempo real de la siguiente orden de servicio.
-Responde de forma directa, concisa y profesional en español.
-Si te preguntan algo que no está en los datos, dilo claramente.
-
-DATOS ACTUALES DE LA OS:
-${context}`;
+    const systemPrompt = `Eres un consultor senior de implementaciones HIS/ERP. Responde directo, conciso y en español. Si algo no está en los datos, dilo.
+OS data: ${context}`;
 
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...history.slice(-8),
+      ...history.slice(-6),
       { role: 'user', content: message },
     ];
 
-    const reply = await this.callGroq(messages, 900);
-    return { reply };
+    const reply = await this.callGroq(messages, 700);
+    return { reply: reply.trim() };
   }
 }

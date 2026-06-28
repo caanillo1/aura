@@ -1,5 +1,6 @@
 import {
   Injectable, NotFoundException, ConflictException, BadRequestException,
+  InternalServerErrorException, Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -32,6 +33,8 @@ const OS_SELECT = {
 
 @Injectable()
 export class ServiceOrdersService {
+  private readonly logger = new Logger(ServiceOrdersService.name);
+
   constructor(
     private prisma: PrismaService,
     private mail: MailService,

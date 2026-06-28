@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image } from '@react-pdf/renderer';
 import { F, FS } from '../design/typography';
-import { N } from '../design/colors';
+import { N, alpha } from '../design/colors';
 
 interface Props {
   company: any;
@@ -12,37 +12,40 @@ interface Props {
 
 export function PageHeader({ company, os, reportTitle, pc }: Props) {
   const nom = company?.commercialName ?? company?.name ?? '';
-  const details = [
-    company?.nit   ? `NIT: ${company.nit}` : null,
-    company?.city  ?? null,
-    company?.phone ?? null,
-  ].filter(Boolean).join('  ·  ');
 
   return (
-    <View fixed style={{
-      position: 'absolute', top: 0, left: 0, right: 0,
-      height: 50, flexDirection: 'row', alignItems: 'center',
-      paddingHorizontal: 36, paddingTop: 8,
-      backgroundColor: N.white,
-      borderBottomWidth: 0.5, borderBottomColor: N.gray200,
-    }}>
-      {/* Logo */}
-      <View style={{ width: 70, alignItems: 'flex-start' }}>
-        {company?.logoData
-          ? <Image src={company.logoData} style={{ height: 24, maxWidth: 68, objectFit: 'contain' }} />
-          : <Text style={{ fontSize: FS.label + 0.5, fontFamily: F.bold, color: pc }}>{nom}</Text>
-        }
+    <View fixed style={{ position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'column' }}>
+      {/* Top accent line — brand color */}
+      <View style={{ height: 3, backgroundColor: pc }} />
+
+      {/* Header row */}
+      <View style={{
+        height: 44, flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 36, paddingTop: 6,
+        backgroundColor: N.white,
+      }}>
+        {/* Left: logo */}
+        <View style={{ width: 90, alignItems: 'flex-start' }}>
+          {company?.logoData
+            ? <Image src={company.logoData} style={{ height: 20, maxWidth: 86, objectFit: 'contain' }} />
+            : <Text style={{ fontSize: 8, fontFamily: F.bold, color: pc }}>{nom}</Text>
+          }
+        </View>
+
+        {/* Center: company */}
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={{ fontSize: 7, color: N.gray400 }}>{nom}</Text>
+        </View>
+
+        {/* Right: report label + OS */}
+        <View style={{ width: 140, alignItems: 'flex-end', gap: 2 }}>
+          <Text style={{ fontSize: 7.5, fontFamily: F.bold, color: pc }}>{reportTitle}</Text>
+          <Text style={{ fontSize: 6.5, color: N.gray400 }}>OS: {os?.osNumber}</Text>
+        </View>
       </View>
-      {/* Centre: company info */}
-      <View style={{ flex: 1, alignItems: 'center' }}>
-        <Text style={{ fontSize: 7.5, fontFamily: F.bold, color: N.gray900 }}>{nom}</Text>
-        {details ? <Text style={{ fontSize: FS.label, color: N.gray400, marginTop: 1 }}>{details}</Text> : null}
-      </View>
-      {/* Right: report type + OS */}
-      <View style={{ width: 130, alignItems: 'flex-end' }}>
-        <Text style={{ fontSize: 7.5, fontFamily: F.bold, color: pc }}>{reportTitle}</Text>
-        <Text style={{ fontSize: FS.label, color: N.gray400, marginTop: 1 }}>OS: {os?.osNumber}</Text>
-      </View>
+
+      {/* Bottom hairline */}
+      <View style={{ height: 0.5, backgroundColor: N.gray100, marginHorizontal: 36 }} />
     </View>
   );
 }

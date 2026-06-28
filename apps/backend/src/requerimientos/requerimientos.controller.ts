@@ -130,7 +130,7 @@ export class RequerimientosController {
   @Post('schedule/run-now')
   @Roles(...ADMIN_COORD)
   @ApiOperation({ summary: 'Ejecutar envío automático inmediatamente (prueba)' })
-  runScheduleNow(@GetUser() user: JwtUser) {
-    return this.scheduler.runNow(user.companyId);
+  runScheduleNow(@GetUser() user: JwtUser, @Body() body?: Record<string, any>) {
+    return this.scheduler.runNow(user.companyId, body ?? {});
   }
 }

@@ -482,9 +482,13 @@ export default function PriorizarPage() {
     }
     setRunningNow(true);
     try {
-      // Persist current config first so runNow reads up-to-date destinatarios/estados
-      await requerimientosApi.saveSchedule(autoConfig);
-      const res = await requerimientosApi.runScheduleNow();
+      // Pass current form values directly — no prior DB save required
+      const res = await requerimientosApi.runScheduleNow({
+        destinatarios: autoConfig.destinatarios,
+        estados:       autoConfig.estados,
+        asunto:        autoConfig.asunto,
+        mensaje:       autoConfig.mensaje,
+      });
       toast.success(`Prueba enviada · ${res.enviados} requerimientos a ${res.destinatarios} destinatario${res.destinatarios !== 1 ? 's' : ''}`);
     } catch (err: any) {
       toast.error(err?.response?.data?.message ?? 'Error al enviar prueba');

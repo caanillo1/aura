@@ -91,11 +91,7 @@ export class InformeSchedulerService implements OnModuleInit {
 
   async saveWeeklyConfig(companyId: string, osId: string, cfg: WeeklyConfig): Promise<{ message: string }> {
     const key = `${WEEKLY_PREFIX}${osId}`;
-    await this.prisma.systemConfig.upsert({
-      where:  { companyId_configKey: { companyId, configKey: key } },
-      create: { companyId, configKey: key, configValue: JSON.stringify(cfg), description: `Auto semanal informe OS ${osId}` },
-      update: { configValue: JSON.stringify(cfg) },
-    });
+    await this.upsertConfig(companyId, key, cfg, `Auto semanal informe OS ${osId}`);
     this.removeCron(`weekly_${osId}`);
     if (cfg.enabled && cfg.destinatarios.length > 0) this.registerWeeklyCron(companyId, osId, cfg);
     return { message: cfg.enabled ? 'Automatización semanal activada' : 'Automatización semanal desactivada' };
@@ -116,11 +112,7 @@ export class InformeSchedulerService implements OnModuleInit {
 
   async saveBimensualConfig(companyId: string, osId: string, cfg: BimensualConfig): Promise<{ message: string }> {
     const key = `${BIMENSUAL_PREFIX}${osId}`;
-    await this.prisma.systemConfig.upsert({
-      where:  { companyId_configKey: { companyId, configKey: key } },
-      create: { companyId, configKey: key, configValue: JSON.stringify(cfg), description: `Auto bimensual informe OS ${osId}` },
-      update: { configValue: JSON.stringify(cfg) },
-    });
+    await this.upsertConfig(companyId, key, cfg, `Auto bimensual informe OS ${osId}`);
     this.removeCron(`bimensual_15_${osId}`);
     this.removeCron(`bimensual_lastday_${osId}`);
     if (cfg.enabled && cfg.destinatarios.length > 0) this.registerBimensualCrons(companyId, osId, cfg);
@@ -142,11 +134,7 @@ export class InformeSchedulerService implements OnModuleInit {
 
   async saveAnalysisConfig(companyId: string, osId: string, cfg: AnalysisConfig): Promise<{ message: string }> {
     const key = `${ANALYSIS_PREFIX}${osId}`;
-    await this.prisma.systemConfig.upsert({
-      where:  { companyId_configKey: { companyId, configKey: key } },
-      create: { companyId, configKey: key, configValue: JSON.stringify(cfg), description: `Auto análisis OS ${osId}` },
-      update: { configValue: JSON.stringify(cfg) },
-    });
+    await this.upsertConfig(companyId, key, cfg, `Auto análisis OS ${osId}`);
     this.removeCron(`analysis_${osId}`);
     if (cfg.enabled && cfg.destinatarios.length > 0) this.registerAnalysisCron(companyId, osId, cfg);
     return { message: cfg.enabled ? 'Automatización de análisis activada' : 'Automatización de análisis desactivada' };
@@ -212,6 +200,23 @@ export class InformeSchedulerService implements OnModuleInit {
     });
     if (!row?.configValue) return null;
     try { return JSON.parse(row.configValue) as T; } catch { return null; }
+  }
+
+  // SQL Server 2016: Prisma upsert generates MERGE which has known bugs — use raw IF/UPDATE/INSERT
+  private async upsertConfig(companyId: string, configKey: string, cfg: object, description: string): Promise<void> {
+    const configValue = JSON.stringify(cfg);
+    await this.prisma.$executeRaw`
+      IF EXISTS (
+        SELECT 1 FROM ConfiguracionSistema
+        WHERE companyId = ${companyId} AND configKey = ${configKey}
+      )
+        UPDATE ConfiguracionSistema
+        SET configValue = ${configValue}, updatedAt = GETDATE()
+        WHERE companyId = ${companyId} AND configKey = ${configKey}
+      ELSE
+        INSERT INTO ConfiguracionSistema (id, companyId, configKey, configValue, description, updatedAt)
+        VALUES (NEWID(), ${companyId}, ${configKey}, ${configValue}, ${description}, GETDATE())
+    `;
   }
 
   private registerWeeklyCron(companyId: string, osId: string, cfg: WeeklyConfig) {

@@ -700,8 +700,8 @@ export const requerimientosApi = {
     api.get('/requerimientos/schedule').then((r) => r.data),
   saveSchedule: (cfg: object) =>
     api.post('/requerimientos/schedule', cfg).then((r) => r.data),
-  runScheduleNow: () =>
-    api.post('/requerimientos/schedule/run-now').then((r) => r.data),
+  runScheduleNow: (cfg?: { destinatarios?: string[]; estados?: string[]; asunto?: string; mensaje?: string }) =>
+    api.post('/requerimientos/schedule/run-now', cfg ?? {}).then((r) => r.data),
   getAnalytics: (params?: { clientId?: string; agenteId?: string; area?: string; tipo?: string; dateFrom?: string; dateTo?: string }) =>
     api.get('/requerimientos/analytics', { params }).then((r) => r.data),
 };

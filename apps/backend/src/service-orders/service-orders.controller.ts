@@ -72,6 +72,26 @@ export class ServiceOrdersController {
     return this.svc.getAlerts(user.companyId, id);
   }
 
+  @Post(':id/ai-analysis')
+  @Roles(...ALL_ROLES)
+  @Permissions('orders.buscar')
+  @ApiOperation({ summary: 'Genera análisis narrativo con IA (Groq) para la OS' })
+  aiAnalyzeOs(@GetUser() user: JwtUser, @Param('id') id: string) {
+    return this.svc.aiAnalyzeOs(user.companyId, id);
+  }
+
+  @Post(':id/ai-chat')
+  @Roles(...ALL_ROLES)
+  @Permissions('orders.buscar')
+  @ApiOperation({ summary: 'Chat con IA sobre los datos de la OS' })
+  aiChatOs(
+    @GetUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { message: string; history?: { role: 'user' | 'assistant'; content: string }[] },
+  ) {
+    return this.svc.aiChatOs(user.companyId, id, body.message, body.history ?? []);
+  }
+
   @Post(':id/download-analysis-pdf')
   @Roles(...ALL_ROLES)
   @Permissions('orders.buscar')

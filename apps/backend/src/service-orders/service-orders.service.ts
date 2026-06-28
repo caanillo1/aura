@@ -2631,4 +2631,113 @@ ${team ? `
 </td></tr></table>
 </body></html>`;
   }
+
+  // ── AI Analysis ─────────────────────────────────────────────────────────────
+
+  private async callGroq(messages: { role: string; content: string }[], maxTokens = 1200): Promise<string> {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new InternalServerErrorException('GROQ_API_KEY no configurada');
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages,
+        temperature: 0.4,
+        max_tokens: maxTokens,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      this.logger.error(`Groq API error: ${err}`);
+      throw new InternalServerErrorException('Error al consultar la IA');
+    }
+
+    const data: any = await response.json();
+    return data?.choices?.[0]?.message?.content ?? '';
+  }
+
+  private buildOsContext(alertData: any): string {
+    const { os, project, riskLevel, alerts, activitySummary, predictions, modules, visits, timeline, tickets, delayAttribution } = alertData;
+    return JSON.stringify({
+      os: { numero: os.osNumber, producto: os.product, cliente: os.client?.businessName, estado: os.status, inicio: os.startDate, fin: os.endDate },
+      riesgo: riskLevel,
+      alertas: (alerts ?? []).map((a: any) => ({ nivel: a.level, titulo: a.titulo, detalle: a.detalle })),
+      proyecto: project ? { nombre: project.name, avance: `${Number(project.progressPercent).toFixed(0)}%`, estado: project.status } : null,
+      actividades: activitySummary ?? null,
+      predicciones: predictions ?? null,
+      cronograma: timeline ? { diasTranscurridos: timeline.daysElapsed, diasRestantes: timeline.daysRemaining, avanceTiempo: `${timeline.timeProgressPercent}%` } : null,
+      modulos: (modules ?? []).map((m: any) => ({
+        nombre: m.name, avance: `${Math.round(m.progressPercent)}%`, salud: m.health,
+        bloqueadas: m.activities.blocked, vencidas: m.activities.overdue,
+      })),
+      visitas: visits ? { total: visits.total, canceladas: visits.cancelled, proximas: visits.upcoming } : null,
+      tickets: tickets ? { total: tickets.total, devueltos: tickets.devueltos, altaPrioridad: tickets.altaPrioridad } : null,
+      atribucionRetraso: delayAttribution ?? null,
+    }, null, 2);
+  }
+
+  async aiAnalyzeOs(companyId: string, osId: string): Promise<{ narrative: string; insights: string[]; nextActions: string[] }> {
+    const alertData = await this.getAlerts(companyId, osId);
+    const context = this.buildOsContext(alertData);
+
+    const systemPrompt = `Eres un consultor senior especializado en implementaciones de software hospitalario (HIS/ERP).
+Tu misión es analizar datos de una orden de servicio y entregar un análisis ejecutivo profundo, concreto y accionable.
+Responde ÚNICAMENTE en JSON válido, sin texto antes ni después.`;
+
+    const userPrompt = `Analiza esta orden de servicio y responde con:
+1. narrative: párrafo ejecutivo de 4-6 oraciones en español que interprete el estado real del proyecto, mencionando datos concretos.
+2. insights: array de 5-7 hallazgos clave y no obvios (patrones de riesgo, correlaciones, anomalías detectadas).
+3. nextActions: array de 4-5 acciones específicas priorizadas para la semana, ordenadas por impacto.
+
+DATOS DE LA OS:
+${context}
+
+Responde SOLO con JSON:
+{"narrative":"...","insights":["...","..."],"nextActions":["...","..."]}`;
+
+    const text = await this.callGroq(
+      [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+      1400,
+    );
+
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new InternalServerErrorException('Respuesta IA sin formato esperado');
+
+    const parsed = JSON.parse(match[0]);
+    return {
+      narrative:   String(parsed.narrative ?? ''),
+      insights:    Array.isArray(parsed.insights)    ? parsed.insights    : [],
+      nextActions: Array.isArray(parsed.nextActions) ? parsed.nextActions : [],
+    };
+  }
+
+  async aiChatOs(
+    companyId: string,
+    osId: string,
+    message: string,
+    history: { role: 'user' | 'assistant'; content: string }[],
+  ): Promise<{ reply: string }> {
+    const alertData = await this.getAlerts(companyId, osId);
+    const context = this.buildOsContext(alertData);
+
+    const systemPrompt = `Eres un consultor senior de implementaciones de software hospitalario (HIS/ERP).
+Tienes acceso a los datos en tiempo real de la siguiente orden de servicio.
+Responde de forma directa, concisa y profesional en español.
+Si te preguntan algo que no está en los datos, dilo claramente.
+
+DATOS ACTUALES DE LA OS:
+${context}`;
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-8),
+      { role: 'user', content: message },
+    ];
+
+    const reply = await this.callGroq(messages, 900);
+    return { reply };
+  }
 }

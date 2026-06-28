@@ -31,11 +31,9 @@ export class EmailSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Cargar y registrar schedules de todas las empresas al iniciar
-    const configs = await this.prisma.systemConfig.findMany({
-      where: { configKey: CONFIG_KEY },
-      select: { companyId: true, configValue: true },
-    });
+    const configs = await this.prisma.$queryRaw<{ companyId: string; configValue: string | null }[]>`
+      SELECT companyId, configValue FROM ConfiguracionSistema WHERE configKey = ${CONFIG_KEY}
+    `;
     for (const row of configs) {
       if (row.configValue) {
         try {
@@ -47,11 +45,12 @@ export class EmailSchedulerService implements OnModuleInit {
   }
 
   async getSchedule(companyId: string): Promise<EmailScheduleConfig | null> {
-    const row = await this.prisma.systemConfig.findUnique({
-      where: { companyId_configKey: { companyId, configKey: CONFIG_KEY } },
-    });
-    if (!row?.configValue) return null;
-    try { return JSON.parse(row.configValue); } catch { return null; }
+    const rows = await this.prisma.$queryRaw<{ configValue: string | null }[]>`
+      SELECT TOP 1 configValue FROM ConfiguracionSistema
+      WHERE companyId = ${companyId} AND configKey = ${CONFIG_KEY}
+    `;
+    if (!rows[0]?.configValue) return null;
+    try { return JSON.parse(rows[0].configValue); } catch { return null; }
   }
 
   async saveSchedule(companyId: string, cfg: EmailScheduleConfig): Promise<void> {

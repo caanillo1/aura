@@ -195,11 +195,12 @@ export class InformeSchedulerService implements OnModuleInit {
   // ── Private helpers ──────────────────────────────────────────────────────────
 
   private async readConfig<T>(companyId: string, configKey: string): Promise<T | null> {
-    const row = await this.prisma.systemConfig.findUnique({
-      where: { companyId_configKey: { companyId, configKey } },
-    });
-    if (!row?.configValue) return null;
-    try { return JSON.parse(row.configValue) as T; } catch { return null; }
+    const rows = await this.prisma.$queryRaw<{ configValue: string | null }[]>`
+      SELECT TOP 1 configValue FROM ConfiguracionSistema
+      WHERE companyId = ${companyId} AND configKey = ${configKey}
+    `;
+    if (!rows[0]?.configValue) return null;
+    try { return JSON.parse(rows[0].configValue) as T; } catch { return null; }
   }
 
   // SQL Server 2016: Prisma upsert generates MERGE which has known bugs — use raw IF/UPDATE/INSERT
@@ -314,10 +315,10 @@ export class InformeSchedulerService implements OnModuleInit {
   }
 
   private async updateLastSent(companyId: string, configKey: string, cfg: any) {
-    const updated = { ...cfg, lastSentAt: new Date().toISOString() };
-    await this.prisma.systemConfig.update({
-      where: { companyId_configKey: { companyId, configKey } },
-      data:  { configValue: JSON.stringify(updated) },
-    });
+    const configValue = JSON.stringify({ ...cfg, lastSentAt: new Date().toISOString() });
+    await this.prisma.$executeRaw`
+      UPDATE ConfiguracionSistema SET configValue = ${configValue}, updatedAt = GETDATE()
+      WHERE companyId = ${companyId} AND configKey = ${configKey}
+    `;
   }
 }

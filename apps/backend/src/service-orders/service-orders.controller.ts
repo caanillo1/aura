@@ -139,8 +139,12 @@ export class ServiceOrdersController {
   @Roles(...ALL_ROLES)
   @Permissions('orders.buscar')
   @ApiOperation({ summary: 'Ejecutar envío de análisis ahora' })
-  runAnalysisNow(@GetUser() user: JwtUser, @Param('id') id: string) {
-    return this.scheduler.runAnalysisNow(user.companyId, id);
+  runAnalysisNow(
+    @GetUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body?: { destinatarios?: string[]; asunto?: string },
+  ) {
+    return this.scheduler.runAnalysisNow(user.companyId, id, body);
   }
 
   @Post(':id/send-report')

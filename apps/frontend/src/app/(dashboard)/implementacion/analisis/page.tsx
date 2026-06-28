@@ -704,16 +704,19 @@ export default function AnalisisPage() {
   const handleRunNow = useCallback(async () => {
     if (!selectedOs) return;
     const destinatarios = autoConfig.destinatarios.split(',').map(s => s.trim()).filter(Boolean);
-    if (!destinatarios.length) { toast.error('Ingresa destinatarios primero'); return; }
+    if (!destinatarios.length) { toast.error('Ingresa al menos un destinatario'); return; }
     setAutoRunning(true);
     try {
-      await serviceOrdersApi.saveAnalysisSchedule(selectedOs.id, {
-        ...autoConfig, destinatarios, asunto: autoConfig.asunto.trim() || undefined,
-      });
-      await serviceOrdersApi.runAnalysisNow(selectedOs.id);
-      toast.success('Análisis enviado correctamente');
-    } catch {
-      toast.error('Error al enviar');
+      const asunto = autoConfig.asunto.trim() || undefined;
+      // Save config and send in parallel — run-now passes destinatarios directly so no DB dependency
+      await Promise.all([
+        serviceOrdersApi.saveAnalysisSchedule(selectedOs.id, { ...autoConfig, destinatarios, asunto }),
+        serviceOrdersApi.runAnalysisNow(selectedOs.id, { destinatarios, asunto }),
+      ]);
+      toast.success(`Análisis enviado a ${destinatarios.length} destinatario${destinatarios.length !== 1 ? 's' : ''}`);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? 'Error al enviar el análisis';
+      toast.error(msg);
     } finally {
       setAutoRunning(false);
     }

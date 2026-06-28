@@ -392,8 +392,8 @@ export const serviceOrdersApi = {
     api.get(`/service-orders/${id}/analysis-schedule`).then((r) => r.data),
   saveAnalysisSchedule: (id: string, body: any): Promise<any> =>
     api.post(`/service-orders/${id}/analysis-schedule`, body).then((r) => r.data),
-  runAnalysisNow: (id: string): Promise<any> =>
-    api.post(`/service-orders/${id}/analysis-schedule/run-now`).then((r) => r.data),
+  runAnalysisNow: (id: string, body?: { destinatarios?: string[]; asunto?: string }): Promise<any> =>
+    api.post(`/service-orders/${id}/analysis-schedule/run-now`, body ?? {}).then((r) => r.data),
 };
 
 // ── Templates ─────────────────────────────────────────────────────────────────

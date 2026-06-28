@@ -152,11 +152,26 @@ export class InformeSchedulerService implements OnModuleInit {
     return { message: cfg.enabled ? 'Automatización de análisis activada' : 'Automatización de análisis desactivada' };
   }
 
-  async runAnalysisNow(companyId: string, osId: string): Promise<{ message: string }> {
-    const cfg = await this.getAnalysisConfig(companyId, osId);
-    if (!cfg?.destinatarios?.length) throw new Error('No hay configuración de análisis guardada');
-    await this.executeAnalysisSend(companyId, osId, cfg);
-    return { message: 'Análisis enviado correctamente' };
+  async runAnalysisNow(
+    companyId: string,
+    osId: string,
+    override?: { destinatarios?: string[]; asunto?: string },
+  ): Promise<{ message: string }> {
+    // Use override destinatarios if provided, otherwise fall back to saved config
+    let destinatarios = override?.destinatarios?.filter(Boolean) ?? [];
+    let asunto = override?.asunto;
+
+    if (!destinatarios.length) {
+      const cfg = await this.getAnalysisConfig(companyId, osId);
+      if (!cfg?.destinatarios?.length) {
+        throw new Error('No hay destinatarios configurados. Ingresa al menos un correo en el campo de destinatarios.');
+      }
+      destinatarios = cfg.destinatarios;
+      asunto = asunto ?? cfg.asunto;
+    }
+
+    await this.svc.sendAnalysis(companyId, osId, { destinatarios, asunto });
+    return { message: `Análisis enviado a ${destinatarios.length} destinatario${destinatarios.length !== 1 ? 's' : ''}` };
   }
 
   private registerAnalysisCron(companyId: string, osId: string, cfg: AnalysisConfig) {

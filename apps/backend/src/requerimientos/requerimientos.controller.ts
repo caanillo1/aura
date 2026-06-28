@@ -47,39 +47,27 @@ export class RequerimientosController {
     return this.svc.getAnalytics(user.companyId, { clientId, agenteId, area, tipo, dateFrom, dateTo });
   }
 
-  @Get(':id')
-  @Roles(...ALL_ROLES)
-  @ApiOperation({ summary: 'Detalle de requerimiento' })
-  findOne(@GetUser() user: JwtUser, @Param('id') id: string) {
-    return this.svc.findOne(user.companyId, id);
+  // ── Rutas estáticas antes de :id para evitar que NestJS capture "schedule", "bulk", etc. como UUID ──
+
+  @Get('schedule')
+  @Roles(...ADMIN_COORD)
+  @ApiOperation({ summary: 'Obtener configuración de envío automático' })
+  getSchedule(@GetUser() user: JwtUser) {
+    return this.scheduler.getSchedule(user.companyId);
   }
 
-  @Post()
-  @Roles(...ALL_ROLES)
-  @ApiOperation({ summary: 'Crear requerimiento' })
-  create(@GetUser() user: JwtUser, @Body() dto: CreateRequerimientoDto) {
-    return this.svc.create(user.companyId, user.id, dto);
+  @Post('schedule')
+  @Roles(...ADMIN_COORD)
+  @ApiOperation({ summary: 'Guardar configuración de envío automático' })
+  saveSchedule(@GetUser() user: JwtUser, @Body() cfg: Record<string, any>) {
+    return this.scheduler.saveSchedule(user.companyId, cfg as EmailScheduleConfig);
   }
 
-  @Patch(':id')
-  @Roles(...ALL_ROLES)
-  @ApiOperation({ summary: 'Actualizar campos de un requerimiento' })
-  update(@GetUser() user: JwtUser, @Param('id') id: string, @Body() dto: UpdateRequerimientoDto) {
-    return this.svc.updateRequerimiento(user.companyId, id, dto);
-  }
-
-  @Post(':id/gestiones')
-  @Roles(...ALL_ROLES)
-  @ApiOperation({ summary: 'Registrar gestión de requerimiento' })
-  addGestion(@GetUser() user: JwtUser, @Param('id') id: string, @Body() dto: AddGestionDto) {
-    return this.svc.addGestion(user.companyId, id, user.id, dto);
-  }
-
-  @Delete(':id')
-  @Roles(...ALL_ROLES)
-  @ApiOperation({ summary: 'Eliminar requerimiento' })
-  delete(@GetUser() user: JwtUser, @Param('id') id: string) {
-    return this.svc.deleteRequerimiento(user.companyId, id);
+  @Post('schedule/run-now')
+  @Roles(...ADMIN_COORD)
+  @ApiOperation({ summary: 'Ejecutar envío automático inmediatamente (prueba)' })
+  runScheduleNow(@GetUser() user: JwtUser, @Body() body?: Record<string, any>) {
+    return this.scheduler.runNow(user.companyId, body ?? {});
   }
 
   @Post('bulk-gestion')
@@ -113,24 +101,40 @@ export class RequerimientosController {
     return this.svc.enviarCorreo(user.companyId, dto);
   }
 
-  @Get('schedule')
-  @Roles(...ADMIN_COORD)
-  @ApiOperation({ summary: 'Obtener configuración de envío automático' })
-  getSchedule(@GetUser() user: JwtUser) {
-    return this.scheduler.getSchedule(user.companyId);
+  @Post()
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Crear requerimiento' })
+  create(@GetUser() user: JwtUser, @Body() dto: CreateRequerimientoDto) {
+    return this.svc.create(user.companyId, user.id, dto);
   }
 
-  @Post('schedule')
-  @Roles(...ADMIN_COORD)
-  @ApiOperation({ summary: 'Guardar configuración de envío automático' })
-  saveSchedule(@GetUser() user: JwtUser, @Body() cfg: Record<string, any>) {
-    return this.scheduler.saveSchedule(user.companyId, cfg as EmailScheduleConfig);
+  // ── Rutas con parámetro :id al final ─────────────────────────────────────────
+
+  @Get(':id')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Detalle de requerimiento' })
+  findOne(@GetUser() user: JwtUser, @Param('id') id: string) {
+    return this.svc.findOne(user.companyId, id);
   }
 
-  @Post('schedule/run-now')
-  @Roles(...ADMIN_COORD)
-  @ApiOperation({ summary: 'Ejecutar envío automático inmediatamente (prueba)' })
-  runScheduleNow(@GetUser() user: JwtUser, @Body() body?: Record<string, any>) {
-    return this.scheduler.runNow(user.companyId, body ?? {});
+  @Patch(':id')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Actualizar campos de un requerimiento' })
+  update(@GetUser() user: JwtUser, @Param('id') id: string, @Body() dto: UpdateRequerimientoDto) {
+    return this.svc.updateRequerimiento(user.companyId, id, dto);
+  }
+
+  @Post(':id/gestiones')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Registrar gestión de requerimiento' })
+  addGestion(@GetUser() user: JwtUser, @Param('id') id: string, @Body() dto: AddGestionDto) {
+    return this.svc.addGestion(user.companyId, id, user.id, dto);
+  }
+
+  @Delete(':id')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Eliminar requerimiento' })
+  delete(@GetUser() user: JwtUser, @Param('id') id: string) {
+    return this.svc.deleteRequerimiento(user.companyId, id);
   }
 }

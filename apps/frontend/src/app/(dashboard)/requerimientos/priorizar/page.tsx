@@ -459,8 +459,9 @@ export default function PriorizarPage() {
     try {
       const cfg = await requerimientosApi.getSchedule();
       if (cfg) setAutoConfig({ enabled: cfg.enabled ?? false, diasSemana: cfg.diasSemana ?? [], hora: cfg.hora ?? 8, minuto: cfg.minuto ?? 0, estados: cfg.estados ?? [], destinatarios: cfg.destinatarios ?? [], asunto: cfg.asunto ?? '', mensaje: cfg.mensaje ?? '' });
-    } catch { /* sin config previa */ }
-    finally { setLoadingAuto(false); }
+    } catch {
+      toast.error('No se pudo cargar la configuración guardada');
+    } finally { setLoadingAuto(false); }
   };
 
   const saveAutoConfig = async () => {
@@ -475,8 +476,14 @@ export default function PriorizarPage() {
   };
 
   const runAutoNow = async () => {
+    if (!autoConfig.destinatarios.length) {
+      toast.error('Agrega al menos un destinatario antes de enviar');
+      return;
+    }
     setRunningNow(true);
     try {
+      // Persist current config first so runNow reads up-to-date destinatarios/estados
+      await requerimientosApi.saveSchedule(autoConfig);
       const res = await requerimientosApi.runScheduleNow();
       toast.success(`Prueba enviada · ${res.enviados} requerimientos a ${res.destinatarios} destinatario${res.destinatarios !== 1 ? 's' : ''}`);
     } catch (err: any) {

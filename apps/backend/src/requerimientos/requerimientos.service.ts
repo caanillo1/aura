@@ -685,6 +685,29 @@ export class RequerimientosService {
     };
   }
 
+  async getWeeklyPriorityStats(companyId: string) {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Dom, 1=Lun...
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - daysFromMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const rows = await this.prisma.$queryRaw<{ estado: string; cnt: bigint }[]>`
+      SELECT g.estado, COUNT(*) AS cnt
+      FROM RequerimientoGestiones g
+      INNER JOIN Requerimientos r ON r.id = g.requerimientoId
+      WHERE r.companyId = ${companyId}
+        AND g.estado IN ('Priorizado', 'Repriorizado')
+        AND g.createdAt >= ${startOfWeek}
+      GROUP BY g.estado
+    `;
+
+    const priorizado   = Number(rows.find(r => r.estado === 'Priorizado')?.cnt  ?? 0);
+    const repriorizado = Number(rows.find(r => r.estado === 'Repriorizado')?.cnt ?? 0);
+    return { priorizado, repriorizado, total: priorizado + repriorizado, weekStart: startOfWeek.toISOString().slice(0, 10) };
+  }
+
   private async syncActivityForReq(
     reqId: string,
     serviceOrderId: string,

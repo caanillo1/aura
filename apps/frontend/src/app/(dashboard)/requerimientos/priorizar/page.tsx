@@ -7,7 +7,7 @@ import {
   ChevronDown, Clock, Send, X, RefreshCw, AlertCircle,
   FileSpreadsheet, Mail, Download, Filter, Calendar,
   Trash2, CheckSquare, Square, UploadCloud, Eye, Save,
-  Settings, Play, ToggleLeft, ToggleRight, UserPlus,
+  Settings, Play, ToggleLeft, ToggleRight, UserPlus, TrendingUp,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import Link from 'next/link';
@@ -131,6 +131,7 @@ export default function PriorizarPage() {
   const [loading,  setLoading]  = useState(true);
   const [clients,  setClients]  = useState<{ id: string; businessName: string }[]>([]);
   const [agents,   setAgents]   = useState<{ id: string; firstName: string; lastName: string }[]>([]);
+  const [weeklyStats, setWeeklyStats] = useState<{ priorizado: number; repriorizado: number; total: number; weekStart: string } | null>(null);
 
   // ── Helpers de fecha ─────────────────────────────────────────────────────
   const isoDate = (d: Date) => d.toISOString().split('T')[0];
@@ -285,14 +286,16 @@ export default function PriorizarPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [reqRes, clientRes, userRes] = await Promise.all([
+      const [reqRes, clientRes, userRes, statsRes] = await Promise.all([
         requerimientosApi.list({ limit: 200 }),
         clientsApi.list({ limit: 500 }),
         usersApi.listAgents({ limit: 200 }),
+        requerimientosApi.weeklyPriorityStats().catch(() => null),
       ]);
       setItems(reqRes.data ?? []);
       setClients(clientRes.data ?? []);
       setAgents(userRes.data ?? []);
+      setWeeklyStats(statsRes);
     } catch {
       toast.error('Error al cargar los requerimientos');
     } finally {
@@ -912,6 +915,24 @@ export default function PriorizarPage() {
           )}
         </div>
       </div>
+
+      {/* ── Contador semanal de priorizaciones ──────────────────────────────── */}
+      {weeklyStats !== null && (
+        <div className="flex items-center gap-3 flex-wrap px-4 py-3 rounded-2xl"
+          style={{ background: isLight ? 'rgba(167,139,250,0.07)' : 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)' }}>
+          <TrendingUp className="w-4 h-4 shrink-0" style={{ color: '#a78bfa' }} />
+          <span className="text-sm font-medium" style={{ color: tc.m }}>Priorizaciones esta semana:</span>
+          <span className="px-3 py-0.5 rounded-full text-xs font-bold" style={{ background: 'rgba(167,139,250,0.18)', color: '#a78bfa' }}>
+            Priorizado {weeklyStats.priorizado}
+          </span>
+          <span className="px-3 py-0.5 rounded-full text-xs font-bold" style={{ background: 'rgba(251,191,36,0.18)', color: '#fbbf24' }}>
+            Repriorizado {weeklyStats.repriorizado}
+          </span>
+          <span className="px-3 py-0.5 rounded-full text-xs font-bold" style={{ background: 'rgba(96,165,250,0.18)', color: '#60a5fa' }}>
+            Total {weeklyStats.total} ticket{weeklyStats.total !== 1 ? 's' : ''} priorizados en la semana
+          </span>
+        </div>
+      )}
 
       {/* ── Loading ─────────────────────────────────────────────────────────── */}
       {loading && (

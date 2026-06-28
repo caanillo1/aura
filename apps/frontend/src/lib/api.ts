@@ -696,6 +696,8 @@ export const requerimientosApi = {
     clientId?: string; agenteId?: string; area?: string; prioridad?: string; estadosActual?: string[];
   }) =>
     api.post('/requerimientos/correo', data).then((r) => r.data),
+  weeklyPriorityStats: () =>
+    api.get('/requerimientos/weekly-priority-stats').then((r) => r.data) as Promise<{ priorizado: number; repriorizado: number; total: number; weekStart: string }>,
   getSchedule: () =>
     api.get('/requerimientos/schedule').then((r) => r.data),
   saveSchedule: (cfg: object) =>

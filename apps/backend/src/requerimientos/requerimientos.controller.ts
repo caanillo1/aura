@@ -49,6 +49,13 @@ export class RequerimientosController {
 
   // ── Rutas estáticas antes de :id para evitar que NestJS capture "schedule", "bulk", etc. como UUID ──
 
+  @Get('weekly-priority-stats')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Contador semanal de priorizaciones (Priorizado + Repriorizado)' })
+  weeklyPriorityStats(@GetUser() user: JwtUser) {
+    return this.svc.getWeeklyPriorityStats(user.companyId);
+  }
+
   @Get('schedule')
   @Roles(...ADMIN_COORD)
   @ApiOperation({ summary: 'Obtener configuración de envío automático' })

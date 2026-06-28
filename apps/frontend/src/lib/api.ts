@@ -316,7 +316,7 @@ export const faqApi = {
 
 // ── Service Orders ────────────────────────────────────────────────────────────
 export const serviceOrdersApi = {
-  list: (params?: { page?: number; limit?: number; search?: string; status?: string; clientId?: string }): Promise<PaginatedResponse<ServiceOrder>> =>
+  list: (params?: { page?: number; limit?: number; search?: string; status?: string; clientId?: string; agentId?: string }): Promise<PaginatedResponse<ServiceOrder>> =>
     api.get('/service-orders', { params }).then((r) => r.data),
   listByClient: (clientId: string, limit = 200): Promise<PaginatedResponse<ServiceOrder>> =>
     api.get('/service-orders/by-client', { params: { clientId, limit } }).then((r) => r.data),

@@ -54,4 +54,5 @@ export class AddImplementerDto {
 export class ServiceOrderFilterDto extends PaginationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() status?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() clientId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() agentId?: string;
 }

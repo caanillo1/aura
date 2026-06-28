@@ -77,15 +77,23 @@ export class ServiceOrdersService {
 
   async findAll(companyId: string, dto: ServiceOrderFilterDto) {
     const { take, skip } = paginate(dto.page, dto.limit);
-    const where: { companyId: string; OR?: object[]; status?: string; clientId?: string } = { companyId };
+    const where: any = { companyId };
+    const andConditions: any[] = [];
     if (dto.search) {
-      where.OR = [
+      andConditions.push({ OR: [
         { osNumber: { contains: dto.search } },
         { product: { contains: dto.search } },
         { client: { businessName: { contains: dto.search } } },
-      ];
+      ]});
     }
-    if (dto.status) where.status = dto.status;
+    if (dto.agentId) {
+      andConditions.push({ OR: [
+        { clinicalLeaderId: dto.agentId },
+        { financialLeaderId: dto.agentId },
+      ]});
+    }
+    if (andConditions.length > 0) where.AND = andConditions;
+    if (dto.status)   where.status   = dto.status;
     if (dto.clientId) where.clientId = dto.clientId;
 
     const [data, total] = await Promise.all([

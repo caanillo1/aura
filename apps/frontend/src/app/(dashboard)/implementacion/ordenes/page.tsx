@@ -5,10 +5,10 @@ import { useTheme } from 'next-themes';
 import { Search, RefreshCw, Plus, ClipboardList, Trash2, X, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { serviceOrdersApi, clientsApi } from '@/lib/api';
+import { serviceOrdersApi, clientsApi, usersApi } from '@/lib/api';
 import { usePermission } from '@/hooks/usePermission';
 import { toast } from 'sonner';
-import type { ServiceOrder, Client } from '@/types';
+import type { ServiceOrder, Client, User } from '@/types';
 import { Modal } from '@/components/ui/Modal';
 
 const STATUS_STYLE: Record<string, { color: string; bg: string; dot: string; label: string }> = {
@@ -31,7 +31,9 @@ export default function OrdenesPage() {
   const [search, setSearch]   = useState('');
   const [fStatus, setFStatus] = useState('');
   const [fClient, setFClient] = useState('');
+  const [fAgent, setFAgent]   = useState('');
   const [clients, setClients] = useState<Client[]>([]);
+  const [agents, setAgents]   = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Eliminación individual
@@ -66,16 +68,18 @@ export default function OrdenesPage() {
       const res = await serviceOrdersApi.list({
         page, limit: 15, search: search || undefined,
         status: fStatus || undefined, clientId: fClient || undefined,
+        agentId: fAgent || undefined,
       });
       setOrders(res.data);
       setTotal(res.meta.total);
     } catch { toast.error('Error al cargar órdenes'); }
     finally { setLoading(false); }
-  }, [page, search, fStatus, fClient]);
+  }, [page, search, fStatus, fClient, fAgent]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     clientsApi.list({ limit: 100 }).then(r => setClients(r.data)).catch(() => {});
+    usersApi.listAgents({ limit: 200 }).then(r => setAgents(r.data)).catch(() => {});
   }, []);
 
   const handleDelete = async () => {
@@ -200,6 +204,13 @@ export default function OrdenesPage() {
           className="input-glass rounded-xl px-4 py-2.5 text-sm">
           <option value="">Todos los clientes</option>
           {clients.map(c => <option key={c.id} value={c.id}>{c.businessName}</option>)}
+        </select>
+        <select value={fAgent} onChange={e => { setFAgent(e.target.value); setPage(1); }}
+          className="input-glass rounded-xl px-4 py-2.5 text-sm">
+          <option value="">Todos los agentes</option>
+          {agents.map(a => (
+            <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>
+          ))}
         </select>
         <button onClick={load} className="p-2.5 rounded-xl transition-colors" style={{ color: tc.m }}>
           <RefreshCw className="w-4 h-4" />

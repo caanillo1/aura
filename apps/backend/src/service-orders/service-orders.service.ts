@@ -2683,13 +2683,14 @@ ${team ? `
 
   private buildOsContext(alertData: any): string {
     const { os, project, riskLevel, alerts, activitySummary, predictions, modules, visits, timeline, tickets, delayAttribution } = alertData;
+    const d = (v: any) => v ? new Date(v).toISOString().slice(0, 10) : null;
     const ctx = {
-      os: { num: os.osNumber, prod: os.product, cliente: os.client?.businessName, estado: os.status, inicio: os.startDate?.slice(0,10), fin: os.endDate?.slice(0,10) },
+      os: { num: os.osNumber, prod: os.product, cliente: os.client?.businessName, estado: os.status, inicio: d(os.startDate), fin: d(os.endDate) },
       riesgo: riskLevel,
       alertas: (alerts ?? []).slice(0, 6).map((a: any) => `[${a.level}] ${a.titulo}`),
       proyecto: project ? { avance: `${Number(project.progressPercent).toFixed(0)}%`, estado: project.status } : null,
       actividades: activitySummary ? { total: activitySummary.total, done: activitySummary.done, prog: activitySummary.inProgress, bloq: activitySummary.blocked, venc: activitySummary.overdue } : null,
-      predicciones: predictions ? { ritmo: predictions.ritmoActividadesSemana, finEst: predictions.fechaEstimadaFin?.slice(0,10), retraso: predictions.diasDeRetraso, exito: predictions.probabilidadExito } : null,
+      predicciones: predictions ? { ritmo: predictions.ritmoActividadesSemana, finEst: d(predictions.fechaEstimadaFin), retraso: predictions.diasDeRetraso, exito: predictions.probabilidadExito } : null,
       cronograma: timeline ? { elapsed: timeline.daysElapsed, remaining: timeline.daysRemaining, timePct: timeline.timeProgressPercent } : null,
       modulos: (modules ?? []).slice(0, 15).map((m: any) => ({ n: m.name, pct: Math.round(m.progressPercent), h: m.health, bloq: m.activities.blocked, venc: m.activities.overdue })),
       visitas: visits ? { total: visits.total, cancel: visits.cancelled, prox: visits.upcoming } : null,

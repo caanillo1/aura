@@ -2700,37 +2700,42 @@ ${team ? `
   }
 
   async aiAnalyzeOs(companyId: string, osId: string): Promise<{ narrative: string; insights: string[]; nextActions: string[] }> {
-    const alertData = await this.getAlerts(companyId, osId);
-    const context = this.buildOsContext(alertData);
+    try {
+      const alertData = await this.getAlerts(companyId, osId);
+      const context = this.buildOsContext(alertData);
 
-    const prompt = `Analiza esta orden de servicio de implementación HIS/ERP y responde SOLO con JSON válido (sin texto extra).
+      const prompt = `Analiza esta orden de servicio de implementación HIS/ERP y responde SOLO con JSON válido (sin texto extra).
 
 Datos: ${context}
 
 JSON requerido (sin texto antes ni después):
 {"narrative":"<párrafo ejecutivo 3-4 oraciones con datos concretos>","insights":["<hallazgo 1>","<hallazgo 2>","<hallazgo 3>","<hallazgo 4>","<hallazgo 5>"],"nextActions":["<acción 1>","<acción 2>","<acción 3>","<acción 4>"]}`;
 
-    const text = await this.callGroq([{ role: 'user', content: prompt }], 1800);
+      const text = await this.callGroq([{ role: 'user', content: prompt }], 1800);
 
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) {
-      this.logger.error(`AI response without JSON: ${text.slice(0, 200)}`);
-      throw new InternalServerErrorException('La IA no devolvió el formato esperado. Intenta de nuevo.');
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) {
+        this.logger.error(`AI no-json response: ${text.slice(0, 300)}`);
+        throw new InternalServerErrorException('La IA no devolvió el formato esperado. Intenta de nuevo.');
+      }
+
+      let parsed: any;
+      try { parsed = JSON.parse(match[0]); }
+      catch (pe) {
+        this.logger.error(`AI JSON parse error: ${String(pe)} | raw: ${match[0].slice(0, 200)}`);
+        throw new InternalServerErrorException('Error procesando la respuesta de la IA. Intenta de nuevo.');
+      }
+
+      return {
+        narrative:   String(parsed.narrative ?? ''),
+        insights:    Array.isArray(parsed.insights)    ? parsed.insights.slice(0, 7)    : [],
+        nextActions: Array.isArray(parsed.nextActions) ? parsed.nextActions.slice(0, 5) : [],
+      };
+    } catch (e: any) {
+      if (e instanceof InternalServerErrorException || e?.status) throw e;
+      this.logger.error(`aiAnalyzeOs unexpected error: ${String(e?.message ?? e)}`);
+      throw new InternalServerErrorException(`Error en análisis IA: ${String(e?.message ?? 'error desconocido')}`);
     }
-
-    let parsed: any;
-    try {
-      parsed = JSON.parse(match[0]);
-    } catch {
-      this.logger.error(`AI JSON parse error: ${match[0].slice(0, 200)}`);
-      throw new InternalServerErrorException('Error procesando la respuesta de la IA. Intenta de nuevo.');
-    }
-
-    return {
-      narrative:   String(parsed.narrative ?? ''),
-      insights:    Array.isArray(parsed.insights)    ? parsed.insights.slice(0, 7)    : [],
-      nextActions: Array.isArray(parsed.nextActions) ? parsed.nextActions.slice(0, 5) : [],
-    };
   }
 
   async aiChatOs(
@@ -2739,20 +2744,25 @@ JSON requerido (sin texto antes ni después):
     message: string,
     history: { role: 'user' | 'assistant'; content: string }[],
   ): Promise<{ reply: string }> {
-    // Build lightweight OS context for chat (reuse alert data structure)
-    const alertData = await this.getAlerts(companyId, osId);
-    const context = this.buildOsContext(alertData);
+    try {
+      const alertData = await this.getAlerts(companyId, osId);
+      const context = this.buildOsContext(alertData);
 
-    const systemPrompt = `Eres un consultor senior de implementaciones HIS/ERP. Responde directo, conciso y en español. Si algo no está en los datos, dilo.
+      const systemPrompt = `Eres un consultor senior de implementaciones HIS/ERP. Responde directo, conciso y en español. Si algo no está en los datos, dilo.
 OS data: ${context}`;
 
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...history.slice(-6),
-      { role: 'user', content: message },
-    ];
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...history.slice(-6),
+        { role: 'user', content: message },
+      ];
 
-    const reply = await this.callGroq(messages, 700);
-    return { reply: reply.trim() };
+      const reply = await this.callGroq(messages, 700);
+      return { reply: reply.trim() };
+    } catch (e: any) {
+      if (e instanceof InternalServerErrorException || e?.status) throw e;
+      this.logger.error(`aiChatOs unexpected error: ${String(e?.message ?? e)}`);
+      throw new InternalServerErrorException(`Error en chat IA: ${String(e?.message ?? 'error desconocido')}`);
+    }
   }
 }

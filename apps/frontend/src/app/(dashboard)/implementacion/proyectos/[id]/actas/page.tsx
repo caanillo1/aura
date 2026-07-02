@@ -144,8 +144,10 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
       const below = window.innerHeight - r.bottom;
       const above = r.top;
       const goUp  = below < 260 && above > below;
+      const w     = Math.max(r.width, 200);
+      const left  = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
       setPanelPos({
-        position: 'fixed', left: r.left, minWidth: r.width, zIndex: 9999,
+        position: 'fixed', left, width: Math.min(w, window.innerWidth - 16), zIndex: 9999,
         ...(goUp
           ? { bottom: window.innerHeight - r.top + 4, maxHeight: Math.min(above - 8, 320) }
           : { top: r.bottom + 4,                      maxHeight: Math.min(below - 8, 320) }),
@@ -157,13 +159,12 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
 
   React.useEffect(() => {
     if (!open) { setSearch(''); return; }
-    // Focus search on open
     const t = setTimeout(() => searchRef.current?.focus(), 50);
-    const h = (e: MouseEvent) => {
+    const h = (e: PointerEvent) => {
       if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener('mousedown', h);
-    return () => { clearTimeout(t); document.removeEventListener('mousedown', h); };
+    document.addEventListener('pointerdown', h);
+    return () => { clearTimeout(t); document.removeEventListener('pointerdown', h); };
   }, [open]);
 
   const pick = (val: string) => {
@@ -220,15 +221,17 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
                 Sin resultados
               </div>
             ) : filtered.map((opt, i) => (
-              <div key={i} onClick={() => !opt.disabled && pick(opt.value)}
+              <div key={i}
+                onPointerDown={e => { e.stopPropagation(); if (!opt.disabled) pick(opt.value); }}
                 style={{
-                  padding: '7px 12px', fontSize: 13, whiteSpace: 'nowrap',
+                  padding: '9px 12px', fontSize: 13, whiteSpace: 'nowrap',
                   overflow: 'hidden', textOverflow: 'ellipsis',
                   cursor: opt.disabled ? 'default' : 'pointer',
                   color: opt.disabled ? mutedClr : (currentVal === opt.value ? '#60a5fa' : optColor),
                   background: currentVal === opt.value ? selBg : 'transparent',
                   borderBottom: i < filtered.length - 1 ? `1px solid ${rowDiv}` : 'none',
-                }}
+                  touchAction: 'manipulation',
+                } as React.CSSProperties}
                 onMouseEnter={e => { if (!opt.disabled && currentVal !== opt.value) (e.currentTarget as HTMLDivElement).style.background = hoverBg; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = currentVal === opt.value ? selBg : 'transparent'; }}>
                 {opt.label}
@@ -277,8 +280,10 @@ function SelMulti({ options, alreadyAdded, onConfirm, className, style, placehol
       const below = window.innerHeight - r.bottom;
       const above = r.top;
       const goUp  = below < 300 && above > below;
+      const w     = Math.max(r.width, 260);
+      const left  = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
       setPanelPos({
-        position: 'fixed', left: r.left, minWidth: Math.max(r.width, 240), zIndex: 9999,
+        position: 'fixed', left, width: Math.min(w, window.innerWidth - 16), zIndex: 9999,
         ...(goUp
           ? { bottom: window.innerHeight - r.top + 4, maxHeight: Math.min(above - 8, 360) }
           : { top: r.bottom + 4,                      maxHeight: Math.min(below - 8, 360) }),
@@ -291,11 +296,11 @@ function SelMulti({ options, alreadyAdded, onConfirm, className, style, placehol
   React.useEffect(() => {
     if (!open) { setSearch(''); return; }
     const t = setTimeout(() => searchRef.current?.focus(), 50);
-    const h = (e: MouseEvent) => {
+    const h = (e: PointerEvent) => {
       if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener('mousedown', h);
-    return () => { clearTimeout(t); document.removeEventListener('mousedown', h); };
+    document.addEventListener('pointerdown', h);
+    return () => { clearTimeout(t); document.removeEventListener('pointerdown', h); };
   }, [open]);
 
   const toggle = (val: string) =>
@@ -324,12 +329,12 @@ function SelMulti({ options, alreadyAdded, onConfirm, className, style, placehol
           {/* Buscador */}
           <div style={{ padding: '8px 10px', borderBottom: `1px solid ${rowDiv}`, flexShrink: 0 }}>
             <input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)}
-              onMouseDown={e => e.stopPropagation()} placeholder="Buscar..."
+              onPointerDown={e => e.stopPropagation()} placeholder="Buscar..."
               style={{ width: '100%', outline: 'none', border: 'none', background: inputBg,
-                borderRadius: 7, padding: '5px 10px', fontSize: 12, color: optColor, boxSizing: 'border-box' }} />
+                borderRadius: 7, padding: '7px 10px', fontSize: 13, color: optColor, boxSizing: 'border-box' }} />
           </div>
           {/* Opciones con checkbox */}
-          <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div style={{ overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
             {available.length === 0 ? (
               <div style={{ padding: '10px 12px', fontSize: 12, color: mutedClr, textAlign: 'center' }}>
                 Todos ya fueron agregados
@@ -339,7 +344,8 @@ function SelMulti({ options, alreadyAdded, onConfirm, className, style, placehol
             ) : filtered.map((opt, i) => {
               const isChecked = checked.has(opt.value);
               return (
-                <div key={i} onClick={() => toggle(opt.value)}
+                <div key={i}
+                  onPointerDown={e => { e.stopPropagation(); toggle(opt.value); }}
                   style={{
                     padding: '7px 12px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
                     cursor: 'pointer',
@@ -368,14 +374,18 @@ function SelMulti({ options, alreadyAdded, onConfirm, className, style, placehol
             <span style={{ fontSize: 11, color: mutedClr }}>
               {checked.size > 0 ? `${checked.size} seleccionado${checked.size !== 1 ? 's' : ''}` : 'Selecciona uno o más'}
             </span>
-            <button onMouseDown={e => e.stopPropagation()} onClick={confirm}
+            <button
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); confirm(); }}
               disabled={checked.size === 0}
               style={{
-                fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 7, cursor: checked.size === 0 ? 'default' : 'pointer',
+                fontSize: 12, fontWeight: 600, padding: '8px 16px', borderRadius: 7,
+                cursor: checked.size === 0 ? 'default' : 'pointer',
+                touchAction: 'manipulation',
                 background: checked.size > 0 ? 'rgba(96,165,250,0.20)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
                 color: checked.size > 0 ? '#60a5fa' : mutedClr,
                 border: `1px solid ${checked.size > 0 ? 'rgba(96,165,250,0.35)' : 'transparent'}`,
-                transition: 'all .15s',
+                transition: 'all .15s', minWidth: 90,
               }}>
               Agregar{checked.size > 0 ? ` (${checked.size})` : ''}
             </button>

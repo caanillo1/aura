@@ -227,6 +227,13 @@ export default function NuevaOrdenPage() {
     return diff > 0 ? Math.round(diff / (1000 * 60 * 60 * 24)) : 0;
   };
 
+  const addDays = (start: string, days: number): string => {
+    if (!start || days <= 0) return '';
+    const d = new Date(start);
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+
   const clampDateYear = (val: string): string => {
     if (!val) return val;
     const parts = val.split('-');
@@ -238,12 +245,26 @@ export default function NuevaOrdenPage() {
     const safe = clampDateYear(value);
     setForm(p => {
       const next = { ...p, [field]: safe };
-      next.durationDays = calcDays(
-        field === 'startDate' ? safe : p.startDate,
-        field === 'endDate'   ? safe : p.endDate,
-      );
+      if (field === 'startDate' && p.durationDays > 0) {
+        // Si hay días definidos, recalcular fecha fin
+        next.endDate = addDays(safe, p.durationDays);
+      } else {
+        // Si se edita alguna fecha manualmente, recalcular días
+        next.durationDays = calcDays(
+          field === 'startDate' ? safe : p.startDate,
+          field === 'endDate'   ? safe : p.endDate,
+        );
+      }
       return next;
     });
+  };
+
+  const handleDaysChange = (days: number) => {
+    setForm(p => ({
+      ...p,
+      durationDays: days,
+      endDate: p.startDate ? addDays(p.startDate, days) : p.endDate,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -340,24 +361,23 @@ export default function NuevaOrdenPage() {
                 value={form.startDate} onChange={e => handleDateChange('startDate', e.target.value)} />
             </div>
             <div>
-              <Label>Fecha de fin <span className="text-red-400 normal-case">*</span></Label>
+              <Label>Duración estimada (días) <span className="text-red-400 normal-case">*</span></Label>
+              <input type="number" min={1} className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
+                placeholder="Ej: 90"
+                value={form.durationDays || ''}
+                onChange={e => handleDaysChange(Number(e.target.value))} />
+            </div>
+            <div>
+              <Label>
+                Fecha de fin <span className="text-red-400 normal-case">*</span>
+                {form.endDate && form.startDate && form.durationDays > 0 && (
+                  <span className="ml-2 text-[10px] font-semibold normal-case tracking-normal"
+                    style={{ color: '#60a5fa' }}>calculada automáticamente</span>
+                )}
+              </Label>
               <input type="date" className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
                 max="2099-12-31" min="2000-01-01"
                 value={form.endDate} onChange={e => handleDateChange('endDate', e.target.value)} />
-            </div>
-            <div>
-              <Label>Duración estimada (días)</Label>
-              <div className="relative">
-                <input type="number" min={0} className="input-glass w-full rounded-xl px-3 py-2.5 text-sm"
-                  readOnly={!!(form.startDate && form.endDate)}
-                  value={form.durationDays}
-                  onChange={e => set('durationDays', Number(e.target.value))}
-                  style={form.startDate && form.endDate ? { opacity: 0.8, cursor: 'default' } : {}} />
-                {form.startDate && form.endDate && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold"
-                    style={{ color: '#60a5fa' }}>auto</span>
-                )}
-              </div>
             </div>
           </div>
         </motion.div>

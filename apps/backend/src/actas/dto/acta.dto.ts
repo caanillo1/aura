@@ -3,6 +3,14 @@ import {
   IsBoolean, IsNumber, ValidateNested, Min, IsEmail,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class AiDraftDto {
+  @ApiProperty() @IsString() @IsIn(['inicio', 'visita', 'cierre', 'capacitacion', 'entrega_soporte']) type: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() clientName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true }) modules?: string[];
+}
+
+
 import { Type } from 'class-transformer';
 
 export class ActaFirmanteDto {

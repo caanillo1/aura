@@ -6,7 +6,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { GetUser } from '../common/decorators/get-user.decorator';
 import type { JwtUser } from '../common/decorators/get-user.decorator';
 import { ActasService } from './actas.service';
-import { CreateActaDto, UpdateActaDto } from './dto/acta.dto';
+import { CreateActaDto, UpdateActaDto, AiDraftDto } from './dto/acta.dto';
 
 const IMPL_ROLES = ['admin', 'coordinator', 'implementer_clinical', 'implementer_financial', 'implementer_support'] as const;
 
@@ -34,6 +34,13 @@ export class ActasController {
   @ApiOperation({ summary: 'Detalle de acta' })
   findOne(@GetUser() user: JwtUser, @Param('id') id: string) {
     return this.svc.findOne(user.companyId, id);
+  }
+
+  @Post('ai-draft')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Generar borrador de acta con IA' })
+  aiDraft(@Body() dto: AiDraftDto) {
+    return this.svc.generateAiDraft(dto);
   }
 
   @Post()

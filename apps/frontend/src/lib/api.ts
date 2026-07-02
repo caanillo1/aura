@@ -639,6 +639,8 @@ export const actasApi = {
     api.patch(`/actas/compromisos/${compromisoId}`, { estado }).then((r) => r.data),
   resendEmail: (actaId: string, firmanteId?: string) =>
     api.post(`/actas/${actaId}/resend-email`, { firmanteId }).then((r) => r.data),
+  aiDraft: (dto: { type: string; clientName?: string; modules?: string[] }) =>
+    api.post('/actas/ai-draft', dto).then((r) => r.data),
 };
 
 export interface CreateVisitPayload {

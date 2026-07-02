@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import {
   ArrowLeft, Plus, RefreshCw, FileText, Trash2, Pencil, Printer,
-  CheckCircle2, Clock, X, Link2, PenLine, Upload, RotateCcw, Lock, Shield, Settings, Mail,
+  CheckCircle2, Clock, X, Link2, PenLine, Upload, RotateCcw, Lock, Shield, Settings, Mail, Sparkles,
 } from 'lucide-react';
 import { actasApi, projectsApi, clientsApi, usersApi, companyApi, municipiosApi, cronogramaApi, type CreateActaPayload, type ActaActividadPayload } from '@/lib/api';
 import { SignaturePad, type SignaturePadRef } from '@/components/ui/SignaturePad';
@@ -1470,6 +1470,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
   const [asunto, setAsunto]               = useState(acta?.asunto ?? '');
   const [objetivoGeneral, setObjetivo]    = useState(acta?.objetivoGeneral ?? '');
   const [alcance, setAlcance]             = useState(acta?.alcance ?? '');
+  const [aiGenerating, setAiGenerating]   = useState(false);
 
   // ── Agente / Implementador ──
   const currentUserFullName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : '';
@@ -1615,6 +1616,21 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
   );
 
   const [saving, setSaving]             = useState(false);
+
+  const handleAiDraft = async () => {
+    setAiGenerating(true);
+    try {
+      const moduleNames = projectModules.map((m: any) => m.name).filter(Boolean);
+      const result = await actasApi.aiDraft({ type, clientName, modules: moduleNames });
+      if (result.asunto)         setAsunto(result.asunto);
+      if (result.objetivoGeneral) setObjetivo(result.objetivoGeneral);
+      if (result.alcance)        setAlcance(result.alcance);
+    } catch {
+      toast.error('No se pudo generar el borrador. Intenta de nuevo.');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!fecha) { toast.error('La fecha es requerida'); return; }
@@ -1785,6 +1801,23 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
 
           {/* ── INICIO ── */}
           {type === 'inicio' && (<>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+              <button
+                type="button"
+                disabled={aiGenerating}
+                onClick={handleAiDraft}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', borderRadius: 10, border: 'none', cursor: aiGenerating ? 'wait' : 'pointer',
+                  background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                  color: '#fff', fontSize: 13, fontWeight: 600,
+                  opacity: aiGenerating ? 0.7 : 1, transition: 'opacity .2s',
+                }}
+              >
+                <Sparkles size={15} />
+                {aiGenerating ? 'Generando...' : 'Generar con IA'}
+              </button>
+            </div>
             <div className="grid grid-cols-1 gap-3">
               <Field label="Agente responsable">
                 <Sel

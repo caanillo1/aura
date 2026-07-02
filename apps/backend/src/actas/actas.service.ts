@@ -1159,4 +1159,62 @@ export class ActasService {
       }
     } catch (err: any) { console.error('[ACTAS] sendFirmanteNotifications error:', err?.message ?? err); }
   }
+
+  // ── IA: generar borrador ───────────────────────────────────────────────────
+
+  async generateAiDraft(dto: { type: string; clientName?: string; modules?: string[] }) {
+    const { type, clientName = 'el cliente', modules = [] } = dto;
+
+    const moduleList = modules.length
+      ? modules.map((m, i) => `${i + 1}. ${m}`).join('\n')
+      : 'No se especificaron módulos.';
+
+    let systemMsg = 'Eres un redactor experto en actas de implementación de software médico (IPS, clínicas, hospitales). Redactas en español formal, conciso y profesional.';
+
+    let userMsg: string;
+
+    if (type === 'inicio') {
+      userMsg = `Genera el contenido para un Acta de Inicio de implementación de software para "${clientName}".\n\nMódulos a implementar:\n${moduleList}\n\nResponde SOLO con JSON válido con estas claves:\n{\n  "asunto": "una línea resumiendo el inicio del proyecto",\n  "objetivoGeneral": "2-3 oraciones con el objetivo general",\n  "alcance": "párrafo describiendo los módulos incluidos y su propósito"\n}`;
+    } else {
+      return { message: 'Tipo de acta no soportado para IA' };
+    }
+
+    const raw = await this.callGroq([
+      { role: 'system', content: systemMsg },
+      { role: 'user',   content: userMsg },
+    ], 600);
+
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found');
+      return JSON.parse(jsonMatch[0]);
+    } catch {
+      return { raw };
+    }
+  }
+
+  private async callGroq(messages: { role: string; content: string }[], maxTokens = 500): Promise<string> {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new BadRequestException('GROQ_API_KEY no configurado');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, max_tokens: maxTokens, temperature: 0.5 }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        this.logger.error(`Groq error ${res.status}: ${txt}`);
+        throw new BadRequestException('Error al consultar la IA');
+      }
+      const data: any = await res.json();
+      return data.choices?.[0]?.message?.content ?? '';
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
 }

@@ -92,6 +92,9 @@ function emptyFirmante(n = 0): Firmante {
 
 // ── Custom select (reemplaza <select> nativo para evitar fondo blanco en dark mode) ──
 
+const normalizeStr = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
 function Sel({ value, defaultValue, onChange, disabled, children, className, style }: {
   value?: string; defaultValue?: string;
   onChange: (e: { target: { value: string } }) => void;
@@ -101,8 +104,10 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
   const isControlled = value !== undefined;
   const [internalVal, setInternalVal] = React.useState(defaultValue ?? '');
   const [open, setOpen]               = React.useState(false);
+  const [search, setSearch]           = React.useState('');
   const [panelPos, setPanelPos]       = React.useState<React.CSSProperties>({});
   const triggerRef                    = useRef<HTMLDivElement>(null);
+  const searchRef                     = useRef<HTMLInputElement>(null);
   const currentVal = isControlled ? value! : internalVal;
 
   const opts: { value: string; label: string; disabled?: boolean }[] = [];
@@ -115,16 +120,22 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
     opts.push({ value: String(p.value ?? ''), label, disabled: !!p.disabled });
   });
 
+  const showSearch = opts.length > 5;
+  const filtered = showSearch && search
+    ? opts.filter(o => normalizeStr(o.label).includes(normalizeStr(search)))
+    : opts;
+
   const selectedLabel = opts.find(o => o.value === currentVal)?.label ?? '';
   const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
-  const panelBg   = isDark ? '#0d1526'  : '#ffffff';
-  const panelBdr  = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
-  const optColor  = isDark ? '#e2e8f0'  : '#0a1628';
-  const mutedClr  = isDark ? '#64748b'  : '#94a3b8';
-  const hoverBg   = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)';
-  const selBg     = isDark ? 'rgba(96,165,250,0.15)'  : 'rgba(30,60,120,0.07)';
-  const rowDiv    = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+  const panelBg  = isDark ? '#0d1526' : '#ffffff';
+  const panelBdr = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
+  const optColor = isDark ? '#e2e8f0' : '#0a1628';
+  const mutedClr = isDark ? '#64748b' : '#94a3b8';
+  const hoverBg  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)';
+  const selBg    = isDark ? 'rgba(96,165,250,0.15)'  : 'rgba(30,60,120,0.07)';
+  const rowDiv   = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+  const inputBg  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
 
   const handleToggle = () => {
     if (disabled) return;
@@ -132,24 +143,27 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
       const r = triggerRef.current.getBoundingClientRect();
       const below = window.innerHeight - r.bottom;
       const above = r.top;
-      const goUp  = below < 220 && above > below;
+      const goUp  = below < 260 && above > below;
       setPanelPos({
         position: 'fixed', left: r.left, minWidth: r.width, zIndex: 9999,
         ...(goUp
-          ? { bottom: window.innerHeight - r.top + 4, maxHeight: Math.min(above - 8, 240) }
-          : { top: r.bottom + 4,                      maxHeight: Math.min(below - 8, 240) }),
+          ? { bottom: window.innerHeight - r.top + 4, maxHeight: Math.min(above - 8, 320) }
+          : { top: r.bottom + 4,                      maxHeight: Math.min(below - 8, 320) }),
       });
+      setSearch('');
     }
     setOpen(v => !v);
   };
 
   React.useEffect(() => {
-    if (!open) return;
+    if (!open) { setSearch(''); return; }
+    // Focus search on open
+    const t = setTimeout(() => searchRef.current?.focus(), 50);
     const h = (e: MouseEvent) => {
       if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
+    return () => { clearTimeout(t); document.removeEventListener('mousedown', h); };
   }, [open]);
 
   const pick = (val: string) => {
@@ -160,6 +174,7 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
 
   return (
     <div ref={triggerRef} style={{ position: 'relative' }}>
+      {/* Trigger */}
       <div onClick={handleToggle} className={className}
         style={{ ...style, display: 'flex', alignItems: 'center', gap: 6,
           cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, userSelect: 'none' }}>
@@ -171,23 +186,55 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
           <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </div>
+
+      {/* Panel */}
       {open && (
         <div style={{ ...panelPos, background: panelBg, border: `1px solid ${panelBdr}`,
-          borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.55)', overflowY: 'auto', overflowX: 'hidden' }}>
-          {opts.map((opt, i) => (
-            <div key={i} onClick={() => !opt.disabled && pick(opt.value)}
-              style={{
-                padding: '7px 12px', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                cursor: opt.disabled ? 'default' : 'pointer',
-                color: opt.disabled ? mutedClr : (currentVal === opt.value ? '#60a5fa' : optColor),
-                background: currentVal === opt.value ? selBg : 'transparent',
-                borderBottom: i < opts.length - 1 ? `1px solid ${rowDiv}` : 'none',
-              }}
-              onMouseEnter={e => { if (!opt.disabled && currentVal !== opt.value) (e.currentTarget as HTMLDivElement).style.background = hoverBg; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = currentVal === opt.value ? selBg : 'transparent'; }}>
-              {opt.label}
+          borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+          {/* Buscador — solo si hay más de 5 opciones */}
+          {showSearch && (
+            <div style={{ padding: '8px 10px', borderBottom: `1px solid ${rowDiv}`, flexShrink: 0 }}>
+              <input
+                ref={searchRef}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                onMouseDown={e => e.stopPropagation()}
+                placeholder="Buscar..."
+                style={{
+                  width: '100%', outline: 'none', border: 'none',
+                  background: inputBg, borderRadius: 7,
+                  padding: '5px 10px', fontSize: 12,
+                  color: optColor,
+                  boxSizing: 'border-box',
+                }}
+              />
             </div>
-          ))}
+          )}
+
+          {/* Opciones */}
+          <div style={{ overflowY: 'auto', overflowX: 'hidden', flex: 1 }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: '10px 12px', fontSize: 12, color: mutedClr, textAlign: 'center' }}>
+                Sin resultados
+              </div>
+            ) : filtered.map((opt, i) => (
+              <div key={i} onClick={() => !opt.disabled && pick(opt.value)}
+                style={{
+                  padding: '7px 12px', fontSize: 13, whiteSpace: 'nowrap',
+                  overflow: 'hidden', textOverflow: 'ellipsis',
+                  cursor: opt.disabled ? 'default' : 'pointer',
+                  color: opt.disabled ? mutedClr : (currentVal === opt.value ? '#60a5fa' : optColor),
+                  background: currentVal === opt.value ? selBg : 'transparent',
+                  borderBottom: i < filtered.length - 1 ? `1px solid ${rowDiv}` : 'none',
+                }}
+                onMouseEnter={e => { if (!opt.disabled && currentVal !== opt.value) (e.currentTarget as HTMLDivElement).style.background = hoverBg; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = currentVal === opt.value ? selBg : 'transparent'; }}>
+                {opt.label}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -27,7 +27,7 @@ export default function ProyectosPage() {
   const [page, setPage]         = useState(1);
   const [search, setSearch]     = useState('');
   const [fStatus, setFStatus]   = useState('');
-  const [agentId, setAgentId]   = useState<string>('');
+  const [agentId, setAgentId]   = useState<string>(() => useAuthStore.getState().user?.id ?? '');
   const [agents, setAgents]     = useState<{ id: string; firstName: string; lastName: string }[]>([]);
   const [loading, setLoading]   = useState(true);
 
@@ -56,10 +56,6 @@ export default function ProyectosPage() {
       setAgents(r.data);
     }).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (user?.id) setAgentId(user.id);
-  }, [user?.id]);
 
   const load = useCallback(async () => {
     setLoading(true);

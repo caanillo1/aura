@@ -563,31 +563,50 @@ export default function OrdenDetailPage() {
       const osStart = os?.startDate ? parseDate(os.startDate) : null;
       const osEnd   = os?.endDate   ? parseDate(os.endDate)   : null;
 
-      // Each module starts independently at OS startDate and distributes its phases
-      // proportionally across the full OS date range (modules run in parallel, not sequentially)
+      console.log('[AURA] generate project — OS dates:', {
+        rawStart: os?.startDate, rawEnd: os?.endDate,
+        parsedStart: osStart ? fmtDate(osStart) : null,
+        parsedEnd:   osEnd   ? fmtDate(osEnd)   : null,
+      });
+
+      // Each module starts independently at OS startDate (parallel, not sequential).
+      // Phases within each module are distributed by whole weeks across the OS range.
       mods.forEach(mod => {
         const Nm = mod.phases.length;
         const agentLeaderId =
           mod.tipo === 'financiero' ? financialId :
           mod.tipo === 'asistencial' || mod.tipo === 'mixto' ? clinicalId : '';
 
-        if (osStart && osEnd && Nm > 0) {
-          const totalMs = osEnd.getTime() - osStart.getTime();
-          let cursor = toNextMon(osStart);
-
-          mod.phases.forEach((ph, idx) => {
-            const rawEnd = new Date(osStart.getTime() + ((idx + 1) / Nm) * totalMs);
-            const phaseEnd = idx === Nm - 1 ? toNextFri(osEnd) : toNextFri(rawEnd);
-            const minEnd = toNextFri(cursor);
-            const end = phaseEnd >= minEnd ? phaseEnd : minEnd;
-            init[ph.id] = { startDate: fmtDate(cursor), endDate: fmtDate(end), agentLeaderId, clientLeaderId: clientLeadId };
-            cursor = monAfterFri(end);
-          });
-        } else {
-          mod.phases.forEach(ph => {
-            init[ph.id] = { startDate: '', endDate: '', agentLeaderId, clientLeaderId: clientLeadId };
-          });
+        if (!osStart || !osEnd || Nm === 0) {
+          mod.phases.forEach(ph => { init[ph.id] = { startDate: '', endDate: '', agentLeaderId, clientLeaderId: clientLeadId }; });
+          return;
         }
+
+        const firstMon = toNextMon(osStart);   // Monday on or after OS start
+        const lastFri  = toNextFri(osEnd);     // Friday on or after OS end
+
+        // Total weeks available (at least N so every phase gets ≥ 1 week)
+        const totalWeeks = Math.max(Nm, Math.round((lastFri.getTime() - firstMon.getTime()) / (7 * 86400000)));
+        const weeksPerPhase = Math.floor(totalWeeks / Nm);
+
+        let cursor = new Date(firstMon);
+
+        mod.phases.forEach((ph: { id: string; name: string; color?: string }, idx: number) => {
+          const phStart = new Date(cursor);
+          let phEnd: Date;
+          if (idx === Nm - 1) {
+            phEnd = new Date(lastFri);               // last phase ends exactly at OS end Friday
+          } else {
+            phEnd = new Date(cursor);
+            phEnd.setDate(cursor.getDate() + weeksPerPhase * 7 - 3); // Mon + 7k-3 = Fri after k weeks
+          }
+          init[ph.id] = { startDate: fmtDate(phStart), endDate: fmtDate(phEnd), agentLeaderId, clientLeaderId: clientLeadId };
+          cursor = new Date(phEnd);
+          cursor.setDate(phEnd.getDate() + 3);       // Fri + 3 = following Monday
+        });
+
+        console.log(`[AURA] module "${mod.name}" (${mod.tipo ?? 'sin tipo'}) — ${Nm} phases, ${weeksPerPhase} weeks/phase:`,
+          mod.phases.map((ph: { id: string; name: string }) => `${ph.name}: ${init[ph.id].startDate} → ${init[ph.id].endDate}`));
       });
 
       setPhaseDates(init);

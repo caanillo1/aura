@@ -300,7 +300,7 @@ export default function OrdenDetailPage() {
   const [selTemplate, setSelTemplate]   = useState('');
   const [projName, setProjName]         = useState('');
   const [projModules, setProjModules]   = useState<{
-    id: string; name: string;
+    id: string; name: string; tipo?: string | null;
     phases: { id: string; name: string; color?: string }[];
   }[]>([]);
   const [phaseDates, setPhaseDates]     = useState<Record<string, { startDate: string; endDate: string; agentLeaderId?: string; clientLeaderId?: string }>>({});
@@ -537,11 +537,69 @@ export default function OrdenDetailPage() {
       const mods = (tpl.modules ?? []).map((m: any) => ({
         id: m.id,
         name: m.name,
+        tipo: m.tipo ?? null,
         phases: (m.phases ?? []).map((p: any) => ({ id: p.id, name: p.name, color: p.color })),
       }));
       setProjModules(mods);
+
+      // ── Auto-populate phaseDates ──────────────────────────────────────────
+      // Helpers (local-timezone safe, no UTC offset issues)
+      const parseDate = (s: string) => { const [y, mo, d] = s.split('-').map(Number); return new Date(y, mo - 1, d); };
+      const fmtDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      // Advance to next Monday (stays if already Monday)
+      const toNextMon = (d: Date) => { const r = new Date(d); const day = r.getDay(); const diff = day === 1 ? 0 : day === 0 ? 1 : 8 - day; r.setDate(r.getDate() + diff); return r; };
+      // Advance to next Friday (stays if already Friday)
+      const toNextFri = (d: Date) => { const r = new Date(d); const day = r.getDay(); const diff = day === 5 ? 0 : day < 5 ? 5 - day : 6 + (5 - day + 7) % 7; r.setDate(r.getDate() + diff); return r; };
+      // Monday after a Friday
+      const monAfterFri = (fri: Date) => { const r = new Date(fri); r.setDate(fri.getDate() + 3); return r; };
+
+      // Flatten all phases in order to distribute dates
+      const allPhases: { phaseId: string; modTipo: string | null }[] = [];
+      mods.forEach(m => m.phases.forEach(p => allPhases.push({ phaseId: p.id, modTipo: m.tipo ?? null })));
+      const N = allPhases.length;
+
+      // Leaders from service order
+      const clinicalId   = (os as any)?.clinicalLeader?.id  ?? (os as any)?.clinicalLeaderId  ?? '';
+      const financialId  = (os as any)?.financialLeader?.id ?? (os as any)?.financialLeaderId ?? '';
+      const clientLeadId = (os as any)?.clientLeader?.id    ?? '';
+
       const init: Record<string, { startDate: string; endDate: string; agentLeaderId?: string; clientLeaderId?: string }> = {};
-      mods.forEach((m: any) => m.phases.forEach((p: any) => { init[p.id] = { startDate: '', endDate: '', agentLeaderId: '', clientLeaderId: '' }; }));
+
+      const osStart = os?.startDate ? parseDate(os.startDate) : null;
+      const osEnd   = os?.endDate   ? parseDate(os.endDate)   : null;
+
+      if (osStart && osEnd && N > 0) {
+        const totalMs = osEnd.getTime() - osStart.getTime();
+        let cursor = toNextMon(osStart);
+
+        allPhases.forEach(({ phaseId, modTipo }, idx) => {
+          // Distribute proportionally: rawEnd = startDate + (idx+1)/N * totalMs
+          const rawEnd = new Date(osStart.getTime() + ((idx + 1) / N) * totalMs);
+          const phaseEnd = idx === N - 1 ? toNextFri(osEnd) : toNextFri(rawEnd);
+          // Ensure at least Mon-Fri (don't go backwards)
+          const minEnd = toNextFri(cursor);
+          const end = phaseEnd >= minEnd ? phaseEnd : minEnd;
+
+          // Agent leader by module tipo
+          let agentLeaderId = '';
+          if (modTipo === 'asistencial')       agentLeaderId = clinicalId;
+          else if (modTipo === 'financiero')   agentLeaderId = financialId;
+          else if (modTipo === 'mixto')        agentLeaderId = clinicalId; // default clínico, editable
+
+          init[phaseId] = { startDate: fmtDate(cursor), endDate: fmtDate(end), agentLeaderId, clientLeaderId: clientLeadId };
+          cursor = monAfterFri(end);
+        });
+      } else {
+        // No dates on OS — still pre-fill leaders
+        allPhases.forEach(({ phaseId, modTipo }) => {
+          let agentLeaderId = '';
+          if (modTipo === 'asistencial')       agentLeaderId = clinicalId;
+          else if (modTipo === 'financiero')   agentLeaderId = financialId;
+          else if (modTipo === 'mixto')        agentLeaderId = clinicalId;
+          init[phaseId] = { startDate: '', endDate: '', agentLeaderId, clientLeaderId: clientLeadId };
+        });
+      }
+
       setPhaseDates(init);
       setExcludedModuleIds(new Set());
       setProjStep(2);
@@ -2277,6 +2335,15 @@ export default function OrdenDetailPage() {
                         <span className="text-xs" style={{ color: tc.m }}>
                           {mod.phases.length} fase{mod.phases.length !== 1 ? 's' : ''}
                         </span>
+                        {mod.tipo && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded capitalize"
+                            style={{
+                              background: mod.tipo === 'asistencial' ? 'rgba(52,211,153,0.15)' : mod.tipo === 'financiero' ? 'rgba(96,165,250,0.15)' : 'rgba(167,139,250,0.15)',
+                              color:      mod.tipo === 'asistencial' ? '#34d399'               : mod.tipo === 'financiero' ? '#60a5fa'               : '#a78bfa',
+                            }}>
+                            {mod.tipo}
+                          </span>
+                        )}
                         <button onClick={toggleMod}
                           title={excluded ? 'Incluir módulo' : 'Excluir módulo'}
                           className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold transition-colors"

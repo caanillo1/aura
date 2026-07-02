@@ -563,12 +563,6 @@ export default function OrdenDetailPage() {
       const osStart = os?.startDate ? parseDate(os.startDate) : null;
       const osEnd   = os?.endDate   ? parseDate(os.endDate)   : null;
 
-      console.log('[AURA] generate project — OS dates:', {
-        rawStart: os?.startDate, rawEnd: os?.endDate,
-        parsedStart: osStart ? fmtDate(osStart) : null,
-        parsedEnd:   osEnd   ? fmtDate(osEnd)   : null,
-      });
-
       // Each module starts independently at OS startDate (parallel, not sequential).
       // Phases within each module are distributed by whole weeks across the OS range.
       mods.forEach(mod => {
@@ -605,8 +599,6 @@ export default function OrdenDetailPage() {
           cursor.setDate(phEnd.getDate() + 3);       // Fri + 3 = following Monday
         });
 
-        console.log(`[AURA] module "${mod.name}" (${mod.tipo ?? 'sin tipo'}) — ${Nm} phases, ${weeksPerPhase} weeks/phase:`,
-          mod.phases.map((ph: { id: string; name: string }) => `${ph.name}: ${init[ph.id].startDate} → ${init[ph.id].endDate}`));
       });
 
       setPhaseDates(init);

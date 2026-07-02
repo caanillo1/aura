@@ -31,6 +31,29 @@ interface UserForm {
   jobTitle: string; agentRegPassword: string;
 }
 
+// ── Componentes auxiliares (fuera del componente para evitar re-mount en cada keystroke) ──
+const Field = ({ i, children }: { i: number; children: React.ReactNode }) => (
+  <motion.div custom={i} variants={fieldVariants} initial="hidden" animate="visible">
+    {children}
+  </motion.div>
+);
+
+const ErrorBox = ({ msg }: { msg: string }) => (
+  <motion.div initial={{ opacity: 0, height: 0, scale: 0.95 }}
+    animate={{ opacity: 1, height: 'auto', scale: 1 }}
+    exit={{ opacity: 0, height: 0, scale: 0.95 }}
+    transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+    className="flex items-center gap-2 rounded-xl px-4 py-3 mb-4 overflow-hidden"
+    style={{ background: 'var(--accent-red-bg)', border: '1px solid rgba(248,113,113,0.28)' }}>
+    <AlertCircle className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-red)' }} />
+    <span className="text-sm" style={{ color: 'var(--accent-red)' }}>{msg}</span>
+  </motion.div>
+);
+
+const InputIcon = ({ icon: Icon }: { icon: React.ElementType }) => (
+  <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+);
+
 // ── Variantes ────────────────────────────────────────────────────────────
 const stepTransition = (dir: number) => ({
   enter:  { x: dir > 0 ? 80 : -80, opacity: 0, scale: 0.96 },
@@ -143,29 +166,6 @@ export default function RegisterPage() {
   const stepOrder: Step[] = userType === 'client' ? ['type', 'company', 'user'] : ['type', 'user'];
   const currentIdx = stepOrder.indexOf(step);
   const variants = stepTransition(dir);
-
-  // ── Componentes auxiliares ────────────────────────────────────────────
-  const Field = ({ i, children }: { i: number; children: React.ReactNode }) => (
-    <motion.div custom={i} variants={fieldVariants} initial="hidden" animate="visible">
-      {children}
-    </motion.div>
-  );
-
-  const ErrorBox = ({ msg }: { msg: string }) => (
-    <motion.div initial={{ opacity: 0, height: 0, scale: 0.95 }}
-      animate={{ opacity: 1, height: 'auto', scale: 1 }}
-      exit={{ opacity: 0, height: 0, scale: 0.95 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="flex items-center gap-2 rounded-xl px-4 py-3 mb-4 overflow-hidden"
-      style={{ background: 'var(--accent-red-bg)', border: '1px solid rgba(248,113,113,0.28)' }}>
-      <AlertCircle className="w-4 h-4 shrink-0" style={{ color: 'var(--accent-red)' }} />
-      <span className="text-sm" style={{ color: 'var(--accent-red)' }}>{msg}</span>
-    </motion.div>
-  );
-
-  const InputIcon = ({ icon: Icon }: { icon: React.ElementType }) => (
-    <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
-  );
 
   return (
     <div className="flex min-h-screen items-center justify-center py-8">
@@ -316,7 +316,6 @@ export default function RegisterPage() {
 
                 <Field i={2}>
                   <motion.button onClick={() => goTo(userType === 'client' ? 'company' : 'user')}
-                    whileTap={{ scale: 0.97 }}
                     whileTap={{ scale: 0.97 }}
                     className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2">
                     Continuar <ChevronRight className="w-4 h-4" />
@@ -486,7 +485,6 @@ export default function RegisterPage() {
                 <Field i={6}>
                   <motion.button onClick={() => { const err = validateCompany(); if (err) { setError(err); return; } goTo('user'); }}
                     whileTap={{ scale: 0.97 }}
-                    whileTap={{ scale: 0.97 }}
                     className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-5">
                     Continuar <ChevronRight className="w-4 h-4" />
                   </motion.button>
@@ -652,7 +650,6 @@ export default function RegisterPage() {
 
                   <Field i={7}>
                     <motion.button type="submit" disabled={loading}
-                      whileTap={{ scale: 0.97 }}
                       whileTap={{ scale: 0.97 }}
                       className="btn-primary w-full rounded-xl py-3 text-sm font-semibold text-white flex items-center justify-center gap-2 mt-1 disabled:opacity-50 disabled:cursor-not-allowed">
                       <AnimatePresence mode="wait">

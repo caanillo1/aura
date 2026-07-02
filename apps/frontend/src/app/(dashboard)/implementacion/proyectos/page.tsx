@@ -1,8 +1,8 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
-import { Search, RefreshCw, FolderKanban, User, X } from 'lucide-react';
+import { Search, RefreshCw, FolderKanban, User, ChevronDown, Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { projectsApi, usersApi } from '@/lib/api';
@@ -22,14 +22,16 @@ export default function ProyectosPage() {
   const isLight = theme === 'light';
   const { user } = useAuthStore();
 
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [total, setTotal]       = useState(0);
-  const [page, setPage]         = useState(1);
-  const [search, setSearch]     = useState('');
-  const [fStatus, setFStatus]   = useState('');
-  const [agentId, setAgentId]   = useState<string>(() => useAuthStore.getState().user?.id ?? '');
-  const [agents, setAgents]     = useState<{ id: string; firstName: string; lastName: string }[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [projects, setProjects]   = useState<Project[]>([]);
+  const [total, setTotal]         = useState(0);
+  const [page, setPage]           = useState(1);
+  const [search, setSearch]       = useState('');
+  const [fStatus, setFStatus]     = useState('');
+  const [agentId, setAgentId]     = useState<string>(() => useAuthStore.getState().user?.id ?? '');
+  const [agents, setAgents]       = useState<{ id: string; firstName: string; lastName: string }[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [dropOpen, setDropOpen]   = useState(false);
+  const dropRef                   = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
 
@@ -50,11 +52,26 @@ export default function ProyectosPage() {
   const rowBorder = isLight ? '1px solid rgba(0,0,0,0.06)' : '1px solid rgba(255,255,255,0.06)';
   const headBg    = isLight ? 'rgba(30,60,120,0.06)' : 'rgba(255,255,255,0.03)';
 
-  // Cargar agentes y defaultear al usuario logueado
+  const dropBg = isLight
+    ? 'rgba(255,255,255,0.98)'
+    : 'rgba(15,20,40,0.97)';
+  const dropBorder = isLight
+    ? '1px solid rgba(0,0,0,0.10)'
+    : '1px solid rgba(255,255,255,0.12)';
+
+  // Cerrar dropdown al hacer click fuera
   useEffect(() => {
-    usersApi.listAgents({ limit: 200 }).then(r => {
-      setAgents(r.data);
-    }).catch(() => {});
+    const handler = (e: MouseEvent) => {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
+        setDropOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    usersApi.listAgents({ limit: 200 }).then(r => setAgents(r.data)).catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
@@ -74,12 +91,11 @@ export default function ProyectosPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Determina el rol del agente filtrado en cada proyecto
   const leaderRole = (p: any): 'clinico' | 'financiero' | 'ambos' | null => {
     if (!agentId) return null;
     const so = p.serviceOrder;
-    const isClinical   = so?.clinicalLeaderId   === agentId;
-    const isFinancial  = so?.financialLeaderId  === agentId;
+    const isClinical  = so?.clinicalLeaderId  === agentId;
+    const isFinancial = so?.financialLeaderId === agentId;
     if (isClinical && isFinancial) return 'ambos';
     if (isClinical)  return 'clinico';
     if (isFinancial) return 'financiero';
@@ -92,12 +108,24 @@ export default function ProyectosPage() {
     ambos:      { label: 'Ambos líderes',    color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
   };
 
-  const currentAgentLabel = (() => {
-    if (!agentId) return 'Todos los agentes';
-    if (agentId === user?.id) return 'Mis proyectos';
-    const a = agents.find(a => a.id === agentId);
-    return a ? `${a.firstName} ${a.lastName}` : 'Agente seleccionado';
-  })();
+  const agentOptions = [
+    { id: '', label: 'Todos los agentes', sub: '' },
+    ...(user?.id ? [{ id: user.id, label: 'Mis proyectos', sub: 'Líder clínico o financiero' }] : []),
+    ...agents.filter(a => a.id !== user?.id).map(a => ({
+      id: a.id,
+      label: `${a.firstName} ${a.lastName}`,
+      sub: '',
+    })),
+  ];
+
+  const selectedOption = agentOptions.find(o => o.id === agentId) ?? agentOptions[0];
+  const isMine = agentId === user?.id && !!agentId;
+
+  const selectAgent = (id: string) => {
+    setAgentId(id);
+    setPage(1);
+    setDropOpen(false);
+  };
 
   return (
     <div className="space-y-5 max-w-7xl">
@@ -126,65 +154,100 @@ export default function ProyectosPage() {
           {Object.entries(STATUS_STYLE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
 
-        {/* Filtro por agente */}
-        <div className="relative flex items-center gap-1">
-          <div className="flex items-center gap-2 input-glass rounded-xl px-3 py-2 text-sm"
-            style={{ border: agentId === user?.id ? '1px solid rgba(167,139,250,0.40)' : undefined }}>
-            <User className="w-3.5 h-3.5 shrink-0" style={{ color: agentId ? '#a78bfa' : tc.m }} />
-            <select
-              value={agentId}
-              onChange={e => { setAgentId(e.target.value); setPage(1); }}
-              className="bg-transparent outline-none text-sm pr-1"
-              style={{ color: agentId ? '#a78bfa' : tc.s, minWidth: 130 }}
-            >
-              <option value="">Todos los agentes</option>
-              {user?.id && (
-                <option value={user.id}>
-                  Mis proyectos
-                </option>
-              )}
-              {agents.filter(a => a.id !== user?.id).map(a => (
-                <option key={a.id} value={a.id}>
-                  {a.firstName} {a.lastName}
-                </option>
-              ))}
-            </select>
-          </div>
-          {agentId && agentId !== user?.id && (
-            <button onClick={() => { setAgentId(user?.id ?? ''); setPage(1); }}
-              className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
-              title="Volver a mis proyectos"
-              style={{ color: tc.m }}>
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+        {/* Dropdown custom de agente */}
+        <div className="relative" ref={dropRef}>
+          <button
+            onClick={() => setDropOpen(v => !v)}
+            className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition-all"
+            style={{
+              background: isMine
+                ? (isLight ? 'rgba(167,139,250,0.10)' : 'rgba(167,139,250,0.12)')
+                : (isLight ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.06)'),
+              border: isMine
+                ? '1px solid rgba(167,139,250,0.45)'
+                : `1px solid ${isLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.10)'}`,
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              minWidth: 180,
+            }}>
+            <User className="w-3.5 h-3.5 shrink-0" style={{ color: isMine ? '#a78bfa' : tc.m }} />
+            <span className="flex-1 text-left font-medium truncate"
+              style={{ color: isMine ? '#a78bfa' : tc.s }}>
+              {selectedOption.label}
+            </span>
+            {isMine && !loading && (
+              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums"
+                style={{ background: 'rgba(167,139,250,0.20)', color: '#a78bfa' }}>
+                {total}
+              </span>
+            )}
+            <ChevronDown className="w-3.5 h-3.5 shrink-0 transition-transform"
+              style={{ color: tc.m, transform: dropOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+          </button>
+
+          <AnimatePresence>
+            {dropOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                transition={{ duration: 0.15 }}
+                className="absolute left-0 top-full mt-1.5 z-50 rounded-xl overflow-hidden min-w-[220px]"
+                style={{
+                  background: dropBg,
+                  border: dropBorder,
+                  boxShadow: isLight
+                    ? '0 8px 24px rgba(0,0,0,0.12)'
+                    : '0 8px 32px rgba(0,0,0,0.55)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                }}>
+                {agentOptions.map((opt, i) => {
+                  const isSelected = opt.id === agentId;
+                  const isMyOption = opt.id === user?.id && !!opt.id;
+                  return (
+                    <button
+                      key={opt.id || 'all'}
+                      onClick={() => selectAgent(opt.id)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
+                      style={{
+                        background: isSelected
+                          ? (isMyOption ? 'rgba(167,139,250,0.14)' : (isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)'))
+                          : 'transparent',
+                        borderBottom: i < agentOptions.length - 1
+                          ? `1px solid ${isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)'}`
+                          : 'none',
+                      }}
+                      onMouseEnter={e => {
+                        if (!isSelected) e.currentTarget.style.background = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.05)';
+                      }}
+                      onMouseLeave={e => {
+                        if (!isSelected) e.currentTarget.style.background = 'transparent';
+                      }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate"
+                          style={{ color: isSelected && isMyOption ? '#a78bfa' : tc.p }}>
+                          {opt.label}
+                        </p>
+                        {opt.sub && (
+                          <p className="text-[10px] mt-0.5" style={{ color: tc.m }}>{opt.sub}</p>
+                        )}
+                      </div>
+                      {isSelected && (
+                        <Check className="w-3.5 h-3.5 shrink-0" style={{ color: isMyOption ? '#a78bfa' : tc.m }} />
+                      )}
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <button onClick={load} className="p-2.5 rounded-xl transition-colors" style={{ color: tc.m }}>
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
-
-      {/* Badge de contexto */}
-      {agentId && (
-        <div className="flex items-center gap-2 text-xs" style={{ color: tc.m }}>
-          <span className="px-2.5 py-1 rounded-full font-medium"
-            style={{ background: 'rgba(167,139,250,0.10)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.22)' }}>
-            {currentAgentLabel}
-          </span>
-          {agentId === user?.id && (
-            <>
-              <span style={{ color: tc.m }}>— Proyectos donde eres líder clínico o financiero</span>
-              {!loading && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold tabular-nums"
-                  style={{ background: 'rgba(167,139,250,0.18)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.35)' }}>
-                  {total}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-      )}
 
       {/* Tabla */}
       <div className="rounded-2xl overflow-hidden" style={tableStyle}>

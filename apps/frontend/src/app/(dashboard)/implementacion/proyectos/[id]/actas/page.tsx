@@ -241,6 +241,151 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
   );
 }
 
+// ── Multi-select con búsqueda y checkboxes ────────────────────────────────
+
+function SelMulti({ options, alreadyAdded, onConfirm, className, style, placeholder = '+ Del cliente' }: {
+  options: { value: string; label: string }[];
+  alreadyAdded: string[];
+  onConfirm: (values: string[]) => void;
+  className?: string; style?: React.CSSProperties; placeholder?: string;
+}) {
+  const [open, setOpen]       = React.useState(false);
+  const [checked, setChecked] = React.useState<Set<string>>(new Set());
+  const [search, setSearch]   = React.useState('');
+  const [panelPos, setPanelPos] = React.useState<React.CSSProperties>({});
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const searchRef  = useRef<HTMLInputElement>(null);
+
+  const available = options.filter(o => !alreadyAdded.includes(o.value));
+  const filtered  = search
+    ? available.filter(o => normalizeStr(o.label).includes(normalizeStr(search)))
+    : available;
+
+  const isDark   = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  const panelBg  = isDark ? '#0d1526' : '#ffffff';
+  const panelBdr = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
+  const optColor = isDark ? '#e2e8f0' : '#0a1628';
+  const mutedClr = isDark ? '#64748b' : '#94a3b8';
+  const hoverBg  = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)';
+  const inputBg  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+  const rowDiv   = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+  const chkClr   = '#60a5fa';
+
+  const handleToggle = () => {
+    if (!open && triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect();
+      const below = window.innerHeight - r.bottom;
+      const above = r.top;
+      const goUp  = below < 300 && above > below;
+      setPanelPos({
+        position: 'fixed', left: r.left, minWidth: Math.max(r.width, 240), zIndex: 9999,
+        ...(goUp
+          ? { bottom: window.innerHeight - r.top + 4, maxHeight: Math.min(above - 8, 360) }
+          : { top: r.bottom + 4,                      maxHeight: Math.min(below - 8, 360) }),
+      });
+      setSearch(''); setChecked(new Set());
+    }
+    setOpen(v => !v);
+  };
+
+  React.useEffect(() => {
+    if (!open) { setSearch(''); return; }
+    const t = setTimeout(() => searchRef.current?.focus(), 50);
+    const h = (e: MouseEvent) => {
+      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => { clearTimeout(t); document.removeEventListener('mousedown', h); };
+  }, [open]);
+
+  const toggle = (val: string) =>
+    setChecked(prev => { const n = new Set(prev); n.has(val) ? n.delete(val) : n.add(val); return n; });
+
+  const confirm = () => {
+    if (checked.size > 0) onConfirm([...checked]);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={triggerRef} style={{ position: 'relative' }}>
+      <div onClick={handleToggle} className={className}
+        style={{ ...style, display: 'flex', alignItems: 'center', gap: 6,
+          cursor: 'pointer', userSelect: 'none' }}>
+        <span>{placeholder}</span>
+        <svg width="10" height="6" viewBox="0 0 10 6" fill="none"
+          style={{ flexShrink: 0, transition: 'transform .15s', transform: open ? 'rotate(180deg)' : '', color: mutedClr }}>
+          <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      {open && (
+        <div style={{ ...panelPos, background: panelBg, border: `1px solid ${panelBdr}`,
+          borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Buscador */}
+          <div style={{ padding: '8px 10px', borderBottom: `1px solid ${rowDiv}`, flexShrink: 0 }}>
+            <input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)}
+              onMouseDown={e => e.stopPropagation()} placeholder="Buscar..."
+              style={{ width: '100%', outline: 'none', border: 'none', background: inputBg,
+                borderRadius: 7, padding: '5px 10px', fontSize: 12, color: optColor, boxSizing: 'border-box' }} />
+          </div>
+          {/* Opciones con checkbox */}
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {available.length === 0 ? (
+              <div style={{ padding: '10px 12px', fontSize: 12, color: mutedClr, textAlign: 'center' }}>
+                Todos ya fueron agregados
+              </div>
+            ) : filtered.length === 0 ? (
+              <div style={{ padding: '10px 12px', fontSize: 12, color: mutedClr, textAlign: 'center' }}>Sin resultados</div>
+            ) : filtered.map((opt, i) => {
+              const isChecked = checked.has(opt.value);
+              return (
+                <div key={i} onClick={() => toggle(opt.value)}
+                  style={{
+                    padding: '7px 12px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+                    cursor: 'pointer',
+                    background: isChecked ? 'rgba(96,165,250,0.12)' : 'transparent',
+                    borderBottom: i < filtered.length - 1 ? `1px solid ${rowDiv}` : 'none',
+                  }}
+                  onMouseEnter={e => { if (!isChecked) (e.currentTarget as HTMLDivElement).style.background = hoverBg; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = isChecked ? 'rgba(96,165,250,0.12)' : 'transparent'; }}>
+                  <div style={{
+                    width: 15, height: 15, borderRadius: 4, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: `2px solid ${isChecked ? chkClr : (isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)')}`,
+                    background: isChecked ? chkClr : 'transparent', transition: 'all .12s',
+                  }}>
+                    {isChecked && <svg width="9" height="7" viewBox="0 0 9 7" fill="none"><path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  </div>
+                  <span style={{ color: isChecked ? chkClr : optColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {opt.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {/* Footer con conteo y botón */}
+          <div style={{ padding: '8px 10px', borderTop: `1px solid ${rowDiv}`, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontSize: 11, color: mutedClr }}>
+              {checked.size > 0 ? `${checked.size} seleccionado${checked.size !== 1 ? 's' : ''}` : 'Selecciona uno o más'}
+            </span>
+            <button onMouseDown={e => e.stopPropagation()} onClick={confirm}
+              disabled={checked.size === 0}
+              style={{
+                fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 7, cursor: checked.size === 0 ? 'default' : 'pointer',
+                background: checked.size > 0 ? 'rgba(96,165,250,0.20)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
+                color: checked.size > 0 ? '#60a5fa' : mutedClr,
+                border: `1px solid ${checked.size > 0 ? 'rgba(96,165,250,0.35)' : 'transparent'}`,
+                transition: 'all .15s',
+              }}>
+              Agregar{checked.size > 0 ? ` (${checked.size})` : ''}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Sub-componente: tabla editable de firmantes ────────────────────────────
 
 interface StaffOption { id: string; firstName: string; lastName: string; jobTitle?: string | null; document?: string; email?: string | null; phone?: string | null; }
@@ -651,26 +796,36 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
       {/* Selectores rápidos desde listas */}
       {((agents && agents.length > 0) || (clientStaff && clientStaff.length > 0)) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-          {agents && agents.length > 0 && (
-            <Sel defaultValue="" onChange={e => { if (e.target.value) { addFromAgent(e.target.value); e.target.value = ''; } }}
-              className="w-full text-xs px-3 py-2 rounded-xl outline-none"
-              style={{ background: 'var(--surface-2)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', colorScheme: cs } as React.CSSProperties}>
-              <option value="">Agregar del equipo →</option>
-              {agents.map(a => (
-                <option key={a.id} value={a.id}>{a.firstName} {a.lastName}{a.jobTitle ? ` — ${a.jobTitle}` : ''}</option>
-              ))}
-            </Sel>
-          )}
-          {clientStaff && clientStaff.length > 0 && (
-            <Sel defaultValue="" onChange={e => { if (e.target.value) { addFromStaff(e.target.value); e.target.value = ''; } }}
-              className="w-full text-xs px-3 py-2 rounded-xl outline-none"
-              style={{ background: 'var(--surface-2)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', colorScheme: cs } as React.CSSProperties}>
-              <option value="">Agregar del cliente →</option>
-              {clientStaff.map(s => (
-                <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` — ${s.jobTitle}` : ''}</option>
-              ))}
-            </Sel>
-          )}
+          {agents && agents.length > 0 && (() => {
+            const availA = agents.filter(a => !rows.some(r => r.nombre === `${a.firstName} ${a.lastName}`));
+            return availA.length > 0 ? (
+              <Sel defaultValue="" onChange={e => { if (e.target.value) { addFromAgent(e.target.value); } }}
+                className="w-full text-xs px-3 py-2 rounded-xl outline-none"
+                style={{ background: 'var(--surface-2)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa' }}>
+                <option value="">Agregar del equipo →</option>
+                {availA.map(a => (
+                  <option key={a.id} value={a.id}>{a.firstName} {a.lastName}{a.jobTitle ? ` — ${a.jobTitle}` : ''}</option>
+                ))}
+              </Sel>
+            ) : (
+              <span className="text-xs px-3 py-2 rounded-xl" style={{ color: '#a78bfa', opacity: 0.5 }}>Equipo agregado ✓</span>
+            );
+          })()}
+          {clientStaff && clientStaff.length > 0 && (() => {
+            const availC = clientStaff.filter(s => !rows.some(r => r.nombre === `${s.firstName} ${s.lastName}`));
+            return availC.length > 0 ? (
+              <Sel defaultValue="" onChange={e => { if (e.target.value) { addFromStaff(e.target.value); } }}
+                className="w-full text-xs px-3 py-2 rounded-xl outline-none"
+                style={{ background: 'var(--surface-2)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa' }}>
+                <option value="">Agregar del cliente →</option>
+                {availC.map(s => (
+                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` — ${s.jobTitle}` : ''}</option>
+                ))}
+              </Sel>
+            ) : (
+              <span className="text-xs px-3 py-2 rounded-xl" style={{ color: '#60a5fa', opacity: 0.5 }}>Clientes agregados ✓</span>
+            );
+          })()}
         </div>
       )}
 
@@ -1825,25 +1980,32 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                 <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: tc.m }}>Participantes</p>
                 <div className="flex gap-2">
                   {(clientStaff ?? []).length > 0 && (
-                    <Sel
-                      defaultValue=""
-                      onChange={e => {
-                        const s = (clientStaff ?? []).find(x => x.id === e.target.value);
-                        if (!s) return;
-                        setParticipantes(prev => [
-                          ...prev,
-                          { numero: prev.length + 1, nombre: `${s.firstName} ${s.lastName}`,
-                            cargo: s.jobTitle ?? '', documento: s.document ?? '',
-                            email: s.email ?? '' },
-                        ]);
+                    <SelMulti
+                      options={(clientStaff ?? []).map(s => ({
+                        value: s.id,
+                        label: `${s.firstName} ${s.lastName}${s.jobTitle ? ` (${s.jobTitle})` : ''}`,
+                      }))}
+                      alreadyAdded={(clientStaff ?? [])
+                        .filter(s => participantes.some(p =>
+                          p.email === s.email || p.nombre === `${s.firstName} ${s.lastName}`
+                        ))
+                        .map(s => s.id)}
+                      onConfirm={ids => {
+                        const nuevos = ids
+                          .map(id => (clientStaff ?? []).find(s => s.id === id))
+                          .filter(Boolean)
+                          .map((s, i) => ({
+                            numero: participantes.length + i + 1,
+                            nombre: `${s!.firstName} ${s!.lastName}`,
+                            cargo: s!.jobTitle ?? '',
+                            documento: s!.document ?? '',
+                            email: s!.email ?? '',
+                          }));
+                        setParticipantes(prev => [...prev, ...nuevos]);
                       }}
                       className="text-xs px-2 py-1.5 rounded-lg outline-none"
-                      style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
-                      <option value="">+ Del cliente</option>
-                      {(clientStaff ?? []).map(s => (
-                        <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` (${s.jobTitle})` : ''}</option>
-                      ))}
-                    </Sel>
+                      style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}
+                    />
                   )}
                   <button type="button"
                     onClick={() => setParticipantes(prev => [

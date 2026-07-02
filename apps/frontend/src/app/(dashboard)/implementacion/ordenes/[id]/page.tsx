@@ -543,13 +543,13 @@ export default function OrdenDetailPage() {
       setProjModules(mods);
 
       // ── Auto-populate phaseDates ──────────────────────────────────────────
-      // Helpers (local-timezone safe, no UTC offset issues)
-      const parseDate = (s: string) => { const [y, mo, d] = s.split('-').map(Number); return new Date(y, mo - 1, d); };
+      // Helpers (local-timezone safe — slice to YYYY-MM-DD first to handle ISO datetimes)
+      const parseDate = (s: string) => { const [y, mo, d] = s.slice(0, 10).split('-').map(Number); return new Date(y, mo - 1, d); };
       const fmtDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       // Advance to next Monday (stays if already Monday)
       const toNextMon = (d: Date) => { const r = new Date(d); const day = r.getDay(); const diff = day === 1 ? 0 : day === 0 ? 1 : 8 - day; r.setDate(r.getDate() + diff); return r; };
-      // Advance to next Friday (stays if already Friday)
-      const toNextFri = (d: Date) => { const r = new Date(d); const day = r.getDay(); const diff = day === 5 ? 0 : day < 5 ? 5 - day : 6 + (5 - day + 7) % 7; r.setDate(r.getDate() + diff); return r; };
+      // Advance to next Friday (stays if already Friday); formula works for all days incl. Sat/Sun
+      const toNextFri = (d: Date) => { const r = new Date(d); r.setDate(r.getDate() + (5 - r.getDay() + 7) % 7); return r; };
       // Monday after a Friday
       const monAfterFri = (fri: Date) => { const r = new Date(fri); r.setDate(fri.getDate() + 3); return r; };
 

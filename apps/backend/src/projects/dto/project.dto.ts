@@ -44,6 +44,7 @@ export class AddModulesDto {
 
 export class ProjectFilterDto extends PaginationDto {
   @ApiPropertyOptional() @IsOptional() @IsString() status?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() agentId?: string;
 }
 
 export class UpdateProjectStatusDto {

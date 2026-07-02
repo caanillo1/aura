@@ -488,7 +488,7 @@ export const templatesApi = {
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 export const projectsApi = {
-  list: (params?: { page?: number; limit?: number; search?: string; status?: string }): Promise<PaginatedResponse<Project>> =>
+  list: (params?: { page?: number; limit?: number; search?: string; status?: string; agentId?: string }): Promise<PaginatedResponse<Project>> =>
     api.get('/projects', { params }).then((r) => r.data),
   modulesByServiceOrder: (serviceOrderId: string): Promise<{ id: string | null; name: string | null; modules: { id: string; name: string; phases: { id: string; name: string; color: string; slug: string | null }[] }[] }> =>
     api.get(`/projects/by-service-order/${serviceOrderId}`).then((r) => r.data),

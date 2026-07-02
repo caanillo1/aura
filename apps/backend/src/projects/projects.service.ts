@@ -22,6 +22,15 @@ export class ProjectsService {
     const { take, skip } = paginate(dto.page, dto.limit);
     const where: any = { serviceOrder: { companyId } };
     if (dto.status) where.status = dto.status;
+    if (dto.agentId) {
+      where.serviceOrder = {
+        ...where.serviceOrder,
+        OR: [
+          { clinicalLeaderId: dto.agentId },
+          { financialLeaderId: dto.agentId },
+        ],
+      };
+    }
     if (dto.search) {
       where.OR = [
         { name: { contains: dto.search } },
@@ -38,6 +47,9 @@ export class ProjectsService {
           serviceOrder: {
             select: {
               id: true, osNumber: true, product: true,
+              clinicalLeaderId: true, financialLeaderId: true,
+              clinicalLeader:  { select: { id: true, firstName: true, lastName: true } },
+              financialLeader: { select: { id: true, firstName: true, lastName: true } },
               client: { select: { id: true, businessName: true } },
             },
           },

@@ -496,6 +496,7 @@ export class ActasService {
       select: {
         actaId: true,
         nombre: true,
+        signerType: true,
         acta: {
           select: {
             type: true, numero: true,
@@ -507,10 +508,13 @@ export class ActasService {
     });
     if (!firmante) throw new NotFoundException('Firmante no encontrado');
 
+    // Preserve existing signerType (e.g. 'participante') — only set if currently null
+    const resolvedSignerType = firmante.signerType ?? signerType;
+
     await this.prisma.actaFirmante.update({
       where: { id: firmanteId },
       data: {
-        signatureData, signedAt: new Date(), signerType,
+        signatureData, signedAt: new Date(), signerType: resolvedSignerType,
         ...(comprendio !== undefined && { comprendio }),
       },
     });

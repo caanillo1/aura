@@ -553,11 +553,6 @@ export default function OrdenDetailPage() {
       // Monday after a Friday
       const monAfterFri = (fri: Date) => { const r = new Date(fri); r.setDate(fri.getDate() + 3); return r; };
 
-      // Flatten all phases in order to distribute dates
-      const allPhases: { phaseId: string; modTipo: string | null }[] = [];
-      mods.forEach(m => m.phases.forEach(p => allPhases.push({ phaseId: p.id, modTipo: m.tipo ?? null })));
-      const N = allPhases.length;
-
       // Leaders from service order
       const clinicalId   = (os as any)?.clinicalLeader?.id  ?? (os as any)?.clinicalLeaderId  ?? '';
       const financialId  = (os as any)?.financialLeader?.id ?? (os as any)?.financialLeaderId ?? '';
@@ -568,37 +563,32 @@ export default function OrdenDetailPage() {
       const osStart = os?.startDate ? parseDate(os.startDate) : null;
       const osEnd   = os?.endDate   ? parseDate(os.endDate)   : null;
 
-      if (osStart && osEnd && N > 0) {
-        const totalMs = osEnd.getTime() - osStart.getTime();
-        let cursor = toNextMon(osStart);
+      // Each module starts independently at OS startDate and distributes its phases
+      // proportionally across the full OS date range (modules run in parallel, not sequentially)
+      mods.forEach(mod => {
+        const Nm = mod.phases.length;
+        const agentLeaderId =
+          mod.tipo === 'financiero' ? financialId :
+          mod.tipo === 'asistencial' || mod.tipo === 'mixto' ? clinicalId : '';
 
-        allPhases.forEach(({ phaseId, modTipo }, idx) => {
-          // Distribute proportionally: rawEnd = startDate + (idx+1)/N * totalMs
-          const rawEnd = new Date(osStart.getTime() + ((idx + 1) / N) * totalMs);
-          const phaseEnd = idx === N - 1 ? toNextFri(osEnd) : toNextFri(rawEnd);
-          // Ensure at least Mon-Fri (don't go backwards)
-          const minEnd = toNextFri(cursor);
-          const end = phaseEnd >= minEnd ? phaseEnd : minEnd;
+        if (osStart && osEnd && Nm > 0) {
+          const totalMs = osEnd.getTime() - osStart.getTime();
+          let cursor = toNextMon(osStart);
 
-          // Agent leader by module tipo
-          let agentLeaderId = '';
-          if (modTipo === 'asistencial')       agentLeaderId = clinicalId;
-          else if (modTipo === 'financiero')   agentLeaderId = financialId;
-          else if (modTipo === 'mixto')        agentLeaderId = clinicalId; // default clínico, editable
-
-          init[phaseId] = { startDate: fmtDate(cursor), endDate: fmtDate(end), agentLeaderId, clientLeaderId: clientLeadId };
-          cursor = monAfterFri(end);
-        });
-      } else {
-        // No dates on OS — still pre-fill leaders
-        allPhases.forEach(({ phaseId, modTipo }) => {
-          let agentLeaderId = '';
-          if (modTipo === 'asistencial')       agentLeaderId = clinicalId;
-          else if (modTipo === 'financiero')   agentLeaderId = financialId;
-          else if (modTipo === 'mixto')        agentLeaderId = clinicalId;
-          init[phaseId] = { startDate: '', endDate: '', agentLeaderId, clientLeaderId: clientLeadId };
-        });
-      }
+          mod.phases.forEach((ph, idx) => {
+            const rawEnd = new Date(osStart.getTime() + ((idx + 1) / Nm) * totalMs);
+            const phaseEnd = idx === Nm - 1 ? toNextFri(osEnd) : toNextFri(rawEnd);
+            const minEnd = toNextFri(cursor);
+            const end = phaseEnd >= minEnd ? phaseEnd : minEnd;
+            init[ph.id] = { startDate: fmtDate(cursor), endDate: fmtDate(end), agentLeaderId, clientLeaderId: clientLeadId };
+            cursor = monAfterFri(end);
+          });
+        } else {
+          mod.phases.forEach(ph => {
+            init[ph.id] = { startDate: '', endDate: '', agentLeaderId, clientLeaderId: clientLeadId };
+          });
+        }
+      });
 
       setPhaseDates(init);
       setExcludedModuleIds(new Set());

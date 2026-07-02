@@ -600,7 +600,6 @@ export class ActasService {
                 status: upd.status,
                 progressPercent: upd.progressPercent,
                 executionDate,
-                ...(upd.status === 'completado' ? { actualEndDate: new Date() } : {}),
               },
             });
           }),
@@ -888,7 +887,6 @@ export class ActasService {
             status: upd.status,
             progressPercent: upd.progressPercent,
             executionDate,
-            ...(upd.status === 'completado' ? { actualEndDate: new Date() } : {}),
           },
         });
       }),

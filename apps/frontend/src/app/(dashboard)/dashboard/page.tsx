@@ -693,6 +693,14 @@ export default function DashboardPage() {
         dateTo:   filters.dateTo   || undefined,
       }} />
 
+      {/* ── KPI Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        {kpiDefs.map((k, i) => (
+          <KpiCard key={k.key} label={k.label} value={k.data.value} delta={k.data.delta}
+            deltaLabel={k.data.deltaLabel} icon={k.icon} color={k.color} delay={i * 0.05} />
+        ))}
+      </div>
+
       {/* ── Próximas Actividades | Alertas de Riesgo ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SectionCard title="Próximas Actividades" delay={0.10}>
@@ -773,14 +781,6 @@ export default function DashboardPage() {
               </div>
             )}
         </SectionCard>
-      </div>
-
-      {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-        {kpiDefs.map((k, i) => (
-          <KpiCard key={k.key} label={k.label} value={k.data.value} delta={k.data.delta}
-            deltaLabel={k.data.deltaLabel} icon={k.icon} color={k.color} delay={i * 0.05} />
-        ))}
       </div>
 
       {/* ── Row 2: Avance | Proyectos | Actividades ── */}

@@ -425,7 +425,9 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
   agents?: StaffOption[];
   userSignature?: string | null; onSetupSignature?: () => void;
 }) {
-  const inputRowStyle = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s };
+  const isDark = tc.p !== '#0a1628';
+  const cs = isDark ? 'dark' : 'light';
+  const inputRowStyle = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s, colorScheme: cs } as React.CSSProperties;
   const [agentSigning, setAgentSigning] = useState<number | null>(null);
 
   const update = (i: number, k: keyof Firmante, v: string | number) =>
@@ -501,7 +503,7 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
           {agents && agents.length > 0 && (
             <select defaultValue="" onChange={e => { if (e.target.value) { addFromAgent(e.target.value); e.target.value = ''; } }}
               className="w-full text-xs px-3 py-2 rounded-xl outline-none"
-              style={{ background: 'var(--surface-2)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa' }}>
+              style={{ background: 'var(--surface-2)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', colorScheme: cs } as React.CSSProperties}>
               <option value="">Agregar del equipo →</option>
               {agents.map(a => (
                 <option key={a.id} value={a.id}>{a.firstName} {a.lastName}{a.jobTitle ? ` — ${a.jobTitle}` : ''}</option>
@@ -511,7 +513,7 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
           {clientStaff && clientStaff.length > 0 && (
             <select defaultValue="" onChange={e => { if (e.target.value) { addFromStaff(e.target.value); e.target.value = ''; } }}
               className="w-full text-xs px-3 py-2 rounded-xl outline-none"
-              style={{ background: 'var(--surface-2)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa' }}>
+              style={{ background: 'var(--surface-2)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', colorScheme: cs } as React.CSSProperties}>
               <option value="">Agregar del cliente →</option>
               {clientStaff.map(s => (
                 <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` — ${s.jobTitle}` : ''}</option>
@@ -654,6 +656,7 @@ function DynamicTable<T extends Record<string, any>>({ title, rows, setRows, col
   columns: { key: keyof T; label: string; type?: 'text' | 'date' | 'time' | 'select' | 'bool'; opts?: string[] }[];
   emptyRow: T; tc: any;
 }) {
+  const dtCs = (tc.p !== '#0a1628' ? 'dark' : 'light') as 'dark' | 'light';
   const update = (i: number, k: keyof T, v: any) =>
     setRows(rows.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
   const add = () => setRows([...rows, { ...emptyRow }]);
@@ -679,7 +682,7 @@ function DynamicTable<T extends Record<string, any>>({ title, rows, setRows, col
                 <select value={row[col.key] === true ? 'si' : row[col.key] === false ? 'no' : ''}
                   onChange={e => update(i, col.key, e.target.value === 'si' ? true : e.target.value === 'no' ? false : null)}
                   className="w-full text-sm px-2 py-1.5 rounded-lg outline-none"
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s }}>
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s, colorScheme: dtCs }}>
                   <option value="">—</option>
                   <option value="si">Sí</option>
                   <option value="no">No</option>
@@ -687,7 +690,7 @@ function DynamicTable<T extends Record<string, any>>({ title, rows, setRows, col
               ) : col.type === 'select' ? (
                 <select value={row[col.key] ?? ''} onChange={e => update(i, col.key, e.target.value)}
                   className="w-full text-sm px-2 py-1.5 rounded-lg outline-none"
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s }}>
+                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s, colorScheme: dtCs }}>
                   {col.opts?.map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
               ) : (
@@ -780,7 +783,8 @@ function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff,
   tc: any;
   actaFecha: string;
 }) {
-  const inputSty = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s };
+  const compCs = (tc.p !== '#0a1628' ? 'dark' : 'light') as 'dark' | 'light';
+  const inputSty = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s, colorScheme: compCs } as React.CSSProperties;
 
   const add = () => setRows([...rows, { numero: rows.length + 1, compromiso: '', responsable: '', estado: 'pendiente' }]);
   const del = (i: number) => setRows(rows.filter((_, idx) => idx !== i));
@@ -920,7 +924,8 @@ function ActividadesVisitaEditor({ rows, setRows, projectModules, agents, client
   statusLabel?: string;
 }) {
   const [openModuleId, setOpenModuleId] = useState<string | null>(null);
-  const inputSty = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s };
+  const avCs = (tc.p !== '#0a1628' ? 'dark' : 'light') as 'dark' | 'light';
+  const inputSty = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s, colorScheme: avCs } as React.CSSProperties;
 
   const selectedIds = new Set(rows.map(r => r.activityId));
 
@@ -1128,7 +1133,8 @@ interface ActaModalProps {
 
 function ActaModal({ mode, defaultType, acta, projectId, projectModules, municipios, clientMunicipioId, clientName, clientStaff, agentOptions, userSignature, currentUser, onSetupSignature, onClose, onSaved, tc }: ActaModalProps) {
   const inputCls = "w-full text-sm px-3 py-2 rounded-xl outline-none";
-  const inputStyle = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s };
+  const modalCs = (tc.p !== '#0a1628' ? 'dark' : 'light') as 'dark' | 'light';
+  const inputStyle = { background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s, colorScheme: modalCs } as React.CSSProperties;
 
   // ── Estado base ──
   const [type, setType]     = useState<ActaType>(acta?.type ?? defaultType ?? 'inicio');
@@ -1682,7 +1688,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                         ]);
                       }}
                       className="text-xs px-2 py-1.5 rounded-lg outline-none"
-                      style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
+                      style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)', colorScheme: modalCs } as React.CSSProperties}>
                       <option value="">+ Del cliente</option>
                       {(clientStaff ?? []).map(s => (
                         <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` (${s.jobTitle})` : ''}</option>

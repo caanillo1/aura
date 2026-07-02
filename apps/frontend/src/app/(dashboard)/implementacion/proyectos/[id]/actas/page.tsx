@@ -109,7 +109,10 @@ function Sel({ value, defaultValue, onChange, disabled, children, className, sty
   React.Children.forEach(children, child => {
     if (!React.isValidElement(child) || (child as any).type !== 'option') return;
     const p = (child as any).props;
-    opts.push({ value: String(p.value ?? ''), label: String(p.children ?? ''), disabled: !!p.disabled });
+    const label = Array.isArray(p.children)
+      ? p.children.map((c: any) => String(c ?? '')).join('')
+      : String(p.children ?? '');
+    opts.push({ value: String(p.value ?? ''), label, disabled: !!p.disabled });
   });
 
   const selectedLabel = opts.find(o => o.value === currentVal)?.label ?? '';

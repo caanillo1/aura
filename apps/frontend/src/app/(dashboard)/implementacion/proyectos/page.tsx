@@ -173,7 +173,15 @@ export default function ProyectosPage() {
             {currentAgentLabel}
           </span>
           {agentId === user?.id && (
-            <span style={{ color: tc.m }}>— Proyectos donde eres líder clínico o financiero</span>
+            <>
+              <span style={{ color: tc.m }}>— Proyectos donde eres líder clínico o financiero</span>
+              {!loading && (
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold tabular-nums"
+                  style={{ background: 'rgba(167,139,250,0.18)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.35)' }}>
+                  {total}
+                </span>
+              )}
+            </>
           )}
         </div>
       )}

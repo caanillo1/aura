@@ -45,6 +45,23 @@ export class CompanyController {
     return this.svc.getStats(user.companyId);
   }
 
+  @Get('dashboard/ai-insight')
+  @ApiOperation({ summary: 'Briefing ejecutivo generado por IA basado en el dashboard' })
+  getAiInsight(
+    @GetUser() user: JwtUser,
+    @Query('clientId') clientId?: string,
+    @Query('agentId') agentId?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.svc.getAiInsight(user.companyId, {
+      clientId: clientId || undefined,
+      agentId: agentId || undefined,
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
+    });
+  }
+
   @Get('dashboard')
   @ApiOperation({ summary: 'Datos completos del dashboard ejecutivo' })
   getDashboard(

@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class CompanyService {
+  private readonly logger = new Logger(CompanyService.name);
   constructor(private prisma: PrismaService) {}
 
   async findOne(companyId: string) {
@@ -325,5 +326,102 @@ export class CompanyService {
         createdAt: n.createdAt,
       })),
     };
+  }
+
+  // ── AI Executive Insight ───────────────────────────────────────────────────
+  async getAiInsight(companyId: string, filters: { clientId?: string; agentId?: string; dateFrom?: Date; dateTo?: Date } = {}) {
+    const dash = await this.getDashboard(companyId, filters);
+
+    const kpis = dash.kpis;
+    const risks = dash.projectRisks;
+    const actas = dash.pendingActasSignature;
+    const upcoming = dash.upcomingActivities;
+    const workload = dash.implementerWorkload;
+
+    const prompt = `Eres el asistente ejecutivo de AURA ERP, una plataforma de gestión de implementaciones de software hospitalario para Sistemas Infotec.
+
+Analiza el siguiente resumen operativo del día y genera un briefing ejecutivo conciso en español.
+
+=== ESTADO OPERATIVO ===
+- Clientes activos: ${kpis.activeClients.value} (${kpis.activeClients.delta > 0 ? '+' : ''}${kpis.activeClients.delta} vs período anterior)
+- Proyectos activos: ${kpis.activeProjects.value} (${kpis.activeProjects.delta > 0 ? '+' : ''}${kpis.activeProjects.delta})
+- Actividades pendientes: ${kpis.pendingActivities.value}
+- Actividades VENCIDAS: ${kpis.overdueActivities.value} ← ALERTA
+- Tickets abiertos: ${kpis.openTickets.value}
+- Actas pendientes de firma: ${kpis.pendingActas.value}
+
+=== PROYECTOS POR ESTADO ===
+${dash.projectsByStatus.map(p => `  ${p.status}: ${p.count}`).join('\n') || '  Sin datos'}
+
+=== ALERTAS DE RIESGO (${risks.length} total) ===
+${risks.slice(0, 5).map(r => `  [${r.risk.toUpperCase()}] OS ${r.osNumber} — ${r.client}: ${r.reason}`).join('\n') || '  Sin alertas activas'}
+
+=== ACTAS SIN FIRMAR MÁS URGENTES ===
+${actas.slice(0, 4).map(a => `  ${a.client} — ${a.type} — ${a.daysPending} días pendiente (${a.signedFirmantes}/${a.totalFirmantes} firmas)`).join('\n') || '  Ninguna'}
+
+=== CARGA DE IMPLEMENTADORES ===
+${workload.slice(0, 5).map(w => `  ${w.name}: ${w.count} proyectos`).join('\n') || '  Sin datos'}
+
+=== PRÓXIMAS ACTIVIDADES (${upcoming.length}) ===
+${upcoming.slice(0, 4).map(a => `  ${a.name} — ${a.client} — ${a.date ? new Date(a.date).toLocaleDateString('es-CO') : 'sin fecha'}`).join('\n') || '  Ninguna'}
+
+Responde ÚNICAMENTE con un objeto JSON válido (sin markdown, sin backticks) con esta estructura exacta:
+{
+  "resumen": "2-3 oraciones concisas describiendo el estado general de las operaciones hoy",
+  "alertas": ["alerta corta 1", "alerta corta 2", "alerta corta 3"],
+  "recomendacion": "Una recomendación ejecutiva concreta y accionable para hoy",
+  "estado": "verde" | "amarillo" | "rojo"
+}
+
+El campo "estado" debe ser "rojo" si hay riesgos críticos o muchas actividades vencidas, "amarillo" si hay alertas moderadas, "verde" si todo está bajo control.`;
+
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new InternalServerErrorException('GROQ_API_KEY no configurada');
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.3,
+          max_tokens: 600,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        this.logger.error(`Groq API error ${response.status}: ${err}`);
+        throw new InternalServerErrorException('Error al consultar la IA');
+      }
+
+      const data: any = await response.json();
+      const content: string = data?.choices?.[0]?.message?.content ?? '';
+
+      // Extraer JSON de la respuesta (puede venir con texto alrededor)
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new InternalServerErrorException('Respuesta IA inválida');
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        resumen:        parsed.resumen        ?? '',
+        alertas:        Array.isArray(parsed.alertas) ? parsed.alertas.slice(0, 4) : [],
+        recomendacion:  parsed.recomendacion  ?? '',
+        estado:         ['verde', 'amarillo', 'rojo'].includes(parsed.estado) ? parsed.estado : 'amarillo',
+        generadoEn:     new Date().toISOString(),
+      };
+    } catch (err: any) {
+      if (err?.name === 'AbortError') throw new InternalServerErrorException('Timeout al consultar la IA');
+      if (err instanceof InternalServerErrorException) throw err;
+      this.logger.error('getAiInsight error:', err);
+      throw new InternalServerErrorException('Error al generar el análisis IA');
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }

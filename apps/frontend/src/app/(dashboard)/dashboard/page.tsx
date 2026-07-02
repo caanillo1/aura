@@ -1,12 +1,13 @@
 'use client';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import {
   Building2, FolderKanban, ClipboardList, Ticket, FileSignature,
   AlertTriangle, TrendingUp, TrendingDown, Minus, ChevronRight,
   RefreshCw, Send, Mail, ShieldAlert, Filter, X, ChevronDown,
-  ClipboardPlus, ListOrdered, Zap,
+  ClipboardPlus, ListOrdered, Sparkles, Loader2, RotateCcw,
+  CircleCheck, CircleAlert, OctagonAlert,
 } from 'lucide-react';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
@@ -315,6 +316,163 @@ function HBarChart({ data, color }: { data: { label: string; value: number }[]; 
   );
 }
 
+// ── AI Insight Card ───────────────────────────────────────────────────────────
+type AiInsight = { resumen: string; alertas: string[]; recomendacion: string; estado: 'verde' | 'amarillo' | 'rojo'; generadoEn: string };
+
+const ESTADO_META = {
+  verde:    { icon: CircleCheck,  color: '#34d399', bg: 'rgba(52,211,153,0.08)',  border: 'rgba(52,211,153,0.25)',  label: 'Operaciones normales' },
+  amarillo: { icon: CircleAlert,  color: '#fbbf24', bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.25)',  label: 'Atención requerida' },
+  rojo:     { icon: OctagonAlert, color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.25)', label: 'Alerta crítica' },
+};
+
+function AiInsightCard({ filters }: { filters: { clientId?: string; agentId?: string; dateFrom?: string; dateTo?: string } }) {
+  const [insight, setInsight]   = useState<AiInsight | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [expanded, setExpanded] = useState(true);
+  const didFetch = useRef(false);
+
+  const fetch = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const data = await companyApi.getAiInsight(filters);
+      setInsight(data);
+    } catch {
+      setError('No se pudo generar el análisis. Intenta de nuevo.');
+    } finally { setLoading(false); }
+  }, [filters]);
+
+  useEffect(() => {
+    if (didFetch.current) return;
+    didFetch.current = true;
+    fetch();
+  }, [fetch]);
+
+  const meta = insight ? ESTADO_META[insight.estado] : null;
+  const StatusIcon = meta?.icon;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="rounded-[20px] overflow-hidden"
+      style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', boxShadow: 'var(--card-shadow)' }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-5 py-3.5 cursor-pointer select-none"
+        onClick={() => setExpanded(p => !p)}
+        style={{ borderBottom: expanded ? '1px solid var(--border-subtle)' : 'none' }}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)' }}>
+            <Sparkles className="w-3.5 h-3.5" style={{ color: '#a78bfa' }} />
+          </div>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Briefing Ejecutivo IA
+          </span>
+          {meta && StatusIcon && (
+            <span className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full"
+              style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
+              <StatusIcon className="w-3 h-3" />
+              {meta.label}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {insight && (
+            <span className="text-[10px] hidden sm:block" style={{ color: 'var(--text-muted)' }}>
+              {new Date(insight.generadoEn).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button
+            onClick={e => { e.stopPropagation(); fetch(); }}
+            disabled={loading}
+            className="p-1.5 rounded-lg transition-colors hover:bg-white/8"
+            title="Regenerar análisis"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            key="body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="p-5">
+              {loading && (
+                <div className="flex items-center gap-3 py-3">
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: '#a78bfa' }} />
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    Analizando operaciones con IA…
+                  </span>
+                </div>
+              )}
+
+              {error && !loading && (
+                <div className="flex items-center gap-2 text-sm py-1" style={{ color: '#f87171' }}>
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              {insight && !loading && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {/* Resumen */}
+                  <div className="lg:col-span-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>
+                      Resumen
+                    </p>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {insight.resumen}
+                    </p>
+                  </div>
+
+                  {/* Alertas */}
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>
+                      Puntos clave
+                    </p>
+                    <ul className="space-y-1.5">
+                      {insight.alertas.map((a, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#a78bfa' }} />
+                          {a}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Recomendación */}
+                  <div className="rounded-2xl px-4 py-3.5"
+                    style={{ background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.2)' }}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: '#a78bfa' }}>
+                      Recomendación
+                    </p>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {insight.recomendacion}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { accessToken } = useAuthStore();
@@ -526,6 +684,14 @@ export default function DashboardPage() {
           </span>
         )}
       </motion.div>
+
+      {/* ── AI Insight ── */}
+      <AiInsightCard filters={{
+        clientId: filters.clientId || undefined,
+        agentId:  filters.agentId  || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo:   filters.dateTo   || undefined,
+      }} />
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">

@@ -123,6 +123,11 @@ export const companyApi = {
     api.patch(`/company/configs/${key}`, { value }).then((r) => r.data),
   getDashboard: (filters?: { clientId?: string; agentId?: string; dateFrom?: string; dateTo?: string }): Promise<any> =>
     api.get('/company/dashboard', { params: filters }).then((r) => r.data),
+  getAiInsight: (filters?: { clientId?: string; agentId?: string; dateFrom?: string; dateTo?: string }): Promise<{
+    resumen: string; alertas: string[]; recomendacion: string;
+    estado: 'verde' | 'amarillo' | 'rojo'; generadoEn: string;
+  }> =>
+    api.get('/company/dashboard/ai-insight', { params: filters }).then((r) => r.data),
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────

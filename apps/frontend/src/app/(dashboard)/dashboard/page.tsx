@@ -693,6 +693,88 @@ export default function DashboardPage() {
         dateTo:   filters.dateTo   || undefined,
       }} />
 
+      {/* ── Próximas Actividades | Alertas de Riesgo ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SectionCard title="Próximas Actividades" delay={0.10}>
+          {upcomingActivities.length === 0
+            ? <Empty msg="Sin actividades pendientes" />
+            : (
+              <div className="space-y-2">
+                {upcomingActivities.map(a => {
+                  const { day, month } = fmtDay(a.date);
+                  return (
+                    <div key={a.id}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-[14px] transition-colors"
+                      style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
+                      <div className="flex-shrink-0 w-10 text-center">
+                        {day === '—'
+                          ? <p className="text-[10px] leading-tight" style={{ color: 'var(--text-muted)' }}>Sin<br/>fecha</p>
+                          : <>
+                              <p className="text-lg font-bold leading-none tabular-nums" style={{ color: 'var(--accent-blue)' }}>{day}</p>
+                              {month && <p className="text-[9px] font-semibold mt-0.5" style={{ color: 'var(--text-muted)' }}>{month}</p>}
+                            </>
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{a.name}</p>
+                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{a.client}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+        </SectionCard>
+
+        <SectionCard title="Alertas de Riesgo" delay={0.14}>
+          {projectRisks.length === 0
+            ? (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                  style={{ background: 'rgba(52,211,153,0.10)', border: '1px solid rgba(52,211,153,0.20)' }}>
+                  <ShieldAlert className="w-5 h-5" style={{ color: '#34d399' }} />
+                </div>
+                <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+                  Sin notas críticas o de alto riesgo
+                </p>
+              </div>
+            )
+            : (
+              <div className="space-y-1">
+                <div className="grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 px-1 pb-2"
+                  style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                  {['OS', 'Cliente', 'Nivel', 'Detalle'].map(h => (
+                    <span key={h} className="text-[10px] font-semibold uppercase tracking-widest"
+                      style={{ color: 'var(--text-muted)' }}>{h}</span>
+                  ))}
+                </div>
+                {projectRisks.map((r, i) => {
+                  const rm = RISK_META[r.risk] ?? RISK_META.alto;
+                  return (
+                    <div key={i}
+                      className="grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 items-center px-1 py-2 rounded-xl transition-colors hover:bg-white/5">
+                      <span className="text-xs font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                        {r.osNumber}
+                      </span>
+                      <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{r.client}</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
+                        style={{ background: rm.bg, color: rm.color }}>
+                        {rm.label}
+                      </span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{r.reason}</span>
+                        <span className="text-[10px] shrink-0 opacity-60" style={{ color: 'var(--text-muted)' }}>
+                          {timeAgo(r.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+        </SectionCard>
+      </div>
+
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {kpiDefs.map((k, i) => (
@@ -807,87 +889,6 @@ export default function DashboardPage() {
         </SectionCard>
       </div>
 
-      {/* ── Row 4: Próximas Actividades | Alertas de Riesgo ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-2">
-        <SectionCard title="Próximas Actividades" delay={0.32}>
-          {upcomingActivities.length === 0
-            ? <Empty msg="Sin actividades pendientes" />
-            : (
-              <div className="space-y-2">
-                {upcomingActivities.map(a => {
-                  const { day, month } = fmtDay(a.date);
-                  return (
-                    <div key={a.id}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-[14px] transition-colors"
-                      style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)' }}>
-                      <div className="flex-shrink-0 w-10 text-center">
-                        {day === '—'
-                          ? <p className="text-[10px] leading-tight" style={{ color: 'var(--text-muted)' }}>Sin<br/>fecha</p>
-                          : <>
-                              <p className="text-lg font-bold leading-none tabular-nums" style={{ color: 'var(--accent-blue)' }}>{day}</p>
-                              {month && <p className="text-[9px] font-semibold mt-0.5" style={{ color: 'var(--text-muted)' }}>{month}</p>}
-                            </>
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{a.name}</p>
-                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{a.client}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-        </SectionCard>
-
-        <SectionCard title="Alertas de Riesgo" delay={0.36}>
-          {projectRisks.length === 0
-            ? (
-              <div className="flex flex-col items-center gap-3 py-8">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-                  style={{ background: 'rgba(52,211,153,0.10)', border: '1px solid rgba(52,211,153,0.20)' }}>
-                  <ShieldAlert className="w-5 h-5" style={{ color: '#34d399' }} />
-                </div>
-                <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-                  Sin notas críticas o de alto riesgo
-                </p>
-              </div>
-            )
-            : (
-              <div className="space-y-1">
-                <div className="grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 px-1 pb-2"
-                  style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                  {['OS', 'Cliente', 'Nivel', 'Detalle'].map(h => (
-                    <span key={h} className="text-[10px] font-semibold uppercase tracking-widest"
-                      style={{ color: 'var(--text-muted)' }}>{h}</span>
-                  ))}
-                </div>
-                {projectRisks.map((r, i) => {
-                  const rm = RISK_META[r.risk] ?? RISK_META.alto;
-                  return (
-                    <div key={i}
-                      className="grid grid-cols-[auto_1fr_auto_1fr] gap-x-3 items-center px-1 py-2 rounded-xl transition-colors hover:bg-white/5">
-                      <span className="text-xs font-mono whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                        {r.osNumber}
-                      </span>
-                      <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{r.client}</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
-                        style={{ background: rm.bg, color: rm.color }}>
-                        {rm.label}
-                      </span>
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{r.reason}</span>
-                        <span className="text-[10px] shrink-0 opacity-60" style={{ color: 'var(--text-muted)' }}>
-                          {timeAgo(r.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-        </SectionCard>
-      </div>
     </div>
   );
 }

@@ -1024,6 +1024,8 @@ export default function ProjectDetailPage() {
   const [bulkApplying, setBulkApplying] = useState(false);
   const [showBulkPanel, setShowBulkPanel] = useState(false);
   const [bulkEdits, setBulkEdits] = useState<Map<string, { status: string; nota: string; blockedBy: string }>>(new Map());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   // Listas para responsables
@@ -1177,6 +1179,24 @@ export default function ProjectDetailPage() {
       load();
     } catch { toast.error('Error al actualizar actividades'); }
     finally { setBulkApplying(false); }
+  };
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true);
+    const ids = Array.from(bulkSelected);
+    let errors = 0;
+    for (const actId of ids) {
+      try { await projectsApi.deleteActivity(actId); }
+      catch { errors++; }
+    }
+    setBulkDeleting(false);
+    setBulkDeleteConfirm(false);
+    setBulkSelected(new Set());
+    setBulkMode(false);
+    setBulkEdits(new Map());
+    if (errors === 0) toast.success(`${ids.length} actividad${ids.length !== 1 ? 'es eliminadas' : ' eliminada'}`);
+    else toast.error(`${ids.length - errors} eliminadas, ${errors} con error`);
+    load();
   };
 
   const handleStatusSave = async () => {
@@ -1720,11 +1740,53 @@ export default function ProjectDetailPage() {
             style={{ background: 'rgba(59,130,246,0.20)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.40)' }}>
             Editar selección →
           </button>
+          {can('activities.manage') && (
+            <button onClick={() => setBulkDeleteConfirm(true)}
+              className="text-xs px-4 py-1.5 rounded-full font-semibold"
+              style={{ background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '1px solid rgba(248,113,113,0.35)' }}>
+              Eliminar
+            </button>
+          )}
           <button onClick={() => { setBulkSelected(new Set()); setBulkMode(false); setBulkEdits(new Map()); }}
             className="text-xs px-2 py-1.5 rounded-full"
             style={{ color: 'rgba(255,255,255,0.40)', border: '1px solid rgba(255,255,255,0.10)' }}>
             ✕
           </button>
+        </div>
+      )}
+
+      {/* Confirmación eliminación masiva */}
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)' }}
+          onClick={e => { if (e.target === e.currentTarget) setBulkDeleteConfirm(false); }}>
+          <div className="rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4"
+            style={{ background: '#0f172a', border: '1px solid rgba(248,113,113,0.25)' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)' }}>
+                <span className="text-lg">🗑️</span>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold" style={{ color: '#e2e8f0' }}>Eliminar actividades</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+            <p className="text-sm" style={{ color: '#94a3b8' }}>
+              ¿Confirmas eliminar <span className="font-bold" style={{ color: '#f87171' }}>{bulkSelected.size} actividad{bulkSelected.size !== 1 ? 'es' : ''}</span>?
+            </p>
+            <div className="flex gap-2 justify-end mt-1">
+              <button onClick={() => setBulkDeleteConfirm(false)} disabled={bulkDeleting}
+                className="text-xs px-4 py-2 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)' }}>
+                Cancelar
+              </button>
+              <button onClick={handleBulkDelete} disabled={bulkDeleting}
+                className="text-xs px-4 py-2 rounded-xl font-semibold flex items-center gap-2"
+                style={{ background: 'rgba(248,113,113,0.18)', color: '#f87171', border: '1px solid rgba(248,113,113,0.35)' }}>
+                {bulkDeleting ? 'Eliminando…' : `Eliminar ${bulkSelected.size}`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

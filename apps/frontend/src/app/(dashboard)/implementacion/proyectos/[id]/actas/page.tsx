@@ -90,6 +90,107 @@ function emptyFirmante(n = 0): Firmante {
   return { nombre: '', cargo: '', empresa: '', email: '', fecha: '', orden: n, signerType: 'agent' };
 }
 
+// ── Custom select (reemplaza <select> nativo para evitar fondo blanco en dark mode) ──
+
+function Sel({ value, defaultValue, onChange, disabled, children, className, style }: {
+  value?: string; defaultValue?: string;
+  onChange: (e: { target: { value: string } }) => void;
+  disabled?: boolean; children: React.ReactNode;
+  className?: string; style?: React.CSSProperties;
+}) {
+  const isControlled = value !== undefined;
+  const [internalVal, setInternalVal] = React.useState(defaultValue ?? '');
+  const [open, setOpen]               = React.useState(false);
+  const [panelPos, setPanelPos]       = React.useState<React.CSSProperties>({});
+  const triggerRef                    = useRef<HTMLDivElement>(null);
+  const currentVal = isControlled ? value! : internalVal;
+
+  const opts: { value: string; label: string; disabled?: boolean }[] = [];
+  React.Children.forEach(children, child => {
+    if (!React.isValidElement(child) || (child as any).type !== 'option') return;
+    const p = (child as any).props;
+    opts.push({ value: String(p.value ?? ''), label: String(p.children ?? ''), disabled: !!p.disabled });
+  });
+
+  const selectedLabel = opts.find(o => o.value === currentVal)?.label ?? '';
+  const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
+  const panelBg   = isDark ? '#0d1526'  : '#ffffff';
+  const panelBdr  = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)';
+  const optColor  = isDark ? '#e2e8f0'  : '#0a1628';
+  const mutedClr  = isDark ? '#64748b'  : '#94a3b8';
+  const hoverBg   = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)';
+  const selBg     = isDark ? 'rgba(96,165,250,0.15)'  : 'rgba(30,60,120,0.07)';
+  const rowDiv    = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+
+  const handleToggle = () => {
+    if (disabled) return;
+    if (!open && triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect();
+      const below = window.innerHeight - r.bottom;
+      const above = r.top;
+      const goUp  = below < 220 && above > below;
+      setPanelPos({
+        position: 'fixed', left: r.left, minWidth: r.width, zIndex: 9999,
+        ...(goUp
+          ? { bottom: window.innerHeight - r.top + 4, maxHeight: Math.min(above - 8, 240) }
+          : { top: r.bottom + 4,                      maxHeight: Math.min(below - 8, 240) }),
+      });
+    }
+    setOpen(v => !v);
+  };
+
+  React.useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  const pick = (val: string) => {
+    if (!isControlled) setInternalVal(defaultValue ?? '');
+    onChange({ target: { value: val } });
+    setOpen(false);
+  };
+
+  return (
+    <div ref={triggerRef} style={{ position: 'relative' }}>
+      <div onClick={handleToggle} className={className}
+        style={{ ...style, display: 'flex', alignItems: 'center', gap: 6,
+          cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, userSelect: 'none' }}>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+          {selectedLabel || <span style={{ color: mutedClr }}>—</span>}
+        </span>
+        <svg width="10" height="6" viewBox="0 0 10 6" fill="none"
+          style={{ flexShrink: 0, transition: 'transform .15s', transform: open ? 'rotate(180deg)' : '', color: mutedClr }}>
+          <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      {open && (
+        <div style={{ ...panelPos, background: panelBg, border: `1px solid ${panelBdr}`,
+          borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.55)', overflowY: 'auto', overflowX: 'hidden' }}>
+          {opts.map((opt, i) => (
+            <div key={i} onClick={() => !opt.disabled && pick(opt.value)}
+              style={{
+                padding: '7px 12px', fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                cursor: opt.disabled ? 'default' : 'pointer',
+                color: opt.disabled ? mutedClr : (currentVal === opt.value ? '#60a5fa' : optColor),
+                background: currentVal === opt.value ? selBg : 'transparent',
+                borderBottom: i < opts.length - 1 ? `1px solid ${rowDiv}` : 'none',
+              }}
+              onMouseEnter={e => { if (!opt.disabled && currentVal !== opt.value) (e.currentTarget as HTMLDivElement).style.background = hoverBg; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = currentVal === opt.value ? selBg : 'transparent'; }}>
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Sub-componente: tabla editable de firmantes ────────────────────────────
 
 interface StaffOption { id: string; firstName: string; lastName: string; jobTitle?: string | null; document?: string; email?: string | null; phone?: string | null; }
@@ -501,24 +602,24 @@ function FirmantesEditor({ rows, setRows, tc, clientStaff, clientName, agents, u
       {((agents && agents.length > 0) || (clientStaff && clientStaff.length > 0)) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
           {agents && agents.length > 0 && (
-            <select defaultValue="" onChange={e => { if (e.target.value) { addFromAgent(e.target.value); e.target.value = ''; } }}
+            <Sel defaultValue="" onChange={e => { if (e.target.value) { addFromAgent(e.target.value); e.target.value = ''; } }}
               className="w-full text-xs px-3 py-2 rounded-xl outline-none"
               style={{ background: 'var(--surface-2)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', colorScheme: cs } as React.CSSProperties}>
               <option value="">Agregar del equipo →</option>
               {agents.map(a => (
                 <option key={a.id} value={a.id}>{a.firstName} {a.lastName}{a.jobTitle ? ` — ${a.jobTitle}` : ''}</option>
               ))}
-            </select>
+            </Sel>
           )}
           {clientStaff && clientStaff.length > 0 && (
-            <select defaultValue="" onChange={e => { if (e.target.value) { addFromStaff(e.target.value); e.target.value = ''; } }}
+            <Sel defaultValue="" onChange={e => { if (e.target.value) { addFromStaff(e.target.value); e.target.value = ''; } }}
               className="w-full text-xs px-3 py-2 rounded-xl outline-none"
               style={{ background: 'var(--surface-2)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', colorScheme: cs } as React.CSSProperties}>
               <option value="">Agregar del cliente →</option>
               {clientStaff.map(s => (
                 <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` — ${s.jobTitle}` : ''}</option>
               ))}
-            </select>
+            </Sel>
           )}
         </div>
       )}
@@ -679,20 +780,20 @@ function DynamicTable<T extends Record<string, any>>({ title, rows, setRows, col
           {columns.map(col => (
             <div key={String(col.key)}>
               {col.type === 'bool' ? (
-                <select value={row[col.key] === true ? 'si' : row[col.key] === false ? 'no' : ''}
+                <Sel value={row[col.key] === true ? 'si' : row[col.key] === false ? 'no' : ''}
                   onChange={e => update(i, col.key, e.target.value === 'si' ? true : e.target.value === 'no' ? false : null)}
                   className="w-full text-sm px-2 py-1.5 rounded-lg outline-none"
                   style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s, colorScheme: dtCs }}>
                   <option value="">—</option>
                   <option value="si">Sí</option>
                   <option value="no">No</option>
-                </select>
+                </Sel>
               ) : col.type === 'select' ? (
-                <select value={row[col.key] ?? ''} onChange={e => update(i, col.key, e.target.value)}
+                <Sel value={row[col.key] ?? ''} onChange={e => update(i, col.key, e.target.value)}
                   className="w-full text-sm px-2 py-1.5 rounded-lg outline-none"
                   style={{ background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', color: tc.s, colorScheme: dtCs }}>
                   {col.opts?.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                </Sel>
               ) : (
                 <input
                   type={col.type === 'date' ? 'date' : col.type === 'time' ? 'time' : 'text'}
@@ -821,13 +922,13 @@ function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff,
                 value={r.compromiso} onChange={e => upd(i, { compromiso: e.target.value })}
                 className="flex-1 text-sm px-2 py-1.5 rounded-lg outline-none resize-none"
                 style={inputSty} />
-              <select value={r.estado} onChange={e => upd(i, { estado: e.target.value })}
+              <Sel value={r.estado} onChange={e => upd(i, { estado: e.target.value })}
                 className="text-xs px-2 py-1.5 rounded-lg outline-none shrink-0"
                 style={{ ...inputSty, width: 110 }}>
                 <option value="pendiente">Pendiente</option>
                 <option value="en_proceso">En proceso</option>
                 <option value="cumplido">Cumplido</option>
-              </select>
+              </Sel>
               <button onClick={() => del(i)} style={{ color: '#f87171', marginTop: 4 }}>
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -836,39 +937,39 @@ function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff,
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <p className="text-[10px] mb-0.5" style={{ color: tc.m }}>Agente responsable</p>
-                <select value={r.assignedToId ?? ''} onChange={e => upd(i, { assignedToId: e.target.value || undefined })}
+                <Sel value={r.assignedToId ?? ''} onChange={e => upd(i, { assignedToId: e.target.value || undefined })}
                   className="w-full text-xs px-2 py-1 rounded-lg outline-none" style={inputSty}>
                   <option value="">— Sin asignar —</option>
                   {agents.map(a => <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>)}
-                </select>
+                </Sel>
               </div>
               <div>
                 <p className="text-[10px] mb-0.5" style={{ color: tc.m }}>Responsable del cliente</p>
-                <select value={r.clientStaffId ?? ''} onChange={e => upd(i, { clientStaffId: e.target.value || undefined })}
+                <Sel value={r.clientStaffId ?? ''} onChange={e => upd(i, { clientStaffId: e.target.value || undefined })}
                   className="w-full text-xs px-2 py-1 rounded-lg outline-none" style={inputSty}>
                   <option value="">— Sin asignar —</option>
                   {clientStaff.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` (${s.jobTitle})` : ''}</option>)}
-                </select>
+                </Sel>
               </div>
             </div>
             {/* Fila 3: módulo + fase */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <p className="text-[10px] mb-0.5" style={{ color: tc.m }}>Módulo del plan</p>
-                <select value={r.moduleId ?? ''} onChange={e => upd(i, { moduleId: e.target.value || undefined, phaseId: undefined })}
+                <Sel value={r.moduleId ?? ''} onChange={e => upd(i, { moduleId: e.target.value || undefined, phaseId: undefined })}
                   className="w-full text-xs px-2 py-1 rounded-lg outline-none" style={inputSty}>
                   <option value="">— Sin módulo —</option>
                   {projectModules.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+                </Sel>
               </div>
               <div>
                 <p className="text-[10px] mb-0.5" style={{ color: tc.m }}>Fase</p>
-                <select value={r.phaseId ?? ''} onChange={e => upd(i, { phaseId: e.target.value || undefined })}
+                <Sel value={r.phaseId ?? ''} onChange={e => upd(i, { phaseId: e.target.value || undefined })}
                   className="w-full text-xs px-2 py-1 rounded-lg outline-none" style={inputSty}
                   disabled={!r.moduleId}>
                   <option value="">— {r.moduleId ? 'Seleccionar fase' : 'Primero un módulo'} —</option>
                   {phasesForModule.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                </Sel>
               </div>
             </div>
             {/* Fila 4: días vigencia → fecha límite + responsable principal */}
@@ -889,12 +990,12 @@ function CompromisosEditor({ rows, setRows, projectModules, agents, clientStaff,
               </div>
               <div>
                 <p className="text-[10px] mb-0.5" style={{ color: tc.m }}>Responsable principal</p>
-                <select value={r.responsablePrincipal ?? ''} onChange={e => upd(i, { responsablePrincipal: e.target.value || undefined })}
+                <Sel value={r.responsablePrincipal ?? ''} onChange={e => upd(i, { responsablePrincipal: e.target.value || undefined })}
                   className="w-full text-xs px-2 py-1 rounded-lg outline-none" style={inputSty}>
                   <option value="">— Sin definir —</option>
                   <option value="agente">Agente (implementador)</option>
                   <option value="cliente">Cliente</option>
-                </select>
+                </Sel>
               </div>
             </div>
           </div>
@@ -1043,21 +1144,21 @@ function ActividadesVisitaEditor({ rows, setRows, projectModules, agents, client
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                       <div>
                                         <p className="text-[10px] mb-0.5" style={{ color: tc.m }}>Agente</p>
-                                        <select value={row.assignedToId ?? ''}
+                                        <Sel value={row.assignedToId ?? ''}
                                           onChange={e => updateRow(act.id, { assignedToId: e.target.value || undefined })}
                                           className="w-full text-xs px-2 py-1 rounded-lg outline-none" style={inputSty}>
                                           <option value="">— Sin asignar —</option>
                                           {agents.map(a => <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>)}
-                                        </select>
+                                        </Sel>
                                       </div>
                                       <div>
                                         <p className="text-[10px] mb-0.5" style={{ color: tc.m }}>Responsable cliente</p>
-                                        <select value={row.clientStaffId ?? ''}
+                                        <Sel value={row.clientStaffId ?? ''}
                                           onChange={e => updateRow(act.id, { clientStaffId: e.target.value || undefined })}
                                           className="w-full text-xs px-2 py-1 rounded-lg outline-none" style={inputSty}>
                                           <option value="">— Sin asignar —</option>
                                           {clientStaff.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` (${s.jobTitle})` : ''}</option>)}
-                                        </select>
+                                        </Sel>
                                       </div>
                                     </div>
                                   </div>
@@ -1392,19 +1493,19 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
           {mode === 'create' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Tipo de acta">
-                <select value={type} onChange={e => setType(e.target.value as ActaType)}
+                <Sel value={type} onChange={e => setType(e.target.value as ActaType)}
                   className={inputCls} style={inputStyle}>
                   {Object.entries(TYPE_CFG).map(([k, v]) => (
                     <option key={k} value={k}>{v.label}</option>
                   ))}
-                </select>
+                </Sel>
               </Field>
               <Field label="Estado">
-                <select value={status} onChange={e => setStatus(e.target.value)}
+                <Sel value={status} onChange={e => setStatus(e.target.value)}
                   className={inputCls} style={inputStyle}>
                   <option value="borrador">Borrador</option>
                   <option value="finalizado">Finalizado</option>
-                </select>
+                </Sel>
               </Field>
             </div>
           )}
@@ -1412,11 +1513,11 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
           {mode === 'edit' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Estado">
-                <select value={status} onChange={e => setStatus(e.target.value)}
+                <Sel value={status} onChange={e => setStatus(e.target.value)}
                   className={inputCls} style={inputStyle}>
                   <option value="borrador">Borrador</option>
                   <option value="finalizado">Finalizado</option>
-                </select>
+                </Sel>
               </Field>
               <Field label="Número de acta">
                 <input value={numero} onChange={e => setNumero(e.target.value)}
@@ -1471,7 +1572,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
           {type === 'inicio' && (<>
             <div className="grid grid-cols-1 gap-3">
               <Field label="Agente responsable">
-                <select
+                <Sel
                   value={agents.find(a => `${a.firstName} ${a.lastName}` === implementador)?.id ?? '__custom__'}
                   onChange={e => {
                     const agent = agents.find(a => a.id === e.target.value);
@@ -1499,7 +1600,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                   {agents.map(a => (
                     <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>
                   ))}
-                </select>
+                </Sel>
               </Field>
               <Field label="Asunto">
                 <input value={asunto} onChange={e => setAsunto(e.target.value)}
@@ -1628,15 +1729,15 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {projectModules.length > 0 && (
                 <Field label="Módulo">
-                  <select value={moduloId} onChange={e => setModuloId(e.target.value)}
+                  <Sel value={moduloId} onChange={e => setModuloId(e.target.value)}
                     className={inputCls} style={inputStyle}>
                     <option value="">— Seleccionar —</option>
                     {projectModules.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
+                  </Sel>
                 </Field>
               )}
               <Field label="Expositor (agente)">
-                <select
+                <Sel
                   value={expositorId}
                   onChange={e => {
                     const agent = agents.find(a => a.id === e.target.value);
@@ -1648,7 +1749,7 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                   {agents.map(a => (
                     <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>
                   ))}
-                </select>
+                </Sel>
               </Field>
             </div>
 
@@ -1674,12 +1775,11 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                 <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: tc.m }}>Participantes</p>
                 <div className="flex gap-2">
                   {(clientStaff ?? []).length > 0 && (
-                    <select
+                    <Sel
                       defaultValue=""
                       onChange={e => {
                         const s = (clientStaff ?? []).find(x => x.id === e.target.value);
                         if (!s) return;
-                        e.target.value = '';
                         setParticipantes(prev => [
                           ...prev,
                           { numero: prev.length + 1, nombre: `${s.firstName} ${s.lastName}`,
@@ -1688,12 +1788,12 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                         ]);
                       }}
                       className="text-xs px-2 py-1.5 rounded-lg outline-none"
-                      style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)', colorScheme: modalCs } as React.CSSProperties}>
+                      style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
                       <option value="">+ Del cliente</option>
                       {(clientStaff ?? []).map(s => (
                         <option key={s.id} value={s.id}>{s.firstName} {s.lastName}{s.jobTitle ? ` (${s.jobTitle})` : ''}</option>
                       ))}
-                    </select>
+                    </Sel>
                   )}
                   <button type="button"
                     onClick={() => setParticipantes(prev => [
@@ -1793,25 +1893,25 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
               <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: tc.m }}>Resumen de capacitación</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Field label="Modalidad">
-                  <select value={capMod} onChange={e => setCapMod(e.target.value)}
+                  <Sel value={capMod} onChange={e => setCapMod(e.target.value)}
                     className={inputCls} style={inputStyle}>
                     <option value="">— Seleccionar —</option>
                     <option value="virtual">Virtual</option>
                     <option value="presencial">Presencial</option>
-                  </select>
+                  </Sel>
                 </Field>
                 <Field label="Horas totales">
                   <input type="number" value={capHoras} onChange={e => setCapHoras(e.target.value)}
                     className={inputCls} style={inputStyle} placeholder="0" />
                 </Field>
                 <Field label="¿Pruebas de arranque?">
-                  <select value={capPruebas === true ? 'si' : capPruebas === false ? 'no' : ''}
+                  <Sel value={capPruebas === true ? 'si' : capPruebas === false ? 'no' : ''}
                     onChange={e => setCapPruebas(e.target.value === 'si' ? true : e.target.value === 'no' ? false : null)}
                     className={inputCls} style={inputStyle}>
                     <option value="">—</option>
                     <option value="si">Sí</option>
                     <option value="no">No</option>
-                  </select>
+                  </Sel>
                 </Field>
               </div>
             </div>

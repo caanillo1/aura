@@ -59,9 +59,10 @@ export interface InformeData {
   actas: any[];
   notes: any[];
   requerimientos?: any[];
-  personalCapacitado: any[];
-  personalEnProceso: any[];
-  personalPendiente?: any[];
+  personalCapacitado:  any[];
+  personalEnProceso:   any[];
+  personalPendiente?:  any[];
+  personalInasistente?: any[];
   generatedAt: string;
 }
 
@@ -94,7 +95,7 @@ function deriveActivityStats(tasks: any[]) {
 // ── Document ──────────────────────────────────────────────────────────────────
 export function InformeDocument({ data, includeActas = false }: Props) {
   const { company, os, actas, notes, personalCapacitado, personalEnProceso,
-          personalPendiente, project, generatedAt } = data;
+          personalPendiente, personalInasistente, project, generatedAt } = data;
 
   const { pc, sc, onPc } = deriveBrand(company);
   const tasks             = os.projectTasks ?? [];
@@ -189,6 +190,7 @@ export function InformeDocument({ data, includeActas = false }: Props) {
           personalCapacitado={personalCapacitado}
           personalEnProceso={personalEnProceso}
           personalPendiente={personalPendiente}
+          personalInasistente={personalInasistente}
           pc={pc} onPc={onPc} sectionNum="8"
         />
       </Page>

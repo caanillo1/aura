@@ -8,7 +8,7 @@ import type { InformeData } from './InformeDocument';
  */
 export function transformForPdf(raw: any): InformeData {
   const { company, os, project, actas, notes,
-          personalCapacitado, personalEnProceso, personalPendiente,
+          personalCapacitado, personalEnProceso, personalPendiente, personalInasistente,
           requerimientos, generatedAt } = raw;
 
   // ── 1. Flatten project modules → phases → activities into os.projectTasks ──
@@ -176,9 +176,10 @@ export function transformForPdf(raw: any): InformeData {
     actas:              transformedActas,
     notes:              transformedNotes,
     requerimientos:     requerimientos     ?? [],
-    personalCapacitado: personalCapacitado ?? [],
-    personalEnProceso:  personalEnProceso  ?? [],
-    personalPendiente:  personalPendiente  ?? [],
-    generatedAt:        generatedAt        ?? new Date().toISOString(),
+    personalCapacitado:  personalCapacitado  ?? [],
+    personalEnProceso:   personalEnProceso   ?? [],
+    personalPendiente:   personalPendiente   ?? [],
+    personalInasistente: personalInasistente ?? [],
+    generatedAt:         generatedAt         ?? new Date().toISOString(),
   };
 }

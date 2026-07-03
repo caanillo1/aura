@@ -48,7 +48,7 @@ export function ProjectTeamSection({ os, pc, sc, onPc, sectionNum }: Props) {
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {rows.map(({ rol, p }, i) => (
-            <View key={i} style={{ flex: 1, minWidth: 160, maxWidth: '48%',
+            <View key={i} wrap={false} style={{ flex: 1, minWidth: 160, maxWidth: '48%',
               flexDirection: 'row', gap: 8,
               alignItems: 'flex-start', padding: '10 12', borderWidth: 0.5, borderColor: N.gray200,
               borderRadius: 8, backgroundColor: N.gray50, overflow: 'hidden',

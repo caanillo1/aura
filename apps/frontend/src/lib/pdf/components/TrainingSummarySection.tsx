@@ -5,9 +5,10 @@ import { N, alpha } from '../design/colors';
 import { SectionTitle } from './SectionTitle';
 
 interface Props {
-  personalCapacitado:  any[];
-  personalEnProceso:   any[];
-  personalPendiente?:  any[];
+  personalCapacitado:   any[];
+  personalEnProceso:    any[];
+  personalPendiente?:   any[];
+  personalInasistente?: any[];
   pc: string;
   onPc: string;
   sectionNum: string;
@@ -47,10 +48,12 @@ function PersonRow({ p, status, color, bg }: {
 }
 
 export function TrainingSummarySection({
-  personalCapacitado, personalEnProceso, personalPendiente, pc, onPc, sectionNum,
+  personalCapacitado, personalEnProceso, personalPendiente, personalInasistente,
+  pc, onPc, sectionNum,
 }: Props) {
-  const pending = personalPendiente ?? [];
-  const total   = personalCapacitado.length + personalEnProceso.length + pending.length;
+  const pending     = personalPendiente   ?? [];
+  const inasistente = personalInasistente ?? [];
+  const total = personalCapacitado.length + personalEnProceso.length + pending.length + inasistente.length;
   if (total === 0) return null;
 
   return (
@@ -60,9 +63,10 @@ export function TrainingSummarySection({
       {/* Stats row */}
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
         {[
-          { label: 'Capacitados', count: personalCapacitado.length,  color: '#065f46', bg: '#d1fae5' },
-          { label: 'En Proceso',  count: personalEnProceso.length,   color: '#1e40af', bg: '#dbeafe' },
-          { label: 'Pendientes',  count: pending.length,             color: '#92400e', bg: '#fef3c7' },
+          { label: 'Capacitados',  count: personalCapacitado.length, color: '#065f46', bg: '#d1fae5' },
+          { label: 'En Proceso',   count: personalEnProceso.length,  color: '#1e40af', bg: '#dbeafe' },
+          { label: 'Pendientes',   count: pending.length,            color: '#92400e', bg: '#fef3c7' },
+          { label: 'Inasistentes', count: inasistente.length,        color: '#991b1b', bg: '#fee2e2' },
         ].map(({ label, count, color, bg }) => (
           <View key={label} style={{ flex: 1, padding: '10 14', borderRadius: 7,
             backgroundColor: bg, borderWidth: 0.5, borderColor: alpha(color, 0.25) }}>
@@ -76,13 +80,16 @@ export function TrainingSummarySection({
       {/* People rows */}
       <View style={{ gap: 5 }}>
         {personalCapacitado.map((p: any) => (
-          <PersonRow key={p.id} p={p} status="Capacitado" color="#065f46" bg="#f0fdf4" />
+          <PersonRow key={p.id} p={p} status="Capacitado"  color="#065f46" bg="#f0fdf4" />
         ))}
         {personalEnProceso.map((p: any) => (
-          <PersonRow key={p.id} p={p} status="En Proceso" color="#1e40af" bg="#eff6ff" />
+          <PersonRow key={p.id} p={p} status="En Proceso"  color="#1e40af" bg="#eff6ff" />
         ))}
         {pending.map((p: any) => (
-          <PersonRow key={p.id} p={p} status="Pendiente" color="#92400e" bg="#fffbeb" />
+          <PersonRow key={p.id} p={p} status="Pendiente"   color="#92400e" bg="#fffbeb" />
+        ))}
+        {inasistente.map((p: any) => (
+          <PersonRow key={p.id} p={p} status="Inasistente" color="#991b1b" bg="#fff5f5" />
         ))}
       </View>
     </View>

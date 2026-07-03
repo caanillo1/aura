@@ -383,15 +383,14 @@ function ActaBody({ acta, pc }: { acta: any; pc: string }) {
     case 'capacitacion':
       return (
         <View>
-          {acta.tema && (
+          {(acta.tema || acta.temasCapacitacion) && (
             <>
-              <SubLabel text="Tema de Capacitacion" />
+              <SubLabel text="Temas de Capacitacion" />
               <Text style={{ fontSize: FS.body, color: N.gray700, lineHeight: LH.relaxed }}>
-                {acta.tema}
+                {acta.tema ?? acta.temasCapacitacion}
               </Text>
             </>
           )}
-          {/* Module/phase checklist-style */}
           {(acta.modulos ?? acta.modules ?? []).length > 0 && (
             <>
               <SubLabel text="Módulos Cubiertos" />
@@ -399,6 +398,7 @@ function ActaBody({ acta, pc }: { acta: any; pc: string }) {
             </>
           )}
           <ParticipantesTable participants={acta.participants ?? acta.participantes ?? []} pc={pc} />
+          <ActaActivitiesTable activities={acta.actividades ?? acta.activities ?? []} pc={pc} />
           {acta.observaciones && (
             <>
               <SubLabel text="Observaciones" />
@@ -407,6 +407,8 @@ function ActaBody({ acta, pc }: { acta: any; pc: string }) {
               </Text>
             </>
           )}
+          <CompromisosTable compromisos={acta.compromisos ?? []} pc={pc} />
+          <AccionesTable    acciones={acta.acciones ?? []}     pc={pc} />
         </View>
       );
 

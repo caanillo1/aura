@@ -45,7 +45,7 @@ export function transformForPdf(raw: any): InformeData {
     observaciones: a.observaciones ?? a.observations ?? null,
     objetivos:     a.objetivos  ?? null,
     alcance:       a.alcance    ?? null,
-    tema:          a.tema       ?? null,
+    tema:          a.tema ?? a.temasCapacitacion ?? null,
     resumen:       a.resumen    ?? null,
     descripcionServicio: a.descripcionServicio ?? null,
 

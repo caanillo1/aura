@@ -399,6 +399,12 @@ export const serviceOrdersApi = {
     api.post(`/service-orders/${id}/analysis-schedule`, body).then((r) => r.data),
   runAnalysisNow: (id: string, body?: { destinatarios?: string[]; asunto?: string }): Promise<any> =>
     api.post(`/service-orders/${id}/analysis-schedule/run-now`, body ?? {}).then((r) => r.data),
+  getCapAnotaciones: (id: string): Promise<any[]> =>
+    api.get(`/service-orders/${id}/cap-anotaciones`).then((r) => r.data),
+  addCapAnotacion: (id: string, body: { staffId: string; tipo: string; texto?: string }): Promise<any> =>
+    api.post(`/service-orders/${id}/cap-anotaciones`, body).then((r) => r.data),
+  deleteCapAnotacion: (id: string, anotacionId: string): Promise<any> =>
+    api.delete(`/service-orders/${id}/cap-anotaciones/${anotacionId}`).then((r) => r.data),
 };
 
 // ── Templates ─────────────────────────────────────────────────────────────────

@@ -2818,4 +2818,64 @@ OS data: ${context}`;
       throw new InternalServerErrorException(`Error en chat IA: ${String(e?.message ?? 'error desconocido')}`);
     }
   }
+
+  // ── Capacitación: anotaciones por persona ────────────────────────────────
+
+  async getCapAnotaciones(companyId: string, osId: string) {
+    const rows = await this.prisma.$queryRaw<any[]>`
+      SELECT ca.id, ca.clientStaffId, ca.tipo, ca.texto, ca.createdAt,
+             u.firstName + ' ' + u.lastName AS creadoPorNombre
+      FROM CapAnotaciones ca
+      INNER JOIN OrdenesServicio os ON os.id = ca.serviceOrderId
+      INNER JOIN Usuarios u ON u.id = ca.createdById
+      WHERE ca.serviceOrderId = ${osId} AND os.companyId = ${companyId}
+      ORDER BY ca.createdAt ASC
+    `;
+    return rows;
+  }
+
+  async addCapAnotacion(
+    companyId: string,
+    osId: string,
+    staffId: string,
+    tipo: string,
+    texto: string,
+    userId: string,
+  ) {
+    // Verify OS belongs to company
+    const os = await this.prisma.$queryRaw<any[]>`
+      SELECT id FROM OrdenesServicio WHERE id = ${osId} AND companyId = ${companyId}
+    `;
+    if (!os.length) throw new NotFoundException('Orden de servicio no encontrada');
+
+    // If tipo='inasistencia', only allow one per person per OS
+    if (tipo === 'inasistencia') {
+      const existing = await this.prisma.$queryRaw<any[]>`
+        SELECT id FROM CapAnotaciones WHERE serviceOrderId = ${osId} AND clientStaffId = ${staffId} AND tipo = 'inasistencia'
+      `;
+      if (existing.length) {
+        // Toggle: delete existing and return null
+        await this.prisma.$executeRaw`DELETE FROM CapAnotaciones WHERE id = ${existing[0].id}`;
+        return { deleted: true };
+      }
+    }
+
+    const newId = require('crypto').randomUUID();
+    await this.prisma.$executeRaw`
+      INSERT INTO CapAnotaciones (id, serviceOrderId, clientStaffId, tipo, texto, createdById, createdAt)
+      VALUES (${newId}, ${osId}, ${staffId}, ${tipo}, ${texto ?? null}, ${userId}, GETDATE())
+    `;
+    return { id: newId, clientStaffId: staffId, tipo, texto };
+  }
+
+  async deleteCapAnotacion(companyId: string, osId: string, anotacionId: string) {
+    const rows = await this.prisma.$queryRaw<any[]>`
+      SELECT ca.id FROM CapAnotaciones ca
+      INNER JOIN OrdenesServicio os ON os.id = ca.serviceOrderId
+      WHERE ca.id = ${anotacionId} AND ca.serviceOrderId = ${osId} AND os.companyId = ${companyId}
+    `;
+    if (!rows.length) throw new NotFoundException('Anotación no encontrada');
+    await this.prisma.$executeRaw`DELETE FROM CapAnotaciones WHERE id = ${anotacionId}`;
+    return { deleted: true };
+  }
 }

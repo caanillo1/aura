@@ -21,7 +21,7 @@ type ActaType = 'inicio' | 'visita' | 'cierre' | 'capacitacion' | 'entrega_sopor
 interface Firmante  { id?: string; nombre: string; cargo: string; empresa: string; email?: string; telefono?: string; documento?: string; fecha: string; orden: number; signatureData?: string; signedAt?: string; signerType?: string; }
 interface FechaV    { fecha: string; horaInicio: string; horaFin: string; }
 interface Compromiso{ numero: number; compromiso: string; responsable: string; estado: string; assignedToId?: string; clientStaffId?: string; moduleId?: string; phaseId?: string; activityId?: string; fechaLimite?: string; diasVigencia?: number; responsablePrincipal?: string; }
-interface Participante { id?: string; numero: number; nombre: string; cargo?: string; documento?: string; email?: string; asistio?: boolean; }
+interface Participante { numero: number; nombre: string; cargo?: string; documento?: string; email?: string; }
 interface Accion    { accion: string; responsable: string; fechaLimite: string; }
 interface Contacto  { nombre: string; telefono: string; area: string; }
 interface CheckItem { label: string; checked: boolean; obs: string; medio?: string; }
@@ -1575,8 +1575,8 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
   const [horaFin, setHoraFin]             = useState(acta?.horaFin ?? '');
   const [participantes, setParticipantes] = useState<Participante[]>(
     acta?.participantes?.map((p: any) => ({
-      id: p.id, numero: p.numero ?? 1, nombre: p.nombre, cargo: p.cargo ?? '',
-      documento: p.documento ?? '', email: p.email ?? '', asistio: p.asistio !== false,
+      numero: p.numero ?? 1, nombre: p.nombre, cargo: p.cargo ?? '',
+      documento: p.documento ?? '', email: p.email ?? '',
     })) ?? []
   );
   const [acciones, setAcciones]           = useState<Accion[]>(
@@ -2070,14 +2070,14 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                   <table className="w-full text-xs">
                     <thead>
                       <tr style={{ background: 'var(--surface-2)' }}>
-                        {['Nombre', 'Cargo', 'Documento', 'Correo', 'Asistió', ''].map(h => (
+                        {['Nombre', 'Cargo', 'Documento', 'Correo', ''].map(h => (
                           <th key={h} className="px-2 py-2 text-left font-medium" style={{ color: tc.m }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {participantes.map((p, i) => (
-                        <tr key={i} className="border-t" style={{ borderColor: 'var(--border-subtle)', opacity: p.asistio === false ? 0.55 : 1 }}>
+                        <tr key={i} className="border-t" style={{ borderColor: 'var(--border-subtle)' }}>
                           {(['nombre', 'cargo', 'documento', 'email'] as const).map(k => (
                             <td key={k} className="px-2 py-1">
                               <input
@@ -2090,27 +2090,6 @@ function ActaModal({ mode, defaultType, acta, projectId, projectModules, municip
                               />
                             </td>
                           ))}
-                          <td className="px-2 py-1 text-center">
-                            {p.id ? (
-                              <button
-                                type="button"
-                                title={p.asistio === false ? 'Marcar como asistió' : 'Marcar como inasistido'}
-                                onClick={async () => {
-                                  try {
-                                    const res = await actasApi.toggleAsistencia(p.id!);
-                                    setParticipantes(prev => prev.map((r, j) => j === i ? { ...r, asistio: res.asistio } : r));
-                                  } catch { toast.error('Error al actualizar asistencia'); }
-                                }}
-                                className="px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors"
-                                style={p.asistio === false
-                                  ? { background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }
-                                  : { background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
-                                {p.asistio === false ? 'Inasistió' : 'Asistió'}
-                              </button>
-                            ) : (
-                              <span className="text-[10px]" style={{ color: tc.m }}>—</span>
-                            )}
-                          </td>
                           <td className="px-2 py-1">
                             <button type="button"
                               onClick={() => setParticipantes(prev => prev.filter((_, j) => j !== i))}

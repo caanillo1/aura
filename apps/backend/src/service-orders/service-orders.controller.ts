@@ -338,4 +338,35 @@ export class ServiceOrdersController {
   delete(@GetUser() user: JwtUser, @Param('id') id: string) {
     return this.svc.delete(user.companyId, id);
   }
+
+  // ── Capacitación: anotaciones ─────────────────────────────────────────────
+
+  @Get(':id/cap-anotaciones')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Obtener anotaciones de capacitación por OS' })
+  getCapAnotaciones(@GetUser() user: JwtUser, @Param('id') id: string) {
+    return this.svc.getCapAnotaciones(user.companyId, id);
+  }
+
+  @Post(':id/cap-anotaciones')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Agregar anotación de capacitación a un participante' })
+  addCapAnotacion(
+    @GetUser() user: JwtUser,
+    @Param('id') id: string,
+    @Body() body: { staffId: string; tipo: string; texto?: string },
+  ) {
+    return this.svc.addCapAnotacion(user.companyId, id, body.staffId, body.tipo, body.texto ?? '', user.id);
+  }
+
+  @Delete(':id/cap-anotaciones/:anotacionId')
+  @Roles(...ALL_ROLES)
+  @ApiOperation({ summary: 'Eliminar anotación de capacitación' })
+  deleteCapAnotacion(
+    @GetUser() user: JwtUser,
+    @Param('id') id: string,
+    @Param('anotacionId') anotacionId: string,
+  ) {
+    return this.svc.deleteCapAnotacion(user.companyId, id, anotacionId);
+  }
 }

@@ -287,11 +287,16 @@ export default function OrdenDetailPage() {
   const [noteNotifyClient, setNoteNotifyClient] = useState(false);
 
   // Tab capacitaciones
-  const [capStaff,    setCapStaff]    = useState<ClientStaff[]>([]);
-  const [capActas,    setCapActas]    = useState<any[]>([]);
-  const [capLoading,  setCapLoading]  = useState(false);
-  const [capSubTab,   setCapSubTab]   = useState<'pendiente' | 'en_proceso' | 'capacitados'>('pendiente');
-  const [capLoaded,   setCapLoaded]   = useState(false);
+  const [capStaff,        setCapStaff]        = useState<ClientStaff[]>([]);
+  const [capActas,        setCapActas]        = useState<any[]>([]);
+  const [capAnotaciones,  setCapAnotaciones]  = useState<any[]>([]);
+  const [capLoading,      setCapLoading]      = useState(false);
+  const [capSubTab,       setCapSubTab]       = useState<'pendiente' | 'en_proceso' | 'capacitados'>('pendiente');
+  const [capLoaded,       setCapLoaded]       = useState(false);
+  // Anotación nueva por staff
+  const [capNotaStaffId,  setCapNotaStaffId]  = useState<string | null>(null);
+  const [capNotaTexto,    setCapNotaTexto]    = useState('');
+  const [capNotaSaving,   setCapNotaSaving]   = useState(false);
 
   // Modal generar proyecto (wizard 2 pasos)
   const [projModal, setProjModal]       = useState(false);
@@ -492,14 +497,16 @@ export default function OrdenDetailPage() {
     if (!os) return;
     setCapLoading(true);
     try {
-      const [staffRes, actasRes] = await Promise.all([
+      const [staffRes, actasRes, anotRes] = await Promise.all([
         clientsApi.getStaff(os.client.id),
         os.project?.id ? actasApi.list(os.project.id) : Promise.resolve([]),
+        serviceOrdersApi.getCapAnotaciones(id),
       ]);
       const staff = Array.isArray(staffRes) ? staffRes : (staffRes as any).data ?? [];
       const actas = (Array.isArray(actasRes) ? actasRes : []).filter((a: any) => a.type === 'capacitacion');
       setCapStaff(staff);
       setCapActas(actas);
+      setCapAnotaciones(Array.isArray(anotRes) ? anotRes : []);
       setCapLoaded(true);
     } catch { toast.error('Error al cargar capacitaciones'); }
     finally { setCapLoading(false); }
@@ -1338,10 +1345,47 @@ export default function OrdenDetailPage() {
                 s => !allParticipantDocs.has(s.document) && !signedDocs.has(s.document)
               );
 
+              // Inasistentes: staff con anotación tipo 'inasistencia'
+              const inasistentesCount = capStaff.filter(s =>
+                capAnotaciones.some(a => a.clientStaffId === s.id && a.tipo === 'inasistencia')
+              ).length;
+
               const displayList =
                 capSubTab === 'capacitados' ? capacitados :
                 capSubTab === 'en_proceso'  ? enProceso   :
                 pendientes;
+
+              const toggleInasistente = async (staffId: string) => {
+                try {
+                  const res = await serviceOrdersApi.addCapAnotacion(id, { staffId, tipo: 'inasistencia' });
+                  if (res?.deleted) {
+                    setCapAnotaciones(prev => prev.filter(a => !(a.clientStaffId === staffId && a.tipo === 'inasistencia')));
+                  } else if (res?.id) {
+                    setCapAnotaciones(prev => [...prev, { ...res, creadoPorNombre: '' }]);
+                  }
+                } catch { toast.error('Error al actualizar inasistencia'); }
+              };
+
+              const addNota = async (staffId: string) => {
+                if (!capNotaTexto.trim()) return;
+                setCapNotaSaving(true);
+                try {
+                  const res = await serviceOrdersApi.addCapAnotacion(id, { staffId, tipo: 'nota', texto: capNotaTexto.trim() });
+                  if (res?.id) {
+                    setCapAnotaciones(prev => [...prev, { ...res, createdAt: new Date().toISOString(), creadoPorNombre: '' }]);
+                  }
+                  setCapNotaTexto('');
+                  setCapNotaStaffId(null);
+                } catch { toast.error('Error al guardar la anotación'); }
+                finally { setCapNotaSaving(false); }
+              };
+
+              const deleteNota = async (anotacionId: string) => {
+                try {
+                  await serviceOrdersApi.deleteCapAnotacion(id, anotacionId);
+                  setCapAnotaciones(prev => prev.filter(a => a.id !== anotacionId));
+                } catch { toast.error('Error al eliminar la anotación'); }
+              };
 
               const StaffRow = ({ s }: { s: ClientStaff }) => {
                 const actasList = docToActas.get(s.document) ?? [];
@@ -1354,12 +1398,17 @@ export default function OrdenDetailPage() {
                 const avatarColor =
                   capSubTab === 'capacitados' ? '#34d399' :
                   capSubTab === 'en_proceso'  ? '#60a5fa' : '#fbbf24';
+
+                const esInasistente = capAnotaciones.some(a => a.clientStaffId === s.id && a.tipo === 'inasistencia');
+                const notas = capAnotaciones.filter(a => a.clientStaffId === s.id && a.tipo === 'nota');
+                const mostrandoNota = capNotaStaffId === s.id;
+
                 return (
                   <div className="p-4 rounded-xl" style={glass(0.6)}>
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-sm"
-                          style={{ background: avatarBg, color: avatarColor }}>
+                          style={{ background: esInasistente ? 'rgba(239,68,68,0.15)' : avatarBg, color: esInasistente ? '#ef4444' : avatarColor }}>
                           {s.firstName[0]}{s.lastName[0]}
                         </div>
                         <div>
@@ -1369,22 +1418,48 @@ export default function OrdenDetailPage() {
                           <p className="text-xs" style={{ color: tc.m }}>{s.jobTitle || '—'}</p>
                         </div>
                       </div>
-                      {capSubTab === 'capacitados' ? (
-                        <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
-                          style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
-                          <CheckCircle2 className="w-3 h-3" /> Capacitado
-                        </span>
-                      ) : capSubTab === 'en_proceso' ? (
-                        <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
-                          style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
-                          <GraduationCap className="w-3 h-3" /> En proceso
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
-                          style={{ background: 'rgba(251,191,36,0.10)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}>
-                          <AlertCircle className="w-3 h-3" /> Pendiente
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Badge estado */}
+                        {esInasistente ? (
+                          <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+                            style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+                            <X className="w-3 h-3" /> Inasistente
+                          </span>
+                        ) : capSubTab === 'capacitados' ? (
+                          <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+                            style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
+                            <CheckCircle2 className="w-3 h-3" /> Capacitado
+                          </span>
+                        ) : capSubTab === 'en_proceso' ? (
+                          <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+                            style={{ background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>
+                            <GraduationCap className="w-3 h-3" /> En proceso
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full"
+                            style={{ background: 'rgba(251,191,36,0.10)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}>
+                            <AlertCircle className="w-3 h-3" /> Pendiente
+                          </span>
+                        )}
+                        {/* Toggle inasistente */}
+                        <button
+                          onClick={() => toggleInasistente(s.id)}
+                          title={esInasistente ? 'Quitar marca de inasistente' : 'Marcar como inasistente'}
+                          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors"
+                          style={esInasistente
+                            ? { background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }
+                            : { background: 'rgba(255,255,255,0.06)', color: tc.m, border: '1px solid rgba(255,255,255,0.10)' }}>
+                          {esInasistente ? <ToggleRight className="w-3 h-3" /> : <ToggleLeft className="w-3 h-3" />}
+                          {esInasistente ? 'Inasistente' : 'Marcar inasistente'}
+                        </button>
+                        {/* Botón agregar nota */}
+                        <button
+                          onClick={() => { setCapNotaStaffId(mostrandoNota ? null : s.id); setCapNotaTexto(''); }}
+                          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors"
+                          style={{ background: 'rgba(255,255,255,0.06)', color: tc.m, border: '1px solid rgba(255,255,255,0.10)' }}>
+                          <Plus className="w-3 h-3" /> Nota
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
@@ -1431,6 +1506,44 @@ export default function OrdenDetailPage() {
                         ))}
                       </div>
                     )}
+
+                    {/* Anotaciones existentes */}
+                    {notas.length > 0 && (
+                      <div className="mt-3 space-y-1.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: tc.m }}>Anotaciones</p>
+                        {notas.map((nota: any) => (
+                          <div key={nota.id} className="flex items-start gap-2 rounded-lg px-3 py-2"
+                            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <MessageSquare className="w-3 h-3 mt-0.5 shrink-0" style={{ color: '#60a5fa' }} />
+                            <p className="flex-1 text-xs" style={{ color: tc.s }}>{nota.texto}</p>
+                            <button onClick={() => deleteNota(nota.id)} className="shrink-0 text-red-400 hover:text-red-300 transition-colors">
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Formulario nueva nota */}
+                    {mostrandoNota && (
+                      <div className="mt-3 flex gap-2 items-end">
+                        <textarea
+                          value={capNotaTexto}
+                          onChange={e => setCapNotaTexto(e.target.value)}
+                          placeholder="Escribe una anotación..."
+                          rows={2}
+                          className="flex-1 rounded-lg px-3 py-2 text-xs resize-none outline-none"
+                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: tc.s }}
+                        />
+                        <button
+                          onClick={() => addNota(s.id)}
+                          disabled={capNotaSaving || !capNotaTexto.trim()}
+                          className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold btn-primary text-white disabled:opacity-50">
+                          {capNotaSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                          Guardar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               };
@@ -1438,12 +1551,13 @@ export default function OrdenDetailPage() {
               return (
                 <>
                   {/* Resumen */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     {[
-                      { label: 'Actas de capacitación', value: capActas.length,    color: '#60a5fa', bg: 'rgba(96,165,250,0.10)'  },
-                      { label: 'Personal del cliente',  value: capStaff.length,    color: '#a78bfa', bg: 'rgba(167,139,250,0.10)' },
-                      { label: 'Capacitados',           value: capacitados.length, color: '#34d399', bg: 'rgba(52,211,153,0.10)'  },
-                      { label: 'En proceso',            value: enProceso.length,   color: '#60a5fa', bg: 'rgba(96,165,250,0.10)'  },
+                      { label: 'Actas de capacitación', value: capActas.length,      color: '#60a5fa', bg: 'rgba(96,165,250,0.10)'  },
+                      { label: 'Personal del cliente',  value: capStaff.length,      color: '#a78bfa', bg: 'rgba(167,139,250,0.10)' },
+                      { label: 'Capacitados',           value: capacitados.length,   color: '#34d399', bg: 'rgba(52,211,153,0.10)'  },
+                      { label: 'En proceso',            value: enProceso.length,     color: '#60a5fa', bg: 'rgba(96,165,250,0.10)'  },
+                      { label: 'Inasistentes',          value: inasistentesCount,    color: '#ef4444', bg: 'rgba(239,68,68,0.10)'   },
                     ].map(({ label, value, color, bg }) => (
                       <div key={label} className="rounded-xl p-4" style={{ background: bg, border: `1px solid ${color}30` }}>
                         <p className="text-2xl font-bold" style={{ color }}>{value}</p>

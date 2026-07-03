@@ -148,6 +148,7 @@ model User {
   role                   Role                      @relation(fields: [roleId], references: [id], onUpdate: NoAction)
   visitsCreated          Visit[]                   @relation("VisitCreatedBy")
   faqsCreados            Faq[]                     @relation("FaqAutor")
+  capAnotacionesCreadas  CapAnotacion[]            @relation("CapAnotacionCreatedBy")
 
   @@map("Usuarios")
 }
@@ -222,6 +223,7 @@ model ClientStaff {
   serviceOrdersLed      ServiceOrder[]        @relation("SOClientLeader")
   trainingParticipants  TrainingParticipant[] @relation("ParticipantStaff")
   client                Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  capAnotaciones        CapAnotacion[]
 
   @@map("PersonalCliente")
 }
@@ -368,6 +370,7 @@ model ServiceOrder {
   financialLeader   User?                     @relation("SOFinancialLeader", fields: [financialLeaderId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   project           Project?
   requerimientos    Requerimiento[]
+  capAnotaciones    CapAnotacion[]
 
   @@unique([companyId, osNumber])
   @@map("OrdenesServicio")
@@ -1273,4 +1276,19 @@ model InformeEjecutivoSnapshot {
 
   @@index([companyId])
   @@map("InformesEjecutivosSnapshots")
+}
+
+model CapAnotacion {
+  id             String       @id @default(uuid()) @db.UniqueIdentifier
+  serviceOrderId String       @db.UniqueIdentifier
+  clientStaffId  String       @db.UniqueIdentifier
+  tipo           String       @default("nota") @db.NVarChar(20)
+  texto          String?      @db.NVarChar(Max)
+  createdById    String       @db.UniqueIdentifier
+  createdAt      DateTime     @default(now())
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  clientStaff    ClientStaff  @relation(fields: [clientStaffId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  createdBy      User         @relation("CapAnotacionCreatedBy", fields: [createdById], references: [id], onUpdate: NoAction)
+
+  @@map("CapAnotaciones")
 }

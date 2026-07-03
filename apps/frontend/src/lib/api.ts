@@ -562,6 +562,8 @@ export const projectsApi = {
     api.delete(`/projects/modules/${moduleId}`).then((r) => r.data),
   deleteProject: (id: string) =>
     api.delete(`/projects/${id}`).then((r) => r.data),
+  recalcProgress: (id: string) =>
+    api.post(`/projects/${id}/recalc-progress`).then((r) => r.data) as Promise<{ message: string }>,
 };
 
 // ── Actas ─────────────────────────────────────────────────────────────────────

@@ -198,6 +198,13 @@ export class ProjectsController {
   ) {
     return this.svc.bulkUpdateActivities(user.companyId, user.id, body.items);
   }
+
+  @Post(':id/recalc-progress')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Forzar recálculo de progreso desde las actividades hacia arriba' })
+  recalcProgress(@GetUser() user: JwtUser, @Param('id') id: string) {
+    return this.svc.recalcAll(user.companyId, id);
+  }
 }
 
 // Endpoint anidado en service-orders para generar proyecto

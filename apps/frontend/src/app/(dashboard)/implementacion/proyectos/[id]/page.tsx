@@ -1017,6 +1017,7 @@ export default function ProjectDetailPage() {
 
   const [project, setProject]   = useState<Project | null>(null);
   const [loading, setLoading]   = useState(true);
+  const [recalcing, setRecalcing] = useState(false);
   const [activeModIdx, setActiveModIdx] = useState(0);
   const [filterStatus, setFilterStatus] = useState<ActivityStatus | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
@@ -1455,7 +1456,25 @@ export default function ProjectDetailPage() {
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            <button onClick={load} title="Refrescar" className="p-2 rounded-xl" style={{ color: tc.m }}>
+            {can('projects.editar') && (
+              <button
+                onClick={async () => {
+                  setRecalcing(true);
+                  try {
+                    await projectsApi.recalcProgress(project.id);
+                    await load();
+                    toast.success('Progreso recalculado');
+                  } catch { toast.error('Error al recalcular'); }
+                  finally { setRecalcing(false); }
+                }}
+                title="Recalcular progreso desde actividades"
+                disabled={recalcing}
+                className="p-2 rounded-xl transition-colors disabled:opacity-40"
+                style={{ background: 'rgba(99,102,241,0.10)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.20)' }}>
+                <RefreshCw className={`w-4 h-4 ${recalcing ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+            <button onClick={load} title="Refrescar datos" className="p-2 rounded-xl" style={{ color: tc.m }}>
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>

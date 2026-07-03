@@ -404,6 +404,7 @@ export class ProjectsService {
         clientStaff: { select: { id: true, firstName: true, lastName: true } },
       },
     });
+    await this.recalcPhase(phaseId);
     return activity;
   }
 
@@ -727,6 +728,20 @@ export class ProjectsService {
       ? mods.reduce((s, m) => s + Number(m.progressPercent), 0) / mods.length
       : 0;
     await this.prisma.project.update({ where: { id: projectId }, data: { progressPercent: avg } });
+  }
+
+  async recalcAll(companyId: string, projectId: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, serviceOrder: { companyId } },
+      select: { id: true, modules: { select: { id: true, phases: { select: { id: true } } } } },
+    });
+    if (!project) throw new NotFoundException('Proyecto no encontrado');
+    for (const mod of project.modules) {
+      for (const phase of mod.phases) {
+        await this.recalcPhase(phase.id);
+      }
+    }
+    return { message: 'Progreso recalculado correctamente' };
   }
 
   // ── Generar proyecto ──────────────────────────────────────────────────────

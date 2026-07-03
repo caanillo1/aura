@@ -48,13 +48,8 @@ interface ActivitySummary {
 }
 
 interface CapacitacionSummary {
-  sesiones: {
-    total: number; programadas: number; completadas: number;
-    proxima: { titulo: string; fecha: string } | null;
-  };
-  participantes: {
-    total: number; capacitados: number; confirmados: number; pendientes: number; cancelados: number;
-  };
+  actas: { total: number; firmadas: number; borrador: number };
+  participantes: { total: number; capacitados: number; enProceso: number; comprendieron: number };
 }
 
 interface Recommendation {
@@ -1070,84 +1065,70 @@ export default function AnalisisPage() {
             )}
 
             {/* ── 5. Capacitación ───────────────────────────────────────── */}
-            {cap && (cap.sesiones.total > 0 || cap.participantes.total > 0) && (
+            {cap && cap.actas.total > 0 && (
               <div>
                 <SectionTitle icon={GraduationCap} title="Capacitación" />
                 <div className="rounded-2xl p-4 space-y-4"
                   style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}>
 
-                  {/* Sesiones */}
+                  {/* Actas */}
                   <div>
                     <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
-                      Sesiones
+                      Actas de capacitación
                     </p>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="rounded-xl p-3 text-center"
                         style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
-                        <p className="text-2xl font-extrabold" style={{ color: '#6366f1' }}>{cap.sesiones.total}</p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Total</p>
+                        <p className="text-2xl font-extrabold" style={{ color: '#6366f1' }}>{cap.actas.total}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Total actas</p>
                       </div>
                       <div className="rounded-xl p-3 text-center"
                         style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
-                        <p className="text-2xl font-extrabold" style={{ color: '#10b981' }}>{cap.sesiones.completadas}</p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Completadas</p>
+                        <p className="text-2xl font-extrabold" style={{ color: '#10b981' }}>{cap.actas.firmadas}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Firmadas</p>
                       </div>
                       <div className="rounded-xl p-3 text-center"
                         style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
-                        <p className="text-2xl font-extrabold" style={{ color: '#f59e0b' }}>{cap.sesiones.programadas}</p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Programadas</p>
+                        <p className="text-2xl font-extrabold" style={{ color: '#f59e0b' }}>{cap.actas.borrador}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>En borrador</p>
                       </div>
                     </div>
-                    {cap.sesiones.proxima && (
-                      <div className="mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-xs"
-                        style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', color: '#6366f1' }}>
-                        <CalendarClock className="w-3.5 h-3.5 shrink-0" />
-                        <span>
-                          <strong>Próxima:</strong> {cap.sesiones.proxima.titulo} —{' '}
-                          {dayjs(cap.sesiones.proxima.fecha).locale('es').format('DD/MM/YYYY HH:mm')}
-                        </span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Participantes */}
                   {cap.participantes.total > 0 && (
                     <div>
                       <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
-                        Participantes ({cap.participantes.total} total)
+                        Personas registradas en actas — {cap.participantes.total} total
                       </p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-3 gap-3">
                         <div className="rounded-xl p-3 flex flex-col items-center gap-1"
                           style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
                           <UserCheck className="w-4 h-4" style={{ color: '#10b981' }} />
                           <p className="text-2xl font-extrabold" style={{ color: '#10b981' }}>{cap.participantes.capacitados}</p>
                           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Capacitados</p>
+                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>(acta firmada)</p>
                         </div>
                         <div className="rounded-xl p-3 flex flex-col items-center gap-1"
-                          style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
-                          <Users className="w-4 h-4" style={{ color: '#60a5fa' }} />
-                          <p className="text-2xl font-extrabold" style={{ color: '#60a5fa' }}>{cap.participantes.confirmados}</p>
-                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Confirmados</p>
+                          style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                          <Users className="w-4 h-4" style={{ color: '#f59e0b' }} />
+                          <p className="text-2xl font-extrabold" style={{ color: '#f59e0b' }}>{cap.participantes.enProceso}</p>
+                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>En proceso</p>
+                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>(acta borrador)</p>
                         </div>
                         <div className="rounded-xl p-3 flex flex-col items-center gap-1"
-                          style={{ background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.15)' }}>
-                          <UserMinus className="w-4 h-4" style={{ color: '#94a3b8' }} />
-                          <p className="text-2xl font-extrabold" style={{ color: '#94a3b8' }}>{cap.participantes.pendientes}</p>
-                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Pendientes</p>
-                        </div>
-                        <div className="rounded-xl p-3 flex flex-col items-center gap-1"
-                          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                          <UserX className="w-4 h-4" style={{ color: '#ef4444' }} />
-                          <p className="text-2xl font-extrabold" style={{ color: '#ef4444' }}>{cap.participantes.cancelados}</p>
-                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Cancelaron</p>
+                          style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                          <CheckCheck className="w-4 h-4" style={{ color: '#6366f1' }} />
+                          <p className="text-2xl font-extrabold" style={{ color: '#6366f1' }}>{cap.participantes.comprendieron}</p>
+                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Comprendieron</p>
+                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>(marcaron ✓)</p>
                         </div>
                       </div>
 
-                      {/* Barra de progreso de capacitación */}
                       {cap.participantes.total > 0 && (
                         <div className="mt-3">
                           <div className="flex justify-between mb-1">
-                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Avance de capacitación</span>
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Personas con acta firmada</span>
                             <span className="text-xs font-bold" style={{ color: '#10b981' }}>
                               {Math.round((cap.participantes.capacitados / cap.participantes.total) * 100)}%
                             </span>

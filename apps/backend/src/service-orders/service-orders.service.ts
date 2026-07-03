@@ -750,18 +750,23 @@ export class ServiceOrdersService {
         orderBy: [{ prioridad: 'asc' }, { estadoActual: 'asc' }],
       }),
       this.prisma.$queryRaw<Array<{
-        id: string; titulo: string; fecha: Date; estado: string;
-        respuesta: string; entroSalaAt: Date | null;
+        actaId: string; actaStatus: string; fecha: Date; moduloId: string | null;
+        nombre: string | null; documento: string | null; comprendio: boolean | null;
       }>>`
         SELECT
-          sc.id, sc.titulo, sc.fecha, sc.estado,
-          COALESCE(si.respuesta, 'pendiente') AS respuesta,
-          si.entroSalaAt
-        FROM SesionesCapacitacion sc
-        LEFT JOIN SesionesInvitados si ON si.sesionId = sc.id
-        INNER JOIN Proyectos p ON p.id = sc.projectId
+          a.id      AS actaId,
+          a.status  AS actaStatus,
+          a.fecha,
+          a.moduloId,
+          ap.nombre,
+          ap.documento,
+          ap.comprendio
+        FROM Actas a
+        INNER JOIN Proyectos p ON p.id = a.projectId
+        LEFT JOIN ActaParticipantes ap ON ap.actaId = a.id
         WHERE p.serviceOrderId = ${osId}
-        ORDER BY sc.fecha ASC
+          AND a.type = 'capacitacion'
+        ORDER BY a.fecha DESC
       `,
     ]);
 
@@ -1060,44 +1065,30 @@ export class ServiceOrdersService {
       },
     };
 
-    // ── Resumen de capacitación ───────────────────────────────────────────────
-    // sesionesRaw: one row per invitado (LEFT JOIN → sesiones sin invitados tienen respuesta='pendiente')
-    const sesionIds   = [...new Set(sesionesRaw.map(r => r.id))];
-    const sesionMeta  = sesionIds.map(id => sesionesRaw.find(r => r.id === id)!);
-    const totalSesiones       = sesionIds.length;
-    const sesionesCompletadas = sesionMeta.filter(s => s.estado === 'completada').length;
-    const sesionesProgramadas = sesionMeta.filter(s => s.estado === 'programada').length;
-    const proximaSesion       = sesionMeta.find(s => s.estado === 'programada' && new Date(s.fecha) >= today);
+    // ── Resumen de capacitación (desde actas type='capacitacion') ────────────
+    // actasCapRows: una fila por participante × acta (LEFT JOIN → actas sin participantes tienen nombre=null)
+    const actaIds         = [...new Set(sesionesRaw.map(r => r.actaId))];
+    const totalActas      = actaIds.length;
+    const actasFirmadas   = [...new Set(sesionesRaw.filter(r => r.actaStatus === 'firmado').map(r => r.actaId))].length;
+    const actasBorrador   = [...new Set(sesionesRaw.filter(r => r.actaStatus === 'borrador').map(r => r.actaId))].length;
 
-    // Filas que corresponden a invitados reales (excluye el LEFT JOIN vacío)
-    const invitadoRows = sesionesRaw.filter(r => {
-      // Una fila sin respuesta real proviene de sesiones sin invitados (respuesta defaults a 'pendiente' via COALESCE)
-      // Para distinguirlas de invitados reales pendientes usamos entroSalaAt == null Y el COUNT
-      return true; // todas las filas cuentan: si la sesión no tiene invitados el LEFT JOIN produce 1 fila con respuesta=pendiente
-    });
-
-    // Detectar si la sesión tiene 0 invitados vs tiene invitados pendientes:
-    // Una sesión sin invitados generará una sola fila con entroSalaAt=null y respuesta='pendiente'
-    // No hay forma de distinguirlos sin un subquery, así que contamos directamente desde las filas
-    const capacitados  = sesionesRaw.filter(r => r.entroSalaAt !== null).length;
-    const confirmados  = sesionesRaw.filter(r => r.respuesta === 'confirmado' && r.entroSalaAt === null).length;
-    const pendientes   = sesionesRaw.filter(r => r.respuesta === 'pendiente' && r.entroSalaAt === null).length;
-    const cancelados   = sesionesRaw.filter(r => r.respuesta === 'cancelado').length;
-    const totalPart    = capacitados + confirmados + pendientes + cancelados;
+    // Solo filas con participante real (nombre no nulo = LEFT JOIN produjo resultado)
+    const partRows        = sesionesRaw.filter(r => r.nombre !== null);
+    const capacitados     = partRows.filter(r => r.actaStatus === 'firmado').length;
+    const enProceso       = partRows.filter(r => r.actaStatus === 'borrador').length;
+    const comprendieron   = partRows.filter(r => r.comprendio === true).length;
 
     const capacitacionSummary = {
-      sesiones: {
-        total:       totalSesiones,
-        programadas: sesionesProgramadas,
-        completadas: sesionesCompletadas,
-        proxima:     proximaSesion ? { titulo: proximaSesion.titulo, fecha: proximaSesion.fecha } : null,
+      actas: {
+        total:    totalActas,
+        firmadas: actasFirmadas,
+        borrador: actasBorrador,
       },
       participantes: {
-        total:      totalPart,
-        capacitados,
-        confirmados,
-        pendientes,
-        cancelados,
+        total:        partRows.length,
+        capacitados,  // en actas firmadas
+        enProceso,    // en actas borrador
+        comprendieron,
       },
     };
 

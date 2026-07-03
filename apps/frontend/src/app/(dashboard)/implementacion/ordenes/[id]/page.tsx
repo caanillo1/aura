@@ -8,7 +8,7 @@ import {
   Clock, Users, Info, FolderKanban, Send, Plus, X, Layers, Pencil, Check, Star,
   GraduationCap, CheckCircle2, AlertCircle, Loader2, FolderOpen, BarChart3, MessageSquare,
   Lock, Globe, Target, ShieldAlert, Mail, CalendarClock, RefreshCw, ToggleLeft, ToggleRight,
-  FileText, Trash2, ChevronDown, ClipboardList,
+  FileText, Trash2, ChevronDown, ClipboardList, UserX,
 } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import { DocumentosSection } from '@/components/ui/DocumentosSection';
@@ -297,6 +297,9 @@ export default function OrdenDetailPage() {
   const [capNotaStaffId,  setCapNotaStaffId]  = useState<string | null>(null);
   const [capNotaTexto,    setCapNotaTexto]    = useState('');
   const [capNotaSaving,   setCapNotaSaving]   = useState(false);
+  // Selección múltiple
+  const [capSelected,     setCapSelected]     = useState<Set<string>>(new Set());
+  const [capBulkSaving,   setCapBulkSaving]   = useState(false);
 
   // Modal generar proyecto (wizard 2 pasos)
   const [projModal, setProjModal]       = useState(false);
@@ -1387,6 +1390,59 @@ export default function OrdenDetailPage() {
                 } catch { toast.error('Error al eliminar la anotación'); }
               };
 
+              const toggleSelect = (staffId: string) =>
+                setCapSelected(prev => {
+                  const next = new Set(prev);
+                  if (next.has(staffId)) next.delete(staffId); else next.add(staffId);
+                  return next;
+                });
+
+              const allSelected = displayList.length > 0 && displayList.every(s => capSelected.has(s.id));
+              const someSelected = displayList.some(s => capSelected.has(s.id));
+
+              const toggleSelectAll = () =>
+                setCapSelected(prev => {
+                  const next = new Set(prev);
+                  if (allSelected) displayList.forEach(s => next.delete(s.id));
+                  else displayList.forEach(s => next.add(s.id));
+                  return next;
+                });
+
+              const bulkMarcarInasistente = async () => {
+                const toMark = [...capSelected].filter(
+                  sid => !capAnotaciones.some(a => a.clientStaffId === sid && a.tipo === 'inasistencia')
+                );
+                setCapBulkSaving(true);
+                try {
+                  const results = await Promise.all(
+                    toMark.map(staffId => serviceOrdersApi.addCapAnotacion(id, { staffId, tipo: 'inasistencia' }))
+                  );
+                  const nuevas = results
+                    .map((r, i) => r?.id ? { ...r, clientStaffId: toMark[i], creadoPorNombre: '' } : null)
+                    .filter(Boolean);
+                  if (nuevas.length) setCapAnotaciones(prev => [...prev, ...nuevas]);
+                  setCapSelected(new Set());
+                  toast.success(`${toMark.length || capSelected.size} participante(s) marcados como inasistentes`);
+                } catch { toast.error('Error al marcar inasistencia'); }
+                finally { setCapBulkSaving(false); }
+              };
+
+              const bulkMarcarPendiente = async () => {
+                const anotToDelete = capAnotaciones.filter(
+                  a => a.tipo === 'inasistencia' && capSelected.has(a.clientStaffId)
+                );
+                if (!anotToDelete.length) { setCapSelected(new Set()); return; }
+                setCapBulkSaving(true);
+                try {
+                  await Promise.all(anotToDelete.map(a => serviceOrdersApi.deleteCapAnotacion(id, a.id)));
+                  const deletedIds = new Set(anotToDelete.map((a: any) => a.id));
+                  setCapAnotaciones(prev => prev.filter(a => !deletedIds.has(a.id)));
+                  setCapSelected(new Set());
+                  toast.success(`${anotToDelete.length} marca(s) de inasistencia eliminadas`);
+                } catch { toast.error('Error al quitar inasistencia'); }
+                finally { setCapBulkSaving(false); }
+              };
+
               const StaffRow = ({ s }: { s: ClientStaff }) => {
                 const actasList = docToActas.get(s.document) ?? [];
                 const modulosCapacitados = Array.from(
@@ -1403,10 +1459,20 @@ export default function OrdenDetailPage() {
                 const notas = capAnotaciones.filter(a => a.clientStaffId === s.id && a.tipo === 'nota');
                 const mostrandoNota = capNotaStaffId === s.id;
 
+                const isSelected = capSelected.has(s.id);
+
                 return (
-                  <div className="p-4 rounded-xl" style={glass(0.6)}>
+                  <div className="p-4 rounded-xl transition-all"
+                    style={{ ...glass(0.6), outline: isSelected ? '2px solid rgba(96,165,250,0.5)' : 'none' }}>
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-3">
+                        {/* Checkbox selección */}
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(s.id)}
+                          className="w-4 h-4 rounded shrink-0 cursor-pointer accent-blue-500"
+                        />
                         <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 font-bold text-sm"
                           style={{ background: esInasistente ? 'rgba(239,68,68,0.15)' : avatarBg, color: esInasistente ? '#ef4444' : avatarColor }}>
                           {s.firstName[0]}{s.lastName[0]}
@@ -1573,13 +1639,47 @@ export default function OrdenDetailPage() {
                       { key: 'en_proceso',  label: `En proceso (${enProceso.length})`,    icon: GraduationCap },
                       { key: 'capacitados', label: `Capacitados (${capacitados.length})`, icon: CheckCircle2 },
                     ] as const).map(({ key, label, icon: Icon }) => (
-                      <button key={key} onClick={() => setCapSubTab(key)}
+                      <button key={key}
+                        onClick={() => { setCapSubTab(key); setCapSelected(new Set()); }}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${capSubTab === key ? 'btn-primary text-white' : ''}`}
                         style={capSubTab !== key ? { color: 'var(--text-secondary)' } : {}}>
                         <Icon className="w-4 h-4" /> {label}
                       </button>
                     ))}
                   </div>
+
+                  {/* Barra de acciones bulk (aparece cuando hay selección) */}
+                  {someSelected && (
+                    <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl flex-wrap"
+                      style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.25)' }}>
+                      <span className="text-sm font-semibold" style={{ color: '#60a5fa' }}>
+                        {capSelected.size} seleccionado{capSelected.size !== 1 ? 's' : ''}
+                      </span>
+                      <div className="flex-1" />
+                      <button
+                        onClick={bulkMarcarInasistente}
+                        disabled={capBulkSaving}
+                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                        style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
+                        {capBulkSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserX className="w-3.5 h-3.5" />}
+                        Marcar inasistente
+                      </button>
+                      <button
+                        onClick={bulkMarcarPendiente}
+                        disabled={capBulkSaving}
+                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                        style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
+                        {capBulkSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ToggleLeft className="w-3.5 h-3.5" />}
+                        Marcar pendiente
+                      </button>
+                      <button
+                        onClick={() => setCapSelected(new Set())}
+                        className="text-xs px-2 py-1 rounded-lg transition-colors"
+                        style={{ color: tc.m }}>
+                        Deseleccionar
+                      </button>
+                    </div>
+                  )}
 
                   {/* Lista */}
                   {displayList.length === 0 ? (
@@ -1597,6 +1697,18 @@ export default function OrdenDetailPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      {/* Seleccionar todos */}
+                      <div className="flex items-center gap-2 px-1">
+                        <input
+                          type="checkbox"
+                          checked={allSelected}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded cursor-pointer accent-blue-500"
+                        />
+                        <span className="text-xs" style={{ color: tc.m }}>
+                          {allSelected ? 'Deseleccionar todos' : `Seleccionar todos (${displayList.length})`}
+                        </span>
+                      </div>
                       {displayList.map(s => <StaffRow key={s.id} s={s} />)}
                     </div>
                   )}

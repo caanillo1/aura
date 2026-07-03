@@ -211,6 +211,7 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
         thead { display: table-header-group !important; }
         tr    { page-break-inside: avoid !important; break-inside: avoid !important; }
         .ica-sig-block { page-break-inside: avoid !important; break-inside: avoid !important; }
+        #ica-exec-body > div { page-break-inside: avoid !important; break-inside: avoid !important; }
         .ica-sig-img   { max-height: 45px !important; object-fit: contain !important; }
       }
     `;
@@ -250,7 +251,7 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
 
   // ── Data ─────────────────────────────────────────────────────────────────────
   const { company, os, project, actas: _actas, requerimientos, notes: _notes,
-          personalCapacitado, personalEnProceso, personalPendiente, generatedAt } = data;
+          personalCapacitado, personalEnProceso, personalPendiente, personalInasistente, generatedAt } = data;
 
   // Sort most-recent first
   const actas = [...(_actas ?? [])].sort((a: any, b: any) =>
@@ -957,7 +958,7 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
                   bg={lighten(sc, 0.93)} />
                 <KpiMini label="Personal Capacitado" color="#059669"
                   value={String(personalCapacitado.length)}
-                  sub={`${personalEnProceso.length} en proceso`}
+                  sub={`${personalEnProceso.length} en proceso · ${(personalInasistente ?? []).length} inasistente`}
                   bg="#f0fdf4" />
                 <KpiMini label="Días Duración" color="#6366f1"
                   value={os.durationDays ? String(os.durationDays) : '—'}
@@ -1065,7 +1066,7 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
             </div>
 
             {/* ── Team ── */}
-            <div>
+            <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
               <SectionTitle n={snTeam} text="Equipo del Proyecto" />
               {teamRows.length === 0 ? (
                 <div style={{ padding: 24, color: '#9ca3af', textAlign: 'center', fontSize: 10.5,
@@ -1077,7 +1078,8 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
                   {teamRows.map(({ rol, p }, i) => (
                     <div key={i} style={{ flex: '1 1 210px', display: 'flex', gap: 13, alignItems: 'flex-start',
                       padding: '15px 17px', border: '1px solid #e9ecef', borderRadius: 10,
-                      background: '#fafbfc', borderTop: `3px solid ${i % 2 === 0 ? pc : sc}` }}>
+                      background: '#fafbfc', borderTop: `3px solid ${i % 2 === 0 ? pc : sc}`,
+                      pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                       <Avatar name={`${p.firstName} ${p.lastName}`} />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 11.5, fontWeight: 700, color: '#111827', fontFamily: F }}>
@@ -1328,9 +1330,10 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
               <SectionTitle n={snCap} text="Estado de Capacitación del Personal" />
               <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
                 {[
-                  { label: 'Capacitados', count: personalCapacitado.length, color: '#059669', bg: '#f0fdf4' },
-                  { label: 'En proceso',  count: personalEnProceso.length,  color: '#2563eb', bg: '#eff6ff' },
-                  { label: 'Pendientes',  count: personalPendiente.length,  color: '#d97706', bg: '#fffbeb' },
+                  { label: 'Capacitados',   count: personalCapacitado.length,                  color: '#059669', bg: '#f0fdf4' },
+                  { label: 'En proceso',    count: personalEnProceso.length,                   color: '#2563eb', bg: '#eff6ff' },
+                  { label: 'Pendientes',    count: personalPendiente.length,                   color: '#d97706', bg: '#fffbeb' },
+                  { label: 'Inasistentes',  count: (personalInasistente ?? []).length,         color: '#dc2626', bg: '#fef2f2' },
                 ].map(({ label, count, color, bg }) => (
                   <div key={label} style={{ flex: 1, padding: '18px 16px', borderRadius: 10,
                     background: bg, textAlign: 'center', border: `1px solid ${alpha(color, 0.2)}` }}>
@@ -1340,7 +1343,7 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
                   </div>
                 ))}
               </div>
-              {(personalCapacitado.length + personalEnProceso.length + personalPendiente.length) > 0 ? (
+              {(personalCapacitado.length + personalEnProceso.length + personalPendiente.length + (personalInasistente ?? []).length) > 0 ? (
                 <table style={tbl}>
                   <thead><tr>
                     <th style={TH()}>Nombre</th>
@@ -1350,9 +1353,10 @@ export function InformeConActas({ osId, onClose, autoEmail }: Props) {
                   </tr></thead>
                   <tbody>
                     {[
-                      ...(personalCapacitado as any[]).map(s => ({ ...s, _e: 'Capacitado', _c: '#065f46', _bg: '#dcfce7' })),
-                      ...(personalEnProceso  as any[]).map(s => ({ ...s, _e: 'En proceso',  _c: '#1e40af', _bg: '#dbeafe' })),
-                      ...(personalPendiente  as any[]).map(s => ({ ...s, _e: 'Pendiente',   _c: '#92400e', _bg: '#fef9c3' })),
+                      ...(personalCapacitado  as any[]).map(s => ({ ...s, _e: 'Capacitado',  _c: '#065f46', _bg: '#dcfce7' })),
+                      ...(personalEnProceso   as any[]).map(s => ({ ...s, _e: 'En proceso',  _c: '#1e40af', _bg: '#dbeafe' })),
+                      ...(personalPendiente   as any[]).map(s => ({ ...s, _e: 'Pendiente',   _c: '#92400e', _bg: '#fef9c3' })),
+                      ...((personalInasistente ?? []) as any[]).map(s => ({ ...s, _e: 'Inasistente', _c: '#991b1b', _bg: '#fee2e2' })),
                     ].map((s, i) => (
                       <tr key={`${s.id}-${i}`} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                         <td style={{ ...TD(), fontWeight: 700 }}>{s.firstName} {s.lastName}</td>

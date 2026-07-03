@@ -624,6 +624,15 @@ export class ServiceOrdersService {
       ),
     );
     const docToStaff = new Map(clientStaff.map((s: any) => [s.document, s]));
+    const idToStaff  = new Map(clientStaff.map((s: any) => [s.id, s]));
+
+    // Fetch inasistencia annotations for this OS
+    const inasistRows = await this.prisma.$queryRaw<{ clientStaffId: string }[]>`
+      SELECT DISTINCT clientStaffId FROM CapAnotaciones
+      WHERE serviceOrderId = ${id} AND tipo = 'inasistencia'
+    `;
+    const inasistStaffIds = new Set(inasistRows.map(r => r.clientStaffId));
+    const personalInasistente = Array.from(inasistStaffIds).map(sid => idToStaff.get(sid)).filter(Boolean);
 
     return {
       company,
@@ -632,9 +641,12 @@ export class ServiceOrdersService {
       actas,
       requerimientos,
       notes,
-      personalCapacitado: Array.from(signedDocs).map(d => docToStaff.get(d)).filter(Boolean),
-      personalEnProceso:  Array.from(allParticipantDocs).filter(d => !signedDocs.has(d)).map(d => docToStaff.get(d)).filter(Boolean),
-      personalPendiente:  clientStaff.filter((s: any) => !allParticipantDocs.has(s.document) && !signedDocs.has(s.document)),
+      personalCapacitado:  Array.from(signedDocs).map(d => docToStaff.get(d)).filter(Boolean),
+      personalEnProceso:   Array.from(allParticipantDocs).filter(d => !signedDocs.has(d)).map(d => docToStaff.get(d)).filter(Boolean),
+      personalPendiente:   clientStaff.filter((s: any) =>
+        !allParticipantDocs.has(s.document) && !signedDocs.has(s.document) && !inasistStaffIds.has(s.id),
+      ),
+      personalInasistente,
       generatedAt: new Date().toISOString(),
     };
   }
@@ -1408,7 +1420,7 @@ export class ServiceOrdersService {
   // ── transformPdfData: maps raw DB fields → InformeData shape expected by react-pdf ──
   private transformPdfData(raw: any): any {
     const { company, os, project, actas, notes, personalCapacitado,
-            personalEnProceso, personalPendiente, requerimientos, generatedAt } = raw;
+            personalEnProceso, personalPendiente, personalInasistente, requerimientos, generatedAt } = raw;
 
     // 1. Flatten project modules/phases/activities into os.projectTasks
     const projectTasks = (project?.modules ?? []).flatMap((mod: any) =>
@@ -1515,10 +1527,11 @@ export class ServiceOrdersService {
       actas:              transformedActas,
       notes:              transformedNotes,
       requerimientos:     requerimientos ?? [],
-      personalCapacitado: personalCapacitado ?? [],
-      personalEnProceso:  personalEnProceso  ?? [],
-      personalPendiente:  personalPendiente  ?? [],
-      generatedAt:        generatedAt ?? new Date().toISOString(),
+      personalCapacitado:  personalCapacitado  ?? [],
+      personalEnProceso:   personalEnProceso   ?? [],
+      personalPendiente:   personalPendiente   ?? [],
+      personalInasistente: personalInasistente ?? [],
+      generatedAt:         generatedAt ?? new Date().toISOString(),
     };
   }
 
@@ -1557,7 +1570,7 @@ export class ServiceOrdersService {
 
   private buildPrintHtml(data: any, includeActas = false): string {
     const { company, os, project, actas,
-            personalCapacitado, personalEnProceso, personalPendiente } = data as any;
+            personalCapacitado, personalEnProceso, personalPendiente, personalInasistente } = data as any;
     const pc  = company?.primaryColor ?? '#1E3A5F';
     const nom = company?.commercialName ?? company?.name ?? '';
 
@@ -1609,9 +1622,10 @@ export class ServiceOrdersService {
     (os.implementers ?? []).forEach((u: any) => leaders.push({ rol: 'Implementador', p: u }));
 
     const allPersonal = [
-      ...(personalCapacitado  ?? []).map((p: any) => ({ ...p, estado: 'Capacitado',  clr: '#065f46' })),
-      ...(personalEnProceso   ?? []).map((p: any) => ({ ...p, estado: 'En Proceso',  clr: '#1e40af' })),
-      ...(personalPendiente   ?? []).map((p: any) => ({ ...p, estado: 'Pendiente',   clr: '#92400e' })),
+      ...(personalCapacitado   ?? []).map((p: any) => ({ ...p, estado: 'Capacitado',   clr: '#065f46' })),
+      ...(personalEnProceso    ?? []).map((p: any) => ({ ...p, estado: 'En Proceso',   clr: '#1e40af' })),
+      ...(personalPendiente    ?? []).map((p: any) => ({ ...p, estado: 'Pendiente',    clr: '#92400e' })),
+      ...(personalInasistente  ?? []).map((p: any) => ({ ...p, estado: 'Inasistente', clr: '#dc2626' })),
     ];
 
     const actasAll: any[] = actas ?? [];
@@ -1895,7 +1909,7 @@ table { border-collapse: collapse; width: 100%; }
 
     return new Promise((resolve, reject) => {
       const { company, os, project, actas, requerimientos,
-              personalCapacitado, personalEnProceso, personalPendiente, generatedAt } = data;
+              personalCapacitado, personalEnProceso, personalPendiente, personalInasistente, generatedAt } = data;
 
       const toRgb = (hex: string): [number,number,number] => {
         const h = (hex ?? '#1E3A5F').replace('#', '').padEnd(6, '0');
@@ -2124,19 +2138,23 @@ table { border-collapse: collapse; width: 100%; }
       }
 
       // ── 6. Capacitación ─────────────────────────────────────────────────────
-      const allCap = [...(personalCapacitado??[]), ...(personalEnProceso??[]), ...(personalPendiente??[])];
+      const allCap = [
+        ...(personalCapacitado??[]), ...(personalEnProceso??[]),
+        ...(personalPendiente??[]),  ...(personalInasistente??[]),
+      ];
       if (allCap.length > 0) {
         doc.moveDown(0.3);
         band('Estado de Capacitación del Personal');
         const CAP_COLOR: Record<string,[number,number,number]> = {
-          Capacitado:[6,95,70], 'En proceso':[30,64,175], Pendiente:[217,119,6],
+          Capacitado:[6,95,70], 'En proceso':[30,64,175], Pendiente:[217,119,6], Inasistente:[220,38,38],
         };
         colTable(
           [{label:'Nombre',w:155},{label:'Cargo',w:130},{label:'Área',w:110},{label:'Estado',w:100}],
           [
-            ...(personalCapacitado??[]).map((s: any) => [s,'Capacitado']),
-            ...(personalEnProceso??[]).map((s: any)  => [s,'En proceso']),
-            ...(personalPendiente??[]).map((s: any)  => [s,'Pendiente']),
+            ...(personalCapacitado??[]).map((s: any)  => [s,'Capacitado']),
+            ...(personalEnProceso??[]).map((s: any)   => [s,'En proceso']),
+            ...(personalPendiente??[]).map((s: any)   => [s,'Pendiente']),
+            ...(personalInasistente??[]).map((s: any) => [s,'Inasistente']),
           ].map(([s, est]: any) => [
             `${s.firstName} ${s.lastName}`, s.jobTitle??'—', s.area??'—',
             { text: est, color: CAP_COLOR[est]??[55,65,81] as [number,number,number] },
@@ -2525,7 +2543,7 @@ table { border-collapse: collapse; width: 100%; }
 
   private buildReportHtml(data: any): string {
     const { company, os, project, actas, requerimientos,
-            personalCapacitado, personalEnProceso, personalPendiente } = data;
+            personalCapacitado, personalEnProceso, personalPendiente, personalInasistente } = data;
 
     const pc  = company?.primaryColor ?? '#1E3A5F';
     const nom = company?.commercialName ?? company?.name ?? '';
@@ -2671,9 +2689,10 @@ ${team ? `
 <p style="margin:0 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:${pc};">Estado de Capacitación</p>
 <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px;">
 <tr>
-  ${stat(personalCapacitado.length, 'Capacitados', '#059669', '#d1fae5')}
-  ${stat(personalEnProceso.length,  'En Proceso',  '#2563eb', '#dbeafe')}
-  ${stat(personalPendiente.length,  'Pendientes',  '#d97706', '#fef3c7')}
+  ${stat(personalCapacitado.length,                  'Capacitados',  '#059669', '#d1fae5')}
+  ${stat(personalEnProceso.length,                   'En Proceso',   '#2563eb', '#dbeafe')}
+  ${stat(personalPendiente.length,                   'Pendientes',   '#d97706', '#fef3c7')}
+  ${stat((personalInasistente ?? []).length,          'Inasistentes', '#dc2626', '#fee2e2')}
 </tr>
 </table>
 

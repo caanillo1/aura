@@ -643,6 +643,8 @@ export const actasApi = {
     api.post(`/actas/${actaId}/resend-email`, { firmanteId }).then((r) => r.data),
   aiDraft: (dto: { type: string; clientName?: string; modules?: string[] }) =>
     api.post('/actas/ai-draft', dto).then((r) => r.data),
+  toggleAsistencia: (participanteId: string) =>
+    api.patch(`/actas/participantes/${participanteId}/asistencia`).then((r) => r.data) as Promise<{ id: string; asistio: boolean }>,
 };
 
 export interface CreateVisitPayload {

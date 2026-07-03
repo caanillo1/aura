@@ -665,6 +665,23 @@ export class ActasService {
     return updated;
   }
 
+  async toggleAsistencia(companyId: string, participanteId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; asistio: boolean }>>`
+      SELECT ap.id, ap.asistio
+      FROM ActaParticipantes ap
+      INNER JOIN Actas a ON a.id = ap.actaId
+      INNER JOIN Proyectos p ON p.id = a.projectId
+      INNER JOIN OrdenesServicio os ON os.id = p.serviceOrderId
+      WHERE ap.id = ${participanteId} AND os.companyId = ${companyId}
+    `;
+    if (!rows.length) throw new NotFoundException('Participante no encontrado');
+    const nuevoValor = rows[0].asistio === false ? 1 : 0;
+    await this.prisma.$executeRaw`
+      UPDATE ActaParticipantes SET asistio = ${nuevoValor} WHERE id = ${participanteId}
+    `;
+    return { id: participanteId, asistio: nuevoValor === 1 };
+  }
+
   async finalizeActa(companyId: string, id: string) {
     const acta = await this.prisma.acta.findUnique({ where: { id } });
     if (!acta) throw new NotFoundException('Acta no encontrada');

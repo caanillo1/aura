@@ -933,6 +933,7 @@ model ActaParticipante {
   horaEntrada String?  @db.NVarChar(10)
   horaSalida  String?  @db.NVarChar(10)
   comprendio  Boolean?
+  asistio     Boolean  @default(true)
   acta        Acta     @relation(fields: [actaId], references: [id], onDelete: Cascade)
 
   @@map("ActaParticipantes")

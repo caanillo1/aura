@@ -93,6 +93,13 @@ export class ActasController {
     return this.svc.resendFirmanteEmail(user.companyId, id, body.firmanteId);
   }
 
+  @Patch('participantes/:participanteId/asistencia')
+  @Roles(...IMPL_ROLES)
+  @ApiOperation({ summary: 'Marcar/desmarcar inasistencia de un participante' })
+  toggleAsistencia(@GetUser() user: JwtUser, @Param('participanteId') participanteId: string) {
+    return this.svc.toggleAsistencia(user.companyId, participanteId);
+  }
+
   @Delete(':id')
   @Roles(...IMPL_ROLES)
   @ApiOperation({ summary: 'Eliminar acta' })

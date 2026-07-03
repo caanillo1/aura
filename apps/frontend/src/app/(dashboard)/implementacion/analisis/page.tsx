@@ -49,7 +49,7 @@ interface ActivitySummary {
 
 interface CapacitacionSummary {
   actas: { total: number; firmadas: number; borrador: number };
-  participantes: { total: number; capacitados: number; enProceso: number; comprendieron: number };
+  participantes: { total: number; capacitados: number; inasistidos: number; enProceso: number; comprendieron: number };
 }
 
 interface Recommendation {
@@ -1101,27 +1101,34 @@ export default function AnalisisPage() {
                       <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
                         Personas registradas en actas — {cap.participantes.total} total
                       </p>
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div className="rounded-xl p-3 flex flex-col items-center gap-1"
                           style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
                           <UserCheck className="w-4 h-4" style={{ color: '#10b981' }} />
                           <p className="text-2xl font-extrabold" style={{ color: '#10b981' }}>{cap.participantes.capacitados}</p>
                           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Capacitados</p>
-                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>(acta firmada)</p>
+                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>acta firmada</p>
                         </div>
                         <div className="rounded-xl p-3 flex flex-col items-center gap-1"
                           style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
                           <Users className="w-4 h-4" style={{ color: '#f59e0b' }} />
                           <p className="text-2xl font-extrabold" style={{ color: '#f59e0b' }}>{cap.participantes.enProceso}</p>
                           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>En proceso</p>
-                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>(acta borrador)</p>
+                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>acta borrador</p>
+                        </div>
+                        <div className="rounded-xl p-3 flex flex-col items-center gap-1"
+                          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                          <UserX className="w-4 h-4" style={{ color: '#ef4444' }} />
+                          <p className="text-2xl font-extrabold" style={{ color: '#ef4444' }}>{cap.participantes.inasistidos}</p>
+                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Inasistidos</p>
+                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>no asistieron</p>
                         </div>
                         <div className="rounded-xl p-3 flex flex-col items-center gap-1"
                           style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
                           <CheckCheck className="w-4 h-4" style={{ color: '#6366f1' }} />
                           <p className="text-2xl font-extrabold" style={{ color: '#6366f1' }}>{cap.participantes.comprendieron}</p>
                           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Comprendieron</p>
-                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>(marcaron ✓)</p>
+                          <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>marcaron ✓</p>
                         </div>
                       </div>
 

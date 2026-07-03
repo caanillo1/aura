@@ -751,7 +751,7 @@ export class ServiceOrdersService {
       }),
       this.prisma.$queryRaw<Array<{
         actaId: string; actaStatus: string; fecha: Date; moduloId: string | null;
-        nombre: string | null; documento: string | null; comprendio: boolean | null;
+        nombre: string | null; documento: string | null; comprendio: boolean | null; asistio: boolean | null;
       }>>`
         SELECT
           a.id      AS actaId,
@@ -760,7 +760,8 @@ export class ServiceOrdersService {
           a.moduloId,
           ap.nombre,
           ap.documento,
-          ap.comprendio
+          ap.comprendio,
+          ap.asistio
         FROM Actas a
         INNER JOIN Proyectos p ON p.id = a.projectId
         LEFT JOIN ActaParticipantes ap ON ap.actaId = a.id
@@ -1066,17 +1067,20 @@ export class ServiceOrdersService {
     };
 
     // ── Resumen de capacitación (desde actas type='capacitacion') ────────────
-    // actasCapRows: una fila por participante × acta (LEFT JOIN → actas sin participantes tienen nombre=null)
-    const actaIds         = [...new Set(sesionesRaw.map(r => r.actaId))];
-    const totalActas      = actaIds.length;
-    const actasFirmadas   = [...new Set(sesionesRaw.filter(r => r.actaStatus === 'firmado').map(r => r.actaId))].length;
-    const actasBorrador   = [...new Set(sesionesRaw.filter(r => r.actaStatus === 'borrador').map(r => r.actaId))].length;
+    // sesionesRaw: una fila por participante × acta (LEFT JOIN → actas sin participantes tienen nombre=null)
+    const actaIds       = [...new Set(sesionesRaw.map(r => r.actaId))];
+    const totalActas    = actaIds.length;
+    const actasFirmadas = [...new Set(sesionesRaw.filter(r => r.actaStatus === 'firmado').map(r => r.actaId))].length;
+    const actasBorrador = [...new Set(sesionesRaw.filter(r => r.actaStatus === 'borrador').map(r => r.actaId))].length;
 
-    // Solo filas con participante real (nombre no nulo = LEFT JOIN produjo resultado)
-    const partRows        = sesionesRaw.filter(r => r.nombre !== null);
-    const capacitados     = partRows.filter(r => r.actaStatus === 'firmado').length;
-    const enProceso       = partRows.filter(r => r.actaStatus === 'borrador').length;
-    const comprendieron   = partRows.filter(r => r.comprendio === true).length;
+    // Solo filas con participante real (nombre no nulo)
+    const partRows      = sesionesRaw.filter(r => r.nombre !== null);
+    // asistio puede ser null en registros anteriores al campo (tratar null como true)
+    const asistioTrue   = (r: typeof partRows[0]) => r.asistio !== false;
+    const capacitados   = partRows.filter(r => r.actaStatus === 'firmado' && asistioTrue(r)).length;
+    const inasistidos   = partRows.filter(r => r.asistio === false).length;
+    const enProceso     = partRows.filter(r => r.actaStatus === 'borrador' && asistioTrue(r)).length;
+    const comprendieron = partRows.filter(r => r.comprendio === true).length;
 
     const capacitacionSummary = {
       actas: {
@@ -1086,8 +1090,9 @@ export class ServiceOrdersService {
       },
       participantes: {
         total:        partRows.length,
-        capacitados,  // en actas firmadas
-        enProceso,    // en actas borrador
+        capacitados,   // asistieron y acta firmada
+        inasistidos,   // marcados como inasistido
+        enProceso,     // asistieron pero acta aún borrador
         comprendieron,
       },
     };

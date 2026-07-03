@@ -695,7 +695,7 @@ export class ServiceOrdersService {
     const today = new Date();
     const cutoff14 = new Date(today.getTime() - 14 * 86400000);
 
-    const [os, project, recentHistory, bloques, reqs] = await Promise.all([
+    const [os, project, recentHistory, bloques, reqs, sesionesRaw] = await Promise.all([
       this.prisma.serviceOrder.findFirst({
         where: { id: osId, companyId },
         select: {
@@ -749,6 +749,20 @@ export class ServiceOrdersService {
                   estadoActual: true, ticketRubi: true, tipo: true, devueltoPor: true },
         orderBy: [{ prioridad: 'asc' }, { estadoActual: 'asc' }],
       }),
+      this.prisma.$queryRaw<Array<{
+        id: string; titulo: string; fecha: Date; estado: string;
+        respuesta: string; entroSalaAt: Date | null;
+      }>>`
+        SELECT
+          sc.id, sc.titulo, sc.fecha, sc.estado,
+          COALESCE(si.respuesta, 'pendiente') AS respuesta,
+          si.entroSalaAt
+        FROM SesionesCapacitacion sc
+        LEFT JOIN SesionesInvitados si ON si.sesionId = sc.id
+        INNER JOIN Proyectos p ON p.id = sc.projectId
+        WHERE p.serviceOrderId = ${osId}
+        ORDER BY sc.fecha ASC
+      `,
     ]);
 
     if (!os) throw new Error('OS no encontrada');
@@ -1046,6 +1060,47 @@ export class ServiceOrdersService {
       },
     };
 
+    // ── Resumen de capacitación ───────────────────────────────────────────────
+    // sesionesRaw: one row per invitado (LEFT JOIN → sesiones sin invitados tienen respuesta='pendiente')
+    const sesionIds   = [...new Set(sesionesRaw.map(r => r.id))];
+    const sesionMeta  = sesionIds.map(id => sesionesRaw.find(r => r.id === id)!);
+    const totalSesiones       = sesionIds.length;
+    const sesionesCompletadas = sesionMeta.filter(s => s.estado === 'completada').length;
+    const sesionesProgramadas = sesionMeta.filter(s => s.estado === 'programada').length;
+    const proximaSesion       = sesionMeta.find(s => s.estado === 'programada' && new Date(s.fecha) >= today);
+
+    // Filas que corresponden a invitados reales (excluye el LEFT JOIN vacío)
+    const invitadoRows = sesionesRaw.filter(r => {
+      // Una fila sin respuesta real proviene de sesiones sin invitados (respuesta defaults a 'pendiente' via COALESCE)
+      // Para distinguirlas de invitados reales pendientes usamos entroSalaAt == null Y el COUNT
+      return true; // todas las filas cuentan: si la sesión no tiene invitados el LEFT JOIN produce 1 fila con respuesta=pendiente
+    });
+
+    // Detectar si la sesión tiene 0 invitados vs tiene invitados pendientes:
+    // Una sesión sin invitados generará una sola fila con entroSalaAt=null y respuesta='pendiente'
+    // No hay forma de distinguirlos sin un subquery, así que contamos directamente desde las filas
+    const capacitados  = sesionesRaw.filter(r => r.entroSalaAt !== null).length;
+    const confirmados  = sesionesRaw.filter(r => r.respuesta === 'confirmado' && r.entroSalaAt === null).length;
+    const pendientes   = sesionesRaw.filter(r => r.respuesta === 'pendiente' && r.entroSalaAt === null).length;
+    const cancelados   = sesionesRaw.filter(r => r.respuesta === 'cancelado').length;
+    const totalPart    = capacitados + confirmados + pendientes + cancelados;
+
+    const capacitacionSummary = {
+      sesiones: {
+        total:       totalSesiones,
+        programadas: sesionesProgramadas,
+        completadas: sesionesCompletadas,
+        proxima:     proximaSesion ? { titulo: proximaSesion.titulo, fecha: proximaSesion.fecha } : null,
+      },
+      participantes: {
+        total:      totalPart,
+        capacitados,
+        confirmados,
+        pendientes,
+        cancelados,
+      },
+    };
+
     return {
       os: {
         id: os.id, osNumber: os.osNumber, product: os.product, status: os.status,
@@ -1063,6 +1118,7 @@ export class ServiceOrdersService {
       visits:           visitsDetail,
       timeline:         timelineDetail,
       activitySummary,
+      capacitacion:     capacitacionSummary,
       recommendations,
       tickets:          ticketsDetail,
       delayAttribution,

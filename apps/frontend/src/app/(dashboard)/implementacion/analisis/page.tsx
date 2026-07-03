@@ -14,6 +14,7 @@ import {
   ExternalLink, TriangleAlert,
   Download, Mail, Bell, Send, Settings2, Play, Plus, Minus,
   BrainCircuit, MessageSquare, CornerDownLeft, ChevronDown, ChevronUp,
+  GraduationCap, Users, UserCheck, UserMinus, UserX,
 } from 'lucide-react';
 import { serviceOrdersApi } from '@/lib/api';
 import { toast } from 'sonner';
@@ -44,6 +45,16 @@ interface TimelineDetail {
 
 interface ActivitySummary {
   total: number; done: number; inProgress: number; pending: number; blocked: number; overdue: number;
+}
+
+interface CapacitacionSummary {
+  sesiones: {
+    total: number; programadas: number; completadas: number;
+    proxima: { titulo: string; fecha: string } | null;
+  };
+  participantes: {
+    total: number; capacitados: number; confirmados: number; pendientes: number; cancelados: number;
+  };
 }
 
 interface Recommendation {
@@ -87,7 +98,8 @@ interface AnalysisData {
              startDate?: string | null; endDate?: string | null } | null;
   riskLevel: RiskLevel; alerts: Alert[]; predictions: Predictions;
   modules?: ModuleDetail[]; visits?: VisitsDetail; timeline?: TimelineDetail | null;
-  activitySummary?: ActivitySummary; recommendations?: Recommendation[];
+  activitySummary?: ActivitySummary; capacitacion?: CapacitacionSummary;
+  recommendations?: Recommendation[];
   tickets?: TicketsDetail; delayAttribution?: DelayAttribution | null;
 }
 
@@ -795,6 +807,7 @@ export default function AnalisisPage() {
   const preds           = data?.predictions;
   const tickets         = data?.tickets;
   const delayAttrib     = data?.delayAttribution;
+  const cap             = data?.capacitacion;
   const critAlerts      = data?.alerts.filter(a => a.level === 'critico').length ?? 0;
   const warnAlerts      = data?.alerts.filter(a => a.level === 'advertencia').length ?? 0;
 
@@ -1056,7 +1069,103 @@ export default function AnalisisPage() {
               </div>
             )}
 
-            {/* ── 5. Charts Row ─────────────────────────────────────────── */}
+            {/* ── 5. Capacitación ───────────────────────────────────────── */}
+            {cap && (cap.sesiones.total > 0 || cap.participantes.total > 0) && (
+              <div>
+                <SectionTitle icon={GraduationCap} title="Capacitación" />
+                <div className="rounded-2xl p-4 space-y-4"
+                  style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}>
+
+                  {/* Sesiones */}
+                  <div>
+                    <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+                      Sesiones
+                    </p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-xl p-3 text-center"
+                        style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                        <p className="text-2xl font-extrabold" style={{ color: '#6366f1' }}>{cap.sesiones.total}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Total</p>
+                      </div>
+                      <div className="rounded-xl p-3 text-center"
+                        style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                        <p className="text-2xl font-extrabold" style={{ color: '#10b981' }}>{cap.sesiones.completadas}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Completadas</p>
+                      </div>
+                      <div className="rounded-xl p-3 text-center"
+                        style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                        <p className="text-2xl font-extrabold" style={{ color: '#f59e0b' }}>{cap.sesiones.programadas}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Programadas</p>
+                      </div>
+                    </div>
+                    {cap.sesiones.proxima && (
+                      <div className="mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-xs"
+                        style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', color: '#6366f1' }}>
+                        <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          <strong>Próxima:</strong> {cap.sesiones.proxima.titulo} —{' '}
+                          {dayjs(cap.sesiones.proxima.fecha).locale('es').format('DD/MM/YYYY HH:mm')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Participantes */}
+                  {cap.participantes.total > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+                        Participantes ({cap.participantes.total} total)
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="rounded-xl p-3 flex flex-col items-center gap-1"
+                          style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.15)' }}>
+                          <UserCheck className="w-4 h-4" style={{ color: '#10b981' }} />
+                          <p className="text-2xl font-extrabold" style={{ color: '#10b981' }}>{cap.participantes.capacitados}</p>
+                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Capacitados</p>
+                        </div>
+                        <div className="rounded-xl p-3 flex flex-col items-center gap-1"
+                          style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)' }}>
+                          <Users className="w-4 h-4" style={{ color: '#60a5fa' }} />
+                          <p className="text-2xl font-extrabold" style={{ color: '#60a5fa' }}>{cap.participantes.confirmados}</p>
+                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Confirmados</p>
+                        </div>
+                        <div className="rounded-xl p-3 flex flex-col items-center gap-1"
+                          style={{ background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.15)' }}>
+                          <UserMinus className="w-4 h-4" style={{ color: '#94a3b8' }} />
+                          <p className="text-2xl font-extrabold" style={{ color: '#94a3b8' }}>{cap.participantes.pendientes}</p>
+                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Pendientes</p>
+                        </div>
+                        <div className="rounded-xl p-3 flex flex-col items-center gap-1"
+                          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                          <UserX className="w-4 h-4" style={{ color: '#ef4444' }} />
+                          <p className="text-2xl font-extrabold" style={{ color: '#ef4444' }}>{cap.participantes.cancelados}</p>
+                          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>Cancelaron</p>
+                        </div>
+                      </div>
+
+                      {/* Barra de progreso de capacitación */}
+                      {cap.participantes.total > 0 && (
+                        <div className="mt-3">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Avance de capacitación</span>
+                            <span className="text-xs font-bold" style={{ color: '#10b981' }}>
+                              {Math.round((cap.participantes.capacitados / cap.participantes.total) * 100)}%
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--border-subtle)' }}>
+                            <div className="h-full rounded-full transition-all"
+                              style={{ width: `${Math.round((cap.participantes.capacitados / cap.participantes.total) * 100)}%`,
+                                       background: 'linear-gradient(90deg,#10b981,#34d399)' }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── 7. Charts Row ─────────────────────────────────────────── */}
             {(modules.length > 0 || (acts && acts.total > 0)) && (
               <div>
                 <SectionTitle icon={Layers} title="Avance por módulo" />
@@ -1105,7 +1214,7 @@ export default function AnalisisPage() {
               </div>
             )}
 
-            {/* ── 6. Timeline ───────────────────────────────────────────── */}
+            {/* ── 8. Timeline ───────────────────────────────────────────── */}
             {timeline && data.project && (
               <div>
                 <SectionTitle icon={Calendar} title="Análisis de cronograma" />
@@ -1120,7 +1229,7 @@ export default function AnalisisPage() {
               </div>
             )}
 
-            {/* ── 7. Recommendations ────────────────────────────────────── */}
+            {/* ── 9. Recommendations ────────────────────────────────────── */}
             {recs.length > 0 && (
               <div>
                 <SectionTitle icon={Lightbulb} title="Recomendaciones de acción" />
@@ -1130,7 +1239,7 @@ export default function AnalisisPage() {
               </div>
             )}
 
-            {/* ── 8. Alerts ─────────────────────────────────────────────── */}
+            {/* ── 10. Alerts ────────────────────────────────────────────── */}
             <div>
               <SectionTitle icon={ShieldAlert}
                 title={data.alerts.length > 0 ? `Alertas activas (${data.alerts.length})` : 'Alertas'} />

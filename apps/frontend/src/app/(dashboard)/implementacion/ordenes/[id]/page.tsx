@@ -1443,7 +1443,7 @@ export default function OrdenDetailPage() {
                 finally { setCapBulkSaving(false); }
               };
 
-              const StaffRow = ({ s }: { s: ClientStaff }) => {
+              const renderStaff = (s: ClientStaff) => {
                 const actasList = docToActas.get(s.document) ?? [];
                 const modulosCapacitados = Array.from(
                   new Set(actasList.filter(a => a.signedAt && a.moduloName).map(a => a.moduloName!))
@@ -1709,7 +1709,7 @@ export default function OrdenDetailPage() {
                           {allSelected ? 'Deseleccionar todos' : `Seleccionar todos (${displayList.length})`}
                         </span>
                       </div>
-                      {displayList.map(s => <StaffRow key={s.id} s={s} />)}
+                      {displayList.map(s => <div key={s.id}>{renderStaff(s)}</div>)}
                     </div>
                   )}
 

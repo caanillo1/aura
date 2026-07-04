@@ -193,7 +193,7 @@ export class ChatService {
 
     const [stats, todos] = await Promise.all([
       this.prisma.$queryRaw<any[]>`
-        SELECT status, COUNT(*) AS total
+        SELECT status, CAST(COUNT(*) AS INT) AS total
         FROM OrdenesServicio WHERE companyId = ${companyId}
         GROUP BY status
       `,
@@ -248,17 +248,18 @@ export class ChatService {
       }
     }
 
-    // General: project stats + activity stats + compact full activity list
-    const [proyectoStats, actividadStats, actividades] = await Promise.all([
+    // General: project stats + activity stats + implementer workload + full activity list
+    const [proyectoStats, actividadStats, implementadores, actividades] = await Promise.all([
       this.prisma.$queryRaw<any[]>`
-        SELECT p.status, COUNT(*) AS total, AVG(CAST(p.progressPercent AS FLOAT)) AS promedioAvance
+        SELECT p.status, CAST(COUNT(*) AS INT) AS total,
+          AVG(CAST(p.progressPercent AS FLOAT)) AS promedioAvance
         FROM Proyectos p
         JOIN OrdenesServicio o ON p.serviceOrderId = o.id
         WHERE o.companyId = ${companyId}
         GROUP BY p.status
       `,
       this.prisma.$queryRaw<any[]>`
-        SELECT a.status, COUNT(*) AS total
+        SELECT a.status, CAST(COUNT(*) AS INT) AS total
         FROM Actividades a
         JOIN Fases f ON a.phaseId = f.id
         JOIN ModulosProyecto pm ON f.projectModuleId = pm.id
@@ -267,20 +268,41 @@ export class ChatService {
         WHERE o.companyId = ${companyId}
         GROUP BY a.status
       `,
+      // Ranking of implementers by assigned activities
+      this.prisma.$queryRaw<any[]>`
+        SELECT ISNULL(u.firstName, '') + ' ' + ISNULL(u.lastName, '') AS implementador,
+          CAST(COUNT(*) AS INT) AS totalActividades,
+          CAST(SUM(CASE WHEN a.status = 'pendiente'   THEN 1 ELSE 0 END) AS INT) AS pendientes,
+          CAST(SUM(CASE WHEN a.status = 'en_proceso'  THEN 1 ELSE 0 END) AS INT) AS enProceso,
+          CAST(SUM(CASE WHEN a.status = 'completado'  THEN 1 ELSE 0 END) AS INT) AS completadas,
+          CAST(SUM(CASE WHEN a.status = 'vencida'     THEN 1 ELSE 0 END) AS INT) AS vencidas
+        FROM Actividades a
+        JOIN Fases f ON a.phaseId = f.id
+        JOIN ModulosProyecto pm ON f.projectModuleId = pm.id
+        JOIN Proyectos p ON pm.projectId = p.id
+        JOIN OrdenesServicio o ON p.serviceOrderId = o.id
+        JOIN Usuarios u ON a.assignedToId = u.id
+        WHERE o.companyId = ${companyId}
+          AND a.assignedToId IS NOT NULL
+        GROUP BY u.firstName, u.lastName
+        ORDER BY totalActividades DESC
+      `,
       this.prisma.$queryRaw<any[]>`
         SELECT a.name AS actividad, a.status,
-          pm.name AS modulo, p.name AS proyecto, c.businessName AS cliente
+          pm.name AS modulo, p.name AS proyecto, c.businessName AS cliente,
+          ISNULL(u.firstName, '') + ' ' + ISNULL(u.lastName, '') AS asignado
         FROM Actividades a
         JOIN Fases f ON a.phaseId = f.id
         JOIN ModulosProyecto pm ON f.projectModuleId = pm.id
         JOIN Proyectos p ON pm.projectId = p.id
         JOIN OrdenesServicio o ON p.serviceOrderId = o.id
         JOIN Clientes c ON o.clientId = c.id
+        LEFT JOIN Usuarios u ON a.assignedToId = u.id
         WHERE o.companyId = ${companyId}
         ORDER BY a.status, p.name, a.name
       `,
     ]);
-    return { tipo: 'resumen_general', proyectoStats, actividadStats, actividades };
+    return { tipo: 'resumen_general', proyectoStats, actividadStats, implementadores, actividades };
   }
 
   private async fetchRequerimientos(companyId: string, terms: string[]) {
@@ -303,7 +325,7 @@ export class ChatService {
 
     const [stats, todos] = await Promise.all([
       this.prisma.$queryRaw<any[]>`
-        SELECT estadoActual, prioridad, COUNT(*) AS total
+        SELECT estadoActual, prioridad, CAST(COUNT(*) AS INT) AS total
         FROM Requerimientos WHERE companyId = ${companyId}
         GROUP BY estadoActual, prioridad
       `,
@@ -340,7 +362,7 @@ export class ChatService {
 
     const [stats, todas] = await Promise.all([
       this.prisma.$queryRaw<any[]>`
-        SELECT a.type, a.status, COUNT(*) AS total
+        SELECT a.type, a.status, CAST(COUNT(*) AS INT) AS total
         FROM Actas a
         JOIN Proyectos p ON a.projectId = p.id
         JOIN OrdenesServicio o ON p.serviceOrderId = o.id

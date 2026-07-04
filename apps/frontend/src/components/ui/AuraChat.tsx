@@ -12,10 +12,10 @@ interface Msg {
 }
 
 const SUGGESTIONS = [
-  '¿Cuántas órdenes de servicio están activas?',
-  '¿Cuál es el avance general de los proyectos?',
+  '¿Qué muestran los gráficos del dashboard?',
+  '¿Cuántas actividades están vencidas?',
+  '¿Cuál es el avance por cliente?',
   '¿Qué tickets están priorizados?',
-  'Dame un resumen del sistema',
 ];
 
 export function AuraChat() {

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CompanyService } from '../company/company.service';
 
 type Role = 'user' | 'assistant';
 
@@ -15,29 +16,44 @@ export interface ChatContext {
 }
 
 type Intent =
+  | 'dashboard'
   | 'ordenes'
   | 'proyectos'
   | 'requerimientos'
   | 'actas'
   | 'clientes'
-  | 'resumen'
   | 'general';
 
 const INTENT_LABELS: Record<Intent, string> = {
-  ordenes: 'órdenes de servicio',
-  proyectos: 'proyectos de implementación',
-  requerimientos: 'requerimientos y tickets',
-  actas: 'actas de reunión',
-  clientes: 'clientes',
-  resumen: 'resumen general del sistema',
-  general: 'información general',
+  dashboard:       'dashboard ejecutivo (KPIs y gráficas)',
+  ordenes:         'órdenes de servicio',
+  proyectos:       'proyectos de implementación',
+  requerimientos:  'requerimientos y tickets',
+  actas:           'actas de reunión',
+  clientes:        'clientes',
+  general:         'información general',
 };
+
+// Human-readable labels for dashboard coded values — passed to the AI so it can interpret them
+const DASHBOARD_CONTEXT = `
+Mapeos de valores que aparecen en los datos del dashboard:
+- projectsByStatus.status: "activo"="En Ejecución", "completado"="Completados", "pausado"="Suspendidos", "cancelado"="Cancelados", "pendiente"="Pendientes de Inicio"
+- activitiesByStatus.status: "pendiente"="Pendientes", "en_proceso"="En Proceso", "completado"="Finalizadas", "cancelado"="Canceladas", "vencida"="Vencidas"
+- pendingActasSignature.type: "inicio"="Inicio", "visita"="Visita", "capacitacion"="Capacitación", "parametrizacion"="Parametrización", "cierre"="Cierre", "entrega_soporte"="Soporte"
+- projectRisks.risk: "critico"="Crítico", "alto"="Alto"
+- kpis.*: cada KPI tiene "value" (valor actual), "delta" (cambio) y "deltaLabel" (periodo de comparación)
+- clientProgress.progress: porcentaje de avance del proyecto (0–100)
+- implementerWorkload.count: número de actividades pendientes/en proceso asignadas a ese implementador
+`;
 
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private companyService: CompanyService,
+  ) {}
 
   async chat(
     companyId: string,
@@ -91,36 +107,37 @@ export class ChatService {
     const lower = mensaje.toLowerCase();
     const pagina = (contexto?.pagina ?? '').toLowerCase();
 
+    // Dashboard keywords — highest priority
+    if (/\bdashboard\b|gr[aá]fic[ao]|kpi\b|m[eé]trica|indicador|briefing|ejecutivo|vencida|carga de trabajo|carga.*implementador|implementador.*carga/i.test(lower)) return 'dashboard';
+
+    // Context-based for other intents
     if (pagina.includes('orden') && !lower.match(/proyecto|requerimiento|acta/)) return 'ordenes';
     if (pagina.includes('proyecto') && !lower.match(/orden|requerimiento|acta/)) return 'proyectos';
     if (pagina.includes('requerimiento') && !lower.match(/orden|proyecto|acta/)) return 'requerimientos';
     if (pagina.includes('acta') && !lower.match(/orden|proyecto|requerimiento/)) return 'actas';
 
+    // Keyword-based
     if (/orden(es)?\s*(de\s*)?servicio|\borden\b|\bos\b/i.test(lower)) return 'ordenes';
     if (/\bproyecto|avance|m[oó]dulo(s)?\b|fase\b|actividad(es)?\b/i.test(lower)) return 'proyectos';
     if (/requerimiento|ticket|gesti[oó]n|priori(dad|zar)|backlog/i.test(lower)) return 'requerimientos';
     if (/\bacta\b|reuni[oó]n/i.test(lower)) return 'actas';
     if (/\bcliente|empresa|compa[nñ]/i.test(lower)) return 'clientes';
-    if (/resumen|informe|estad[ií]stic|kpi|general|todos/i.test(lower)) return 'resumen';
+    if (/resumen|informe|estad[ií]stic|general|todos/i.test(lower)) return 'dashboard';
 
     return 'general';
   }
 
   // ── Search term extraction ──────────────────────────────────────────────────
 
-  /** Extracts numbers and quoted/long words that might identify a specific record. */
   private extractSearchTerms(mensaje: string): string[] {
     const terms = new Set<string>();
 
-    // Numbers (order numbers, req numbers, etc.)
     const nums = mensaje.match(/\b\d+\b/g);
     if (nums) nums.forEach(n => terms.add(n));
 
-    // Quoted names
     const quoted = mensaje.match(/["']([^"']{2,})["']/g);
     if (quoted) quoted.map(q => q.replace(/["']/g, '')).forEach(q => terms.add(q));
 
-    // Capitalized sequences >= 4 chars that look like proper nouns (potential client names)
     const proper = mensaje.match(/\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,}){0,3}/g);
     if (proper) proper.filter(w => w.length >= 4).forEach(w => terms.add(w));
 
@@ -133,12 +150,12 @@ export class ChatService {
     try {
       const terms = this.extractSearchTerms(mensaje);
       switch (intent) {
+        case 'dashboard':      return await this.companyService.getDashboard(companyId);
         case 'ordenes':        return await this.fetchOrdenes(companyId, terms);
         case 'proyectos':      return await this.fetchProyectos(companyId, terms);
         case 'requerimientos': return await this.fetchRequerimientos(companyId, terms);
         case 'actas':          return await this.fetchActas(companyId, terms);
         case 'clientes':       return await this.fetchClientes(companyId, terms);
-        case 'resumen':        return await this.fetchResumen(companyId);
         default:               return null;
       }
     } catch (err: any) {
@@ -147,10 +164,6 @@ export class ChatService {
     }
   }
 
-  /**
-   * If search terms are found: targeted query filtering by osNumber or businessName.
-   * Otherwise: compact list of ALL orders (key fields only) + stats.
-   */
   private async fetchOrdenes(companyId: string, terms: string[]) {
     if (terms.length > 0) {
       for (const term of terms) {
@@ -170,12 +183,10 @@ export class ChatService {
       }
     }
 
-    // General: compact all + stats
     const [stats, todos] = await Promise.all([
       this.prisma.$queryRaw<any[]>`
         SELECT status, COUNT(*) AS total
-        FROM OrdenesServicio
-        WHERE companyId = ${companyId}
+        FROM OrdenesServicio WHERE companyId = ${companyId}
         GROUP BY status
       `,
       this.prisma.$queryRaw<any[]>`
@@ -249,8 +260,7 @@ export class ChatService {
     const [stats, todos] = await Promise.all([
       this.prisma.$queryRaw<any[]>`
         SELECT estadoActual, prioridad, COUNT(*) AS total
-        FROM Requerimientos
-        WHERE companyId = ${companyId}
+        FROM Requerimientos WHERE companyId = ${companyId}
         GROUP BY estadoActual, prioridad
       `,
       this.prisma.$queryRaw<any[]>`
@@ -329,32 +339,6 @@ export class ChatService {
     `;
   }
 
-  private async fetchResumen(companyId: string) {
-    const [ordenes, proyectos, reqs, clientes] = await Promise.all([
-      this.prisma.$queryRaw<any[]>`
-        SELECT status, COUNT(*) AS total
-        FROM OrdenesServicio WHERE companyId = ${companyId}
-        GROUP BY status
-      `,
-      this.prisma.$queryRaw<any[]>`
-        SELECT p.status, COUNT(*) AS total, AVG(CAST(p.progressPercent AS FLOAT)) AS promedioAvance
-        FROM Proyectos p
-        JOIN OrdenesServicio o ON p.serviceOrderId = o.id
-        WHERE o.companyId = ${companyId}
-        GROUP BY p.status
-      `,
-      this.prisma.$queryRaw<any[]>`
-        SELECT estadoActual, COUNT(*) AS total
-        FROM Requerimientos WHERE companyId = ${companyId}
-        GROUP BY estadoActual
-      `,
-      this.prisma.$queryRaw<any[]>`
-        SELECT COUNT(*) AS total FROM Clientes WHERE companyId = ${companyId}
-      `,
-    ]);
-    return { ordenes, proyectos, reqs, clientes };
-  }
-
   // ── System prompt ───────────────────────────────────────────────────────────
 
   private buildSystemPrompt(intent: Intent, datos: any): string {
@@ -366,13 +350,23 @@ Si la pregunta es ambigua, pide aclaraciones o indica qué información tienes d
 
     if (!datos) return base;
 
-    return `${base}
+    const extraContext = intent === 'dashboard' ? DASHBOARD_CONTEXT : '';
 
+    return `${base}
+${extraContext}
 Datos actuales de ${INTENT_LABELS[intent]}:
 \`\`\`json
 ${JSON.stringify(datos, null, 2)}
 \`\`\`
 
-Usa estos datos para responder. Si los datos son de tipo "resumen_general", tienes la lista COMPLETA de registros. Si son "detalle_especifico", son los registros que coinciden con lo que buscó el usuario.`;
+Usa estos datos para responder con precisión. ${
+  intent === 'dashboard'
+    ? 'Puedes interpretar los KPIs, gráficas, actividades próximas, cargas de trabajo y alertas de riesgo.'
+    : datos?.tipo === 'resumen_general'
+      ? 'Tienes la lista COMPLETA de registros. Puedes responder sobre cualquiera de ellos.'
+      : datos?.tipo === 'detalle_especifico'
+        ? 'Estos son los registros que coinciden con la búsqueda del usuario.'
+        : ''
+}`;
   }
 }

@@ -12,8 +12,8 @@ interface Msg {
 }
 
 const SUGGESTIONS = [
+  '¿Qué actividades están pendientes y cuáles ejecutándose?',
   '¿Qué muestran los gráficos del dashboard?',
-  '¿Cuántas actividades están vencidas?',
   '¿Cuál es el avance por cliente?',
   '¿Qué tickets están priorizados?',
 ];

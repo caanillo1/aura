@@ -34,6 +34,14 @@ const INTENT_LABELS: Record<Intent, string> = {
   general:         'información general',
 };
 
+const PROYECTOS_CONTEXT = `
+Mapeos de valores en datos de proyectos y actividades:
+- status de proyecto: "activo"="En Ejecución", "completado"="Completado", "pausado"="Suspendido", "cancelado"="Cancelado", "pendiente"="Pendiente de inicio"
+- status de actividad: "pendiente"="Pendiente", "en_proceso"="En Ejecución", "completado"="Completada", "cancelado"="Cancelada", "vencida"="Vencida"
+- priority: "alta", "media", "baja"
+- progressPercent: porcentaje de avance (0-100)
+`;
+
 // Human-readable labels for dashboard coded values — passed to the AI so it can interpret them
 const DASHBOARD_CONTEXT = `
 Mapeos de valores que aparecen en los datos del dashboard:
@@ -204,22 +212,44 @@ export class ChatService {
     if (terms.length > 0) {
       for (const term of terms) {
         const like = `%${term}%`;
-        const rows = await this.prisma.$queryRaw<any[]>`
-          SELECT
-            p.name, p.status, p.progressPercent, p.startDate, p.endDate,
-            c.businessName AS cliente
-          FROM Proyectos p
-          JOIN OrdenesServicio o ON p.serviceOrderId = o.id
-          JOIN Clientes c ON o.clientId = c.id
-          WHERE o.companyId = ${companyId}
-            AND (p.name LIKE ${like} OR c.businessName LIKE ${like})
-          ORDER BY p.name
-        `;
-        if (rows.length > 0) return { tipo: 'detalle_especifico', registros: rows };
+        const [proyectos, actividades] = await Promise.all([
+          this.prisma.$queryRaw<any[]>`
+            SELECT p.name AS proyecto, p.status, p.progressPercent, p.startDate, p.endDate,
+              c.businessName AS cliente
+            FROM Proyectos p
+            JOIN OrdenesServicio o ON p.serviceOrderId = o.id
+            JOIN Clientes c ON o.clientId = c.id
+            WHERE o.companyId = ${companyId}
+              AND (p.name LIKE ${like} OR c.businessName LIKE ${like})
+            ORDER BY p.name
+          `,
+          this.prisma.$queryRaw<any[]>`
+            SELECT a.name AS actividad, a.status, a.priority AS prioridad,
+              a.plannedStartDate AS fechaInicio, a.plannedEndDate AS fechaFin,
+              a.progressPercent AS avance,
+              f.name AS fase, pm.name AS modulo,
+              p.name AS proyecto, c.businessName AS cliente,
+              ISNULL(u.firstName, '') + ' ' + ISNULL(u.lastName, '') AS asignado
+            FROM Actividades a
+            JOIN Fases f ON a.phaseId = f.id
+            JOIN ModulosProyecto pm ON f.projectModuleId = pm.id
+            JOIN Proyectos p ON pm.projectId = p.id
+            JOIN OrdenesServicio o ON p.serviceOrderId = o.id
+            JOIN Clientes c ON o.clientId = c.id
+            LEFT JOIN Usuarios u ON a.assignedToId = u.id
+            WHERE o.companyId = ${companyId}
+              AND (p.name LIKE ${like} OR c.businessName LIKE ${like} OR a.name LIKE ${like})
+            ORDER BY a.status, pm.name, a.name
+          `,
+        ]);
+        if (proyectos.length > 0 || actividades.length > 0) {
+          return { tipo: 'detalle_especifico', proyectos, actividades };
+        }
       }
     }
 
-    const [stats, todos] = await Promise.all([
+    // General: project stats + activity stats + compact full activity list
+    const [proyectoStats, actividadStats, actividades] = await Promise.all([
       this.prisma.$queryRaw<any[]>`
         SELECT p.status, COUNT(*) AS total, AVG(CAST(p.progressPercent AS FLOAT)) AS promedioAvance
         FROM Proyectos p
@@ -228,15 +258,29 @@ export class ChatService {
         GROUP BY p.status
       `,
       this.prisma.$queryRaw<any[]>`
-        SELECT p.name, p.status, p.progressPercent, c.businessName AS cliente
-        FROM Proyectos p
+        SELECT a.status, COUNT(*) AS total
+        FROM Actividades a
+        JOIN Fases f ON a.phaseId = f.id
+        JOIN ModulosProyecto pm ON f.projectModuleId = pm.id
+        JOIN Proyectos p ON pm.projectId = p.id
+        JOIN OrdenesServicio o ON p.serviceOrderId = o.id
+        WHERE o.companyId = ${companyId}
+        GROUP BY a.status
+      `,
+      this.prisma.$queryRaw<any[]>`
+        SELECT a.name AS actividad, a.status,
+          pm.name AS modulo, p.name AS proyecto, c.businessName AS cliente
+        FROM Actividades a
+        JOIN Fases f ON a.phaseId = f.id
+        JOIN ModulosProyecto pm ON f.projectModuleId = pm.id
+        JOIN Proyectos p ON pm.projectId = p.id
         JOIN OrdenesServicio o ON p.serviceOrderId = o.id
         JOIN Clientes c ON o.clientId = c.id
         WHERE o.companyId = ${companyId}
-        ORDER BY p.progressPercent DESC
+        ORDER BY a.status, p.name, a.name
       `,
     ]);
-    return { tipo: 'resumen_general', estadisticas: stats, proyectos: todos };
+    return { tipo: 'resumen_general', proyectoStats, actividadStats, actividades };
   }
 
   private async fetchRequerimientos(companyId: string, terms: string[]) {
@@ -350,7 +394,9 @@ Si la pregunta es ambigua, pide aclaraciones o indica qué información tienes d
 
     if (!datos) return base;
 
-    const extraContext = intent === 'dashboard' ? DASHBOARD_CONTEXT : '';
+    const extraContext =
+      intent === 'dashboard' ? DASHBOARD_CONTEXT :
+      intent === 'proyectos' ? PROYECTOS_CONTEXT : '';
 
     return `${base}
 ${extraContext}
@@ -362,11 +408,15 @@ ${JSON.stringify(datos, null, 2)}
 Usa estos datos para responder con precisión. ${
   intent === 'dashboard'
     ? 'Puedes interpretar los KPIs, gráficas, actividades próximas, cargas de trabajo y alertas de riesgo.'
-    : datos?.tipo === 'resumen_general'
-      ? 'Tienes la lista COMPLETA de registros. Puedes responder sobre cualquiera de ellos.'
-      : datos?.tipo === 'detalle_especifico'
-        ? 'Estos son los registros que coinciden con la búsqueda del usuario.'
-        : ''
+    : intent === 'proyectos'
+      ? datos?.tipo === 'detalle_especifico'
+        ? 'Tienes proyectos y sus actividades filtradas. Puedes responder qué actividades están pendientes, ejecutándose o completadas, y quién las tiene asignadas.'
+        : 'Tienes estadísticas de proyectos, estadísticas de actividades por estado y la lista COMPLETA de actividades con su estado actual, módulo, proyecto y cliente asignado.'
+      : datos?.tipo === 'resumen_general'
+        ? 'Tienes la lista COMPLETA de registros. Puedes responder sobre cualquiera de ellos.'
+        : datos?.tipo === 'detalle_especifico'
+          ? 'Estos son los registros que coinciden con la búsqueda del usuario.'
+          : ''
 }`;
   }
 }

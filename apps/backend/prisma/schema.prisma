@@ -456,6 +456,7 @@ model ProjectModule {
   sesiones        SesionCapacitacion[]
   project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  @@index([projectId])
   @@map("ModulosProyecto")
 }
 
@@ -478,6 +479,7 @@ model Phase {
   activities      Activity[]
   projectModule   ProjectModule    @relation(fields: [projectModuleId], references: [id], onDelete: Cascade)
 
+  @@index([projectModuleId])
   @@map("Fases")
 }
 
@@ -520,6 +522,8 @@ model Activity {
   threads          ActivityThread[]
   subActivities    SubActivity[]
 
+  @@index([phaseId])
+  @@index([assignedToId])
   @@map("Actividades")
 }
 

@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -9,11 +10,11 @@ import * as path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: true });
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Aumentar límite de body para soportar logos en base64
-  app.use(require('express').json({ limit: '10mb' }));
-  app.use(require('express').urlencoded({ extended: true, limit: '10mb' }));
+  app.useBodyParser('json', { limit: '10mb' });
+  app.useBodyParser('urlencoded', { extended: true, limit: '10mb' });
   const logger = new Logger('Bootstrap');
 
   // Prefijo global de API

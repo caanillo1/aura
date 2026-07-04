@@ -462,7 +462,7 @@ export class RequerimientosService {
       const hasta = dto.gestionHasta ? new Date(dto.gestionHasta + 'T23:59:59') : new Date('2099-12-31');
       const rows = await this.prisma.$queryRaw<{ requerimientoId: string }[]>`
         SELECT DISTINCT requerimientoId
-        FROM GestionRequerimiento
+        FROM RequerimientoGestiones
         WHERE createdAt >= ${desde} AND createdAt <= ${hasta}
       `;
       reqIdsFiltrados = rows.map(r => r.requerimientoId);

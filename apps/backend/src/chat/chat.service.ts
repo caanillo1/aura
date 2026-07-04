@@ -72,41 +72,45 @@ export class ChatService {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) throw new Error('GROQ_API_KEY no configurado');
 
-    const intent = this.detectIntent(mensaje, contexto);
-    const datos = await this.fetchData(companyId, intent, mensaje);
-    const systemPrompt = this.buildSystemPrompt(intent, datos);
+    try {
+      const intent = this.detectIntent(mensaje, contexto);
+      const datos = await this.fetchData(companyId, intent, mensaje);
+      const systemPrompt = this.buildSystemPrompt(intent, datos);
 
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...historial.slice(-10),
-      { role: 'user', content: mensaje },
-    ];
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...historial.slice(-10),
+        { role: 'user', content: mensaje },
+      ];
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages,
-        temperature: 0.4,
-        max_tokens: 1024,
-      }),
-    });
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(
+          { model: 'llama-3.3-70b-versatile', messages, temperature: 0.4, max_tokens: 1024 },
+          // BigInt-safe replacer: converts any BigInt to number
+          (_, v) => (typeof v === 'bigint' ? Number(v) : v),
+        ),
+      });
 
-    if (!response.ok) {
-      const err = await response.text();
-      this.logger.error(`Groq error: ${err}`);
-      throw new Error('Error al consultar la IA');
+      if (!response.ok) {
+        const err = await response.text();
+        this.logger.error(`Groq error (${response.status}): ${err}`);
+        return { respuesta: 'La IA no pudo procesar la consulta en este momento. Intenta de nuevo.', intent };
+      }
+
+      const json = (await response.json()) as any;
+      const respuesta =
+        json.choices?.[0]?.message?.content ?? 'No se pudo obtener una respuesta.';
+
+      return { respuesta, intent };
+    } catch (err: any) {
+      this.logger.error(`Chat error: ${err?.message}`, err?.stack);
+      return { respuesta: 'Ocurrió un error al procesar tu consulta. Intenta de nuevo.', intent: 'general' };
     }
-
-    const json = (await response.json()) as any;
-    const respuesta =
-      json.choices?.[0]?.message?.content ?? 'No se pudo obtener una respuesta.';
-
-    return { respuesta, intent };
   }
 
   // ── Intent detection ────────────────────────────────────────────────────────
@@ -248,8 +252,9 @@ export class ChatService {
       }
     }
 
-    // General: project stats + activity stats + implementer workload + full activity list
-    const [proyectoStats, actividadStats, implementadores, actividades] = await Promise.all([
+    // General mode: compact summaries only (no unbounded activity list to avoid exceeding AI context)
+    const [proyectoStats, actividadStats, avancePorCliente, implementadores, proyectos] = await Promise.all([
+      // Project counts + avg progress by status
       this.prisma.$queryRaw<any[]>`
         SELECT p.status, CAST(COUNT(*) AS INT) AS total,
           AVG(CAST(p.progressPercent AS FLOAT)) AS promedioAvance
@@ -258,6 +263,7 @@ export class ChatService {
         WHERE o.companyId = ${companyId}
         GROUP BY p.status
       `,
+      // Activity counts by status
       this.prisma.$queryRaw<any[]>`
         SELECT a.status, CAST(COUNT(*) AS INT) AS total
         FROM Actividades a
@@ -268,14 +274,28 @@ export class ChatService {
         WHERE o.companyId = ${companyId}
         GROUP BY a.status
       `,
-      // Ranking of implementers by assigned activities
+      // Project progress per client (answers "avance por cliente")
+      this.prisma.$queryRaw<any[]>`
+        SELECT c.businessName AS cliente,
+          CAST(COUNT(*) AS INT) AS proyectos,
+          AVG(CAST(p.progressPercent AS FLOAT)) AS avancePromedio,
+          MIN(CAST(p.progressPercent AS FLOAT)) AS avanceMinimo,
+          MAX(CAST(p.progressPercent AS FLOAT)) AS avanceMaximo
+        FROM Proyectos p
+        JOIN OrdenesServicio o ON p.serviceOrderId = o.id
+        JOIN Clientes c ON o.clientId = c.id
+        WHERE o.companyId = ${companyId}
+        GROUP BY c.businessName
+        ORDER BY avancePromedio DESC
+      `,
+      // Implementer ranking (answers "quién tiene más actividades")
       this.prisma.$queryRaw<any[]>`
         SELECT ISNULL(u.firstName, '') + ' ' + ISNULL(u.lastName, '') AS implementador,
           CAST(COUNT(*) AS INT) AS totalActividades,
-          CAST(SUM(CASE WHEN a.status = 'pendiente'   THEN 1 ELSE 0 END) AS INT) AS pendientes,
-          CAST(SUM(CASE WHEN a.status = 'en_proceso'  THEN 1 ELSE 0 END) AS INT) AS enProceso,
-          CAST(SUM(CASE WHEN a.status = 'completado'  THEN 1 ELSE 0 END) AS INT) AS completadas,
-          CAST(SUM(CASE WHEN a.status = 'vencida'     THEN 1 ELSE 0 END) AS INT) AS vencidas
+          CAST(SUM(CASE WHEN a.status = 'pendiente'  THEN 1 ELSE 0 END) AS INT) AS pendientes,
+          CAST(SUM(CASE WHEN a.status = 'en_proceso' THEN 1 ELSE 0 END) AS INT) AS enProceso,
+          CAST(SUM(CASE WHEN a.status = 'completado' THEN 1 ELSE 0 END) AS INT) AS completadas,
+          CAST(SUM(CASE WHEN a.status = 'vencida'    THEN 1 ELSE 0 END) AS INT) AS vencidas
         FROM Actividades a
         JOIN Fases f ON a.phaseId = f.id
         JOIN ModulosProyecto pm ON f.projectModuleId = pm.id
@@ -287,22 +307,27 @@ export class ChatService {
         GROUP BY u.firstName, u.lastName
         ORDER BY totalActividades DESC
       `,
+      // Compact project list with progress
       this.prisma.$queryRaw<any[]>`
-        SELECT a.name AS actividad, a.status,
-          pm.name AS modulo, p.name AS proyecto, c.businessName AS cliente,
-          ISNULL(u.firstName, '') + ' ' + ISNULL(u.lastName, '') AS asignado
-        FROM Actividades a
-        JOIN Fases f ON a.phaseId = f.id
-        JOIN ModulosProyecto pm ON f.projectModuleId = pm.id
-        JOIN Proyectos p ON pm.projectId = p.id
+        SELECT p.name AS proyecto, p.status,
+          CAST(p.progressPercent AS FLOAT) AS avance,
+          c.businessName AS cliente
+        FROM Proyectos p
         JOIN OrdenesServicio o ON p.serviceOrderId = o.id
         JOIN Clientes c ON o.clientId = c.id
-        LEFT JOIN Usuarios u ON a.assignedToId = u.id
         WHERE o.companyId = ${companyId}
-        ORDER BY a.status, p.name, a.name
+        ORDER BY p.progressPercent DESC
       `,
     ]);
-    return { tipo: 'resumen_general', proyectoStats, actividadStats, implementadores, actividades };
+    return {
+      tipo: 'resumen_general',
+      proyectoStats,
+      actividadStats,
+      avancePorCliente,
+      implementadores,
+      proyectos,
+      nota: 'Para ver actividades detalladas de un proyecto específico, menciona el nombre del proyecto o cliente.',
+    };
   }
 
   private async fetchRequerimientos(companyId: string, terms: string[]) {

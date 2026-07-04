@@ -212,7 +212,7 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
         </View>
 
         {/* KPIs */}
-        <View style={s.sec}>
+        <View style={s.sec} wrap={false}>
           <Text style={s.secTitle}>Indicadores Clave</Text>
           <View style={s.kpiRow}>
             {[
@@ -233,7 +233,7 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
         </View>
 
         {/* Gráficas */}
-        <View style={{ flexDirection: 'row', gap: 8, margin: '8 24 0 24' }}>
+        <View wrap={false} style={{ flexDirection: 'row', gap: 8, margin: '8 24 0 24' }}>
 
           <View style={[s.chartCard, { flex: 1 }]}>
             <Text style={s.chartTitle}>Semáforo</Text>
@@ -253,18 +253,21 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
 
           <View style={[s.chartCard, { flex: 2.2 }]}>
             <Text style={s.chartTitle}>Avance por proyecto</Text>
-            <View style={{ gap: 6, width: '100%' }}>
-              {filas.map(f => {
+            <View style={{ gap: 5, width: '100%' }}>
+              {filas.slice(0, 18).map(f => {
                 const sem   = getSem(f.endDate, f.progressPercent, f.status);
-                const short = f.clienteNombre.length > 24 ? f.clienteNombre.slice(0, 24) + '…' : f.clienteNombre;
+                const short = f.clienteNombre.length > 22 ? f.clienteNombre.slice(0, 22) + '…' : f.clienteNombre;
                 return (
-                  <View key={f.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ fontSize: 6, color: C.textLight, width: 90 }}>{short}</Text>
+                  <View key={f.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Text style={{ fontSize: 5.5, color: C.textLight, width: 84 }}>{short}</Text>
                     <ProgressBar pct={f.progressPercent} color={SEM_COLOR[sem]} />
-                    <Text style={{ fontSize: 6.5, color: SEM_COLOR[sem], fontFamily: 'Helvetica-Bold', width: 24, textAlign: 'right' }}>{f.progressPercent}%</Text>
+                    <Text style={{ fontSize: 6, color: SEM_COLOR[sem], fontFamily: 'Helvetica-Bold', width: 22, textAlign: 'right' }}>{f.progressPercent}%</Text>
                   </View>
                 );
               })}
+              {filas.length > 18 && (
+                <Text style={{ fontSize: 6, color: C.textLight, marginTop: 2 }}>+ {filas.length - 18} proyectos más…</Text>
+              )}
             </View>
           </View>
 
@@ -279,7 +282,7 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
         </View>
 
         {/* Obs + Recs */}
-        <View style={{ flexDirection: 'row', gap: 8, margin: '8 24 0 24' }}>
+        <View wrap={false} style={{ flexDirection: 'row', gap: 8, margin: '8 24 0 24' }}>
           <View style={s.obsCard}>
             <Text style={s.secTitle}>Observaciones</Text>
             <Text style={s.obsTxt}>{obs || 'Sin observaciones registradas.'}</Text>
@@ -300,13 +303,14 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
       {/* ══ TABLA DE PROYECTOS ═══════════════════════════════════════════════ */}
       <Page size="A4" orientation="landscape" style={s.pageL}>
 
-        <View style={s.hdr}>
+        <View fixed style={s.hdr}>
           <View><Text style={s.hdrMain}>ESTADO DE PROYECTOS</Text><Text style={s.hdrSub}>{co} — {fecha}</Text></View>
           <Text style={s.hdrConf}>CONFIDENCIAL</Text>
         </View>
 
         <View style={{ margin: '10 24 0 24' }}>
-          <View style={s.tblHdr}>
+          {/* Encabezado fijo — se repite en cada página de desborde */}
+          <View fixed style={s.tblHdr}>
             {([ ['SEM', W.sem], ['CLIENTE', W.cli], ['ORDEN DE SERVICIO', W.os], ['INICIO', W.fi], ['COMPROMISO', W.fe], ['ESTADO', W.est], ['%', W.av], ['MOTIVO RETRASO', W.mot], ['RESPONSABLE', W.re], ['ACCIÓN REQUERIDA', W.acc], ['NUEVA FECHA', W.nf] ] as [string, string][]).map(([lbl, w]) =>
               <Text key={lbl} style={{ ...s.th, width: w as any }}>{lbl}</Text>
             )}
@@ -317,7 +321,7 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
             const color = SEM_COLOR[sem];
             const row   = i % 2 === 0 ? s.tblRow : s.tblAlt;
             return (
-              <View key={f.id} style={row}>
+              <View key={f.id} wrap={false} style={row}>
                 <View style={{ width: W.sem as any, justifyContent: 'center', alignItems: 'center', padding: '3 2' }}>
                   <Svg width={10} height={10}><Circle cx={5} cy={5} r={5} fill={color} /></Svg>
                 </View>
@@ -338,8 +342,8 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
           })}
         </View>
 
-        {/* Leyenda */}
-        <View style={{ flexDirection: 'row', gap: 18, margin: '10 24 0 24' }}>
+        {/* Leyenda + nota — fijas al final de cada página de desborde */}
+        <View fixed style={{ flexDirection: 'row', gap: 18, margin: '6 24 0 24' }}>
           {[{ c: C.verde, l: 'En fecha — dentro del plazo con avance adecuado' }, { c: C.amarillo, l: 'Riesgo — plazo próximo o avance bajo' }, { c: C.rojo, l: 'Crítico — plazo vencido o avance insuficiente' }].map(i => (
             <View key={i.l} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Dot color={i.c} />
@@ -348,17 +352,16 @@ export function InformeEjecutivoPDF({ filas, company, obs, recs, fecha }: Props)
           ))}
         </View>
 
-        {/* Nota */}
-        <View style={{ margin: '8 24 0 24', padding: '6 10', backgroundColor: '#EFF6FF', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: C.azul }}>
+        <View fixed style={{ margin: '4 24 0 24', padding: '5 10', backgroundColor: '#EFF6FF', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: C.azul }}>
           <Text style={{ fontSize: 6.5, color: C.textMid }}>
             <Text style={{ fontFamily: 'Helvetica-Bold' }}>Nota: </Text>
             Las nuevas fechas estimadas están sujetas a la validación y cumplimiento de los compromisos por parte del cliente.
           </Text>
         </View>
 
-        <View style={s.ftr}>
+        <View fixed style={s.ftr}>
           <Text style={s.ftrTxt}>{co} — Documento Confidencial — Uso exclusivo de accionistas y directivos</Text>
-          <Text style={s.ftrTxt}>Página 3 de 3</Text>
+          <Text style={s.ftrTxt} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
         </View>
 
       </Page>

@@ -1151,6 +1151,7 @@ export class ProjectsService {
         startDate: true, endDate: true,
         motivoRetraso: true, responsableRetraso: true,
         accionRequerida: true, nuevaFechaEstimada: true,
+        modules: { select: { name: true }, orderBy: { order: 'asc' } },
         serviceOrder: {
           select: {
             osNumber: true, product: true,
@@ -1174,6 +1175,7 @@ export class ProjectsService {
       responsableRetraso: p.responsableRetraso ?? '',
       accionRequerida: p.accionRequerida ?? '',
       nuevaFechaEstimada: p.nuevaFechaEstimada ?? null,
+      modules: p.modules.map(m => m.name),
     }));
   }
 

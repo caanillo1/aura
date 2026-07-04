@@ -546,6 +546,7 @@ export const projectsApi = {
     id: string; nombre: string; clienteId: string | null; clienteNombre: string; osName: string;
     startDate: string; endDate: string; status: string; progressPercent: number;
     motivoRetraso: string; responsableRetraso: string; accionRequerida: string; nuevaFechaEstimada: string | null;
+    modules: string[];
   }>> =>
     api.get('/projects/informe-ejecutivo').then((r) => r.data),
   updateDatosInforme: (id: string, data: { motivoRetraso?: string; responsableRetraso?: string; accionRequerida?: string; nuevaFechaEstimada?: string }) =>

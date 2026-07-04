@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import {
   ArrowLeft, Printer, RefreshCw, Loader2, Pencil, Check, X,
-  Save, History, ChevronDown, Trash2, Plus, Sparkles, CalendarDays,
+  Save, History, ChevronDown, Trash2, Plus, Sparkles, CalendarDays, Filter,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -27,6 +27,7 @@ interface FilaInforme {
   responsableRetraso: string;
   accionRequerida: string;
   nuevaFechaEstimada: string | null;
+  modules?: string[];
 }
 
 // ── semáforo ──────────────────────────────────────────────────────────────────
@@ -295,7 +296,10 @@ export default function InformeEjecutivoPage() {
   const { theme } = useTheme();
   const dark = theme !== 'light';
 
-  const [filas,       setFilas]       = useState<FilaInforme[]>([]);
+  const [filas,           setFilas]           = useState<FilaInforme[]>([]);
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [modulesOpen,     setModulesOpen]     = useState(false);
+  const modulesRef = useRef<HTMLDivElement>(null);
   const [company,     setCompany]     = useState<any>(null);
   const [loading,     setLoading]     = useState(true);
   const [snapshots,   setSnapshots]   = useState<SnapshotMeta[]>([]);
@@ -311,9 +315,12 @@ export default function InformeEjecutivoPage() {
   const [obs,  setObs]  = useState(() => typeof window !== 'undefined' ? localStorage.getItem('informe_obs')  ?? '' : '');
   const [recs, setRecs] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('informe_recs') ?? '' : '');
 
-  // Cerrar dropdown al click fuera
+  // Cerrar dropdowns al click fuera
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (snapRef.current && !snapRef.current.contains(e.target as Node)) setSnapOpen(false); };
+    const h = (e: MouseEvent) => {
+      if (snapRef.current && !snapRef.current.contains(e.target as Node)) setSnapOpen(false);
+      if (modulesRef.current && !modulesRef.current.contains(e.target as Node)) setModulesOpen(false);
+    };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
@@ -370,10 +377,13 @@ export default function InformeEjecutivoPage() {
         ? new Date(snapActual.fechaCorte).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
         : new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
 
-      const pdfFilas = filas.map(f => ({
+      const source = selectedModules.length === 0
+        ? filas
+        : filas.filter(f => selectedModules.some(m => (f.modules ?? []).includes(m)));
+      const pdfFilas = source.map(f => ({
         id:                  f.id,
         clienteNombre:       f.clienteNombre,
-        osName:            f.osName ?? '',
+        osName:              f.osName ?? '',
         startDate:           f.startDate,
         endDate:             f.endDate,
         status:              f.status,
@@ -428,12 +438,22 @@ export default function InformeEjecutivoPage() {
     toast.success('Versión eliminada');
   };
 
+  // Módulos únicos disponibles para filtrar
+  const allModuleNames = Array.from(
+    new Set(filas.flatMap(f => f.modules ?? []))
+  ).sort((a, b) => a.localeCompare(b, 'es'));
+
+  // Filas filtradas (si no hay selección se muestran todas)
+  const filasFiltradas = selectedModules.length === 0
+    ? filas
+    : filas.filter(f => selectedModules.some(m => (f.modules ?? []).includes(m)));
+
   // Resumen
-  const total       = filas.length;
-  const enCurso     = filas.filter(f => f.status === 'activo').length;
-  const completados = filas.filter(f => f.status === 'completado').length;
-  const pausados    = filas.filter(f => f.status === 'pausado').length;
-  const porResponsable = filas.reduce((acc, f) => {
+  const total       = filasFiltradas.length;
+  const enCurso     = filasFiltradas.filter(f => f.status === 'activo').length;
+  const completados = filasFiltradas.filter(f => f.status === 'completado').length;
+  const pausados    = filasFiltradas.filter(f => f.status === 'pausado').length;
+  const porResponsable = filasFiltradas.reduce((acc, f) => {
     if (!f.responsableRetraso) return acc;
     acc[f.responsableRetraso] = (acc[f.responsableRetraso] ?? 0) + 1;
     return acc;
@@ -521,6 +541,54 @@ export default function InformeEjecutivoPage() {
               )}
             </div>
 
+            {/* Filtro por módulos */}
+            {allModuleNames.length > 0 && (
+              <div ref={modulesRef} className="relative">
+                <button onClick={() => setModulesOpen(p => !p)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors"
+                  style={{
+                    background: selectedModules.length > 0 ? 'rgba(96,165,250,0.15)' : 'var(--surface-2)',
+                    border: selectedModules.length > 0 ? '1px solid rgba(96,165,250,0.5)' : '1px solid var(--card-border)',
+                    color: selectedModules.length > 0 ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                  }}>
+                  <Filter className="w-4 h-4" />
+                  {selectedModules.length === 0 ? 'Módulos' : `${selectedModules.length} módulo${selectedModules.length > 1 ? 's' : ''}`}
+                  <ChevronDown className="w-4 h-4" style={{ transform: modulesOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+                </button>
+
+                {modulesOpen && (
+                  <div className="absolute right-0 mt-1 w-64 z-50 rounded-xl overflow-hidden"
+                    style={{ background: dark ? '#101c2e' : '#fff', border: '1px solid var(--card-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.3)', maxHeight: 320, overflowY: 'auto' }}>
+                    {selectedModules.length > 0 && (
+                      <button
+                        className="w-full text-left px-4 py-2 text-xs font-semibold transition-colors"
+                        style={{ color: 'var(--accent-blue)', borderBottom: '1px solid var(--border-subtle)' }}
+                        onClick={() => setSelectedModules([])}>
+                        Limpiar filtro
+                      </button>
+                    )}
+                    {allModuleNames.map(mod => {
+                      const checked = selectedModules.includes(mod);
+                      return (
+                        <div key={mod}
+                          className="flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm transition-colors"
+                          style={{ color: checked ? 'var(--accent-blue)' : 'var(--text-secondary)', background: checked ? 'rgba(96,165,250,0.08)' : 'transparent', fontWeight: checked ? 600 : 400 }}
+                          onMouseEnter={e => { if (!checked) (e.currentTarget as HTMLElement).style.background = dark ? 'rgba(255,255,255,0.04)' : '#f1f5f9'; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = checked ? 'rgba(96,165,250,0.08)' : 'transparent'; }}
+                          onClick={() => setSelectedModules(prev => checked ? prev.filter(m => m !== mod) : [...prev, mod])}>
+                          <span className="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                            style={{ borderColor: checked ? 'var(--accent-blue)' : 'var(--border-strong)', background: checked ? 'var(--accent-blue)' : 'transparent' }}>
+                            {checked && <Check className="w-3 h-3 text-white" />}
+                          </span>
+                          <span className="truncate">{mod}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Generar análisis IA (solo en actual) */}
             {!readOnly && (
               <button onClick={handleGenerarAnalisis} disabled={generating}
@@ -589,6 +657,40 @@ export default function InformeEjecutivoPage() {
               el porcentaje de avance, las causas que han impedido el paso a producción y las acciones requeridas para el cierre de cada proyecto.
             </div>
 
+            {/* ── Chips de filtro activo ── */}
+            {selectedModules.length > 0 && (
+              <div className="mx-4 mb-3 flex flex-wrap items-center gap-2 no-print">
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Filtrando por:</span>
+                {selectedModules.map(m => (
+                  <span key={m} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
+                    style={{ background: 'rgba(96,165,250,0.15)', color: 'var(--accent-blue)', border: '1px solid rgba(96,165,250,0.3)' }}>
+                    {m}
+                    <button onClick={() => setSelectedModules(prev => prev.filter(x => x !== m))} className="ml-0.5 hover:opacity-70">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+                <button onClick={() => setSelectedModules([])} className="text-xs underline"
+                  style={{ color: 'var(--text-muted)' }}>Limpiar</button>
+                <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>
+                  — {filasFiltradas.length} de {filas.length} proyecto{filas.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+
+            {filasFiltradas.length === 0 && (
+              <div className="mx-4 mb-4 py-12 text-center rounded-xl"
+                style={{ background: dark ? 'rgba(255,255,255,0.03)' : '#e8edf3', border: '1px solid var(--card-border)' }}>
+                <Filter className="w-8 h-8 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-muted)' }} />
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Sin resultados</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Ningún proyecto tiene los módulos seleccionados
+                </p>
+                <button onClick={() => setSelectedModules([])} className="mt-3 text-xs font-semibold underline"
+                  style={{ color: 'var(--accent-blue)' }}>Limpiar filtro</button>
+              </div>
+            )}
+
             {/* ── Tabla (lg+) ── */}
             <div className="hidden lg:block mx-4 mb-4 overflow-x-auto rounded-xl">
               <table className="w-full border-collapse text-xs" style={{ minWidth: '900px' }}>
@@ -600,7 +702,7 @@ export default function InformeEjecutivoPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filas.map((f, i) => {
+                  {filasFiltradas.map((f, i) => {
                     const sem = getSemaforo(f.endDate, f.progressPercent, f.status);
                     const rowBg = i % 2 === 0 ? (dark ? 'rgba(255,255,255,0.02)' : '#ffffff') : (dark ? 'rgba(255,255,255,0.04)' : '#f8fafc');
                     const newDateColor = sem === 'rojo' ? '#ef4444' : sem === 'amarillo' ? '#eab308' : '#22c55e';
@@ -652,7 +754,7 @@ export default function InformeEjecutivoPage() {
 
             {/* ── Tarjetas (móvil + tablet) ── */}
             <div className="lg:hidden mx-4 mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {filas.map(f => {
+              {filasFiltradas.map(f => {
                 const sem = getSemaforo(f.endDate, f.progressPercent, f.status);
                 const semColor = SEMAFORO_COLOR[sem];
                 const newDateColor = sem === 'rojo' ? '#ef4444' : sem === 'amarillo' ? '#eab308' : '#22c55e';
@@ -727,7 +829,7 @@ export default function InformeEjecutivoPage() {
             </div>
 
             {/* ── Gráficas ── */}
-            {filas.length > 0 && (
+            {filasFiltradas.length > 0 && (
               <div className="mx-4 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
 
                 {/* 1. Semáforo */}
@@ -737,9 +839,9 @@ export default function InformeEjecutivoPage() {
                     <PieChart>
                       <Pie
                         data={[
-                          { name: 'En fecha',        value: filas.filter(f => getSemaforo(f.endDate, f.progressPercent, f.status) === 'verde').length,    color: '#22c55e' },
-                          { name: 'Riesgo',          value: filas.filter(f => getSemaforo(f.endDate, f.progressPercent, f.status) === 'amarillo').length, color: '#eab308' },
-                          { name: 'Retraso crítico', value: filas.filter(f => getSemaforo(f.endDate, f.progressPercent, f.status) === 'rojo').length,     color: '#ef4444' },
+                          { name: 'En fecha',        value: filasFiltradas.filter(f => getSemaforo(f.endDate, f.progressPercent, f.status) === 'verde').length,    color: '#22c55e' },
+                          { name: 'Riesgo',          value: filasFiltradas.filter(f => getSemaforo(f.endDate, f.progressPercent, f.status) === 'amarillo').length, color: '#eab308' },
+                          { name: 'Retraso crítico', value: filasFiltradas.filter(f => getSemaforo(f.endDate, f.progressPercent, f.status) === 'rojo').length,     color: '#ef4444' },
                         ].filter(d => d.value > 0)}
                         cx="50%" cy="50%" innerRadius={45} outerRadius={70}
                         dataKey="value" paddingAngle={3}
@@ -770,7 +872,7 @@ export default function InformeEjecutivoPage() {
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart
                       layout="vertical"
-                      data={filas.map(f => ({
+                      data={filasFiltradas.map(f => ({
                         name: f.clienteNombre.split(' ').slice(0, 2).join(' '),
                         avance: f.progressPercent,
                         color: SEMAFORO_COLOR[getSemaforo(f.endDate, f.progressPercent, f.status)],
@@ -785,7 +887,7 @@ export default function InformeEjecutivoPage() {
                         formatter={(v: any) => [`${v}%`, 'Avance']}
                       />
                       <Bar dataKey="avance" radius={[0, 4, 4, 0]}>
-                        {filas.map((f, i) => (
+                        {filasFiltradas.map((f, i) => (
                           <Cell key={i} fill={SEMAFORO_COLOR[getSemaforo(f.endDate, f.progressPercent, f.status)]} />
                         ))}
                       </Bar>

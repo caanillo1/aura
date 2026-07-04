@@ -202,7 +202,7 @@ export class ChatService {
         GROUP BY status
       `,
       this.prisma.$queryRaw<any[]>`
-        SELECT o.osNumber, o.status, o.product, c.businessName AS cliente
+        SELECT TOP 100 o.osNumber, o.status, o.product, c.businessName AS cliente
         FROM OrdenesServicio o
         JOIN Clientes c ON o.clientId = c.id
         WHERE o.companyId = ${companyId}
@@ -228,7 +228,7 @@ export class ChatService {
             ORDER BY p.name
           `,
           this.prisma.$queryRaw<any[]>`
-            SELECT a.name AS actividad, a.status, a.priority AS prioridad,
+            SELECT TOP 150 a.name AS actividad, a.status, a.priority AS prioridad,
               a.plannedStartDate AS fechaInicio, a.plannedEndDate AS fechaFin,
               a.progressPercent AS avance,
               f.name AS fase, pm.name AS modulo,
@@ -307,9 +307,9 @@ export class ChatService {
         GROUP BY u.firstName, u.lastName
         ORDER BY totalActividades DESC
       `,
-      // Compact project list with progress
+      // Compact project list with progress (bounded)
       this.prisma.$queryRaw<any[]>`
-        SELECT p.name AS proyecto, p.status,
+        SELECT TOP 100 p.name AS proyecto, p.status,
           CAST(p.progressPercent AS FLOAT) AS avance,
           c.businessName AS cliente
         FROM Proyectos p
@@ -355,11 +355,11 @@ export class ChatService {
         GROUP BY estadoActual, prioridad
       `,
       this.prisma.$queryRaw<any[]>`
-        SELECT r.numero, r.estadoActual, r.prioridad, r.area, c.businessName AS cliente
+        SELECT TOP 100 r.numero, r.estadoActual, r.prioridad, r.area, c.businessName AS cliente
         FROM Requerimientos r
         JOIN Clientes c ON r.clientId = c.id
         WHERE r.companyId = ${companyId}
-        ORDER BY r.numero
+        ORDER BY r.numero DESC
       `,
     ]);
     return { tipo: 'resumen_general', estadisticas: stats, requerimientos: todos };
@@ -395,7 +395,7 @@ export class ChatService {
         GROUP BY a.type, a.status
       `,
       this.prisma.$queryRaw<any[]>`
-        SELECT a.type, a.numero, a.fecha, a.status, c.businessName AS cliente
+        SELECT TOP 50 a.type, a.numero, a.fecha, a.status, c.businessName AS cliente
         FROM Actas a
         JOIN Proyectos p ON a.projectId = p.id
         JOIN OrdenesServicio o ON p.serviceOrderId = o.id
@@ -445,11 +445,19 @@ Si la pregunta es ambigua, pide aclaraciones o indica qué información tienes d
       intent === 'dashboard' ? DASHBOARD_CONTEXT :
       intent === 'proyectos' ? PROYECTOS_CONTEXT : '';
 
+    const datosJson = JSON.stringify(
+      datos,
+      (_, v) => (typeof v === 'bigint' ? Number(v) : v),
+      2,
+    );
+
+    this.logger.debug(`buildSystemPrompt intent=${intent} datosJson=${datosJson.length} chars`);
+
     return `${base}
 ${extraContext}
 Datos actuales de ${INTENT_LABELS[intent]}:
 \`\`\`json
-${JSON.stringify(datos, null, 2)}
+${datosJson}
 \`\`\`
 
 Usa estos datos para responder con precisión. ${
@@ -458,9 +466,9 @@ Usa estos datos para responder con precisión. ${
     : intent === 'proyectos'
       ? datos?.tipo === 'detalle_especifico'
         ? 'Tienes proyectos y sus actividades filtradas. Puedes responder qué actividades están pendientes, ejecutándose o completadas, y quién las tiene asignadas.'
-        : 'Tienes estadísticas de proyectos, estadísticas de actividades por estado y la lista COMPLETA de actividades con su estado actual, módulo, proyecto y cliente asignado.'
+        : 'Tienes un resumen ejecutivo: estadísticas de proyectos y actividades por estado, avance promedio por cliente, ranking de implementadores y lista de proyectos. Para actividades detalladas menciona el proyecto o cliente específico.'
       : datos?.tipo === 'resumen_general'
-        ? 'Tienes la lista COMPLETA de registros. Puedes responder sobre cualquiera de ellos.'
+        ? 'Tienes la lista de registros (máximo 100 más recientes). Puedes responder sobre cualquiera de ellos.'
         : datos?.tipo === 'detalle_especifico'
           ? 'Estos son los registros que coinciden con la búsqueda del usuario.'
           : ''

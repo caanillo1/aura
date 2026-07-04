@@ -455,12 +455,30 @@ export class RequerimientosService {
   }
 
   async enviarCorreo(companyId: string, dto: EnviarCorreoRequerimientosDto) {
+    // ── Si hay filtro por rango de gestiones, obtener los IDs de reqs afectados ──
+    let reqIdsFiltrados: string[] | null = null;
+    if (dto.gestionDesde || dto.gestionHasta) {
+      const desde = dto.gestionDesde ? new Date(dto.gestionDesde + 'T00:00:00') : new Date('2000-01-01');
+      const hasta = dto.gestionHasta ? new Date(dto.gestionHasta + 'T23:59:59') : new Date('2099-12-31');
+      const rows = await this.prisma.$queryRaw<{ requerimientoId: string }[]>`
+        SELECT DISTINCT requerimientoId
+        FROM GestionRequerimiento
+        WHERE createdAt >= ${desde} AND createdAt <= ${hasta}
+      `;
+      reqIdsFiltrados = rows.map(r => r.requerimientoId);
+      // Si no hay ninguna gestión en ese rango, devolver vacío directamente
+      if (reqIdsFiltrados.length === 0) {
+        return { enviados: 0, destinatarios: dto.destinatarios.length };
+      }
+    }
+
     const where: any = { companyId };
     if (dto.clientId)                              where.clientId     = dto.clientId;
     if (dto.agenteId)                              where.agenteId     = dto.agenteId;
     if (dto.area)                                  where.area         = dto.area;
     if (dto.prioridad)                             where.prioridad    = dto.prioridad;
     if (dto.estadosActual?.length)                 where.estadoActual = { in: dto.estadosActual };
+    if (reqIdsFiltrados !== null)                  where.id           = { in: reqIdsFiltrados };
 
     const reqs = await this.prisma.requerimiento.findMany({
       where,
@@ -468,7 +486,20 @@ export class RequerimientosService {
         client:         { select: { businessName: true } },
         agente:         { select: { firstName: true, lastName: true } },
         templateModule: { select: { name: true } },
-        gestiones:      { select: { observacion: true, createdAt: true }, orderBy: { createdAt: 'desc' }, take: 1 },
+        // Mostrar la gestión más reciente de la semana (no la última de toda la vida)
+        gestiones: {
+          select: { observacion: true, estado: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          ...(dto.gestionDesde || dto.gestionHasta ? {
+            where: {
+              createdAt: {
+                gte: dto.gestionDesde ? new Date(dto.gestionDesde + 'T00:00:00') : undefined,
+                lte: dto.gestionHasta ? new Date(dto.gestionHasta + 'T23:59:59') : undefined,
+              },
+            },
+          } : {}),
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -481,11 +512,20 @@ export class RequerimientosService {
       Negado: '#f87171', Repriorizado: '#fbbf24', Entregado: '#34d399',
     };
 
-    const rows = reqs.map((r, i) => `
+    const rows = reqs.map((r, i) => {
+      const gestion = r.gestiones[0];
+      const gestEstado = (gestion as any)?.estado ?? null;
+      const gestColor = EST_COLOR[gestEstado] ?? '#94a3b8';
+      return `
       <tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'}">
         <td style="padding:10px 12px;font-family:monospace;font-size:12px;font-weight:700;color:#dc2626;white-space:nowrap">${r.ticketRubi || '—'}</td>
         <td style="padding:10px 12px;font-size:13px;color:#1e293b;max-width:220px">${r.titulo}</td>
-        <td style="padding:10px 12px;font-size:12px;color:#475569;max-width:200px">${r.gestiones[0]?.observacion ?? '—'}</td>
+        <td style="padding:10px 12px;font-size:12px;color:#475569;max-width:200px">${gestion?.observacion ?? '—'}</td>
+        ${gestEstado ? `<td style="padding:10px 12px">
+          <span style="padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:${gestColor}20;color:${gestColor}">
+            ${gestEstado}
+          </span>
+        </td>` : '<td style="padding:10px 12px;font-size:12px;color:#94a3b8">—</td>'}
         <td style="padding:10px 12px;font-size:12px;color:#475569">${r.client?.businessName ?? '—'}</td>
         <td style="padding:10px 12px;font-size:12px;color:#475569">${r.templateModule ? r.templateModule.name : '—'}</td>
         <td style="padding:10px 12px;font-size:12px;color:#475569">${r.agente ? `${r.agente.firstName} ${r.agente.lastName}` : '—'}</td>
@@ -499,19 +539,25 @@ export class RequerimientosService {
             ${r.estadoActual}
           </span>
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
+
+    const semanaLabel = (dto.gestionDesde && dto.gestionHasta)
+      ? `Semana ${new Date(dto.gestionDesde).toLocaleDateString('es-CO', { day:'2-digit', month:'short', timeZone:'UTC' })} – ${new Date(dto.gestionHasta).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric', timeZone:'UTC' })}`
+      : null;
 
     const filtersApplied = [
+      semanaLabel && `Periodo: <strong>${semanaLabel}</strong>`,
       dto.prioridad && `Prioridad: <strong>${dto.prioridad}</strong>`,
-      dto.estadosActual?.length && `Estado: <strong>${dto.estadosActual.join(', ')}</strong>`,
+      dto.estadosActual?.length && `Gestión: <strong>${dto.estadosActual.join(', ')}</strong>`,
       dto.area && `Área: <strong>${dto.area}</strong>`,
     ].filter(Boolean).join(' · ');
 
     const html = `
-    <div style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:24px">
-      <h2 style="color:#1e293b;margin:0 0 4px">Requerimientos — Priorización</h2>
+    <div style="font-family:Arial,sans-serif;max-width:960px;margin:0 auto;padding:24px">
+      <h2 style="color:#1e293b;margin:0 0 4px">Requerimientos — Priorización semanal</h2>
       <p style="color:#64748b;margin:0 0 20px;font-size:14px">
-        ${reqs.length} requerimiento${reqs.length !== 1 ? 's' : ''} exportados
+        ${reqs.length} requerimiento${reqs.length !== 1 ? 's' : ''} gestionados
         ${filtersApplied ? ` · ${filtersApplied}` : ''}
       </p>
       ${dto.mensaje ? `<div style="background:#f1f5f9;border-left:4px solid #6366f1;padding:12px 16px;border-radius:4px;margin-bottom:20px;font-size:14px;color:#334155">${dto.mensaje}</div>` : ''}
@@ -521,11 +567,12 @@ export class RequerimientosService {
             <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Ticket Rubi</th>
             <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Requerimiento</th>
             <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Observación</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Gestión semana</th>
             <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Cliente</th>
             <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Módulo</th>
             <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Agente</th>
             <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Prioridad</th>
-            <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Estado</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Estado actual</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>

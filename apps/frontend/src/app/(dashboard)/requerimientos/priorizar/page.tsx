@@ -216,9 +216,11 @@ export default function PriorizarPage() {
     destinatarios: string[];
     asunto: string;
     mensaje: string;
+    filtrarSemanaActual: boolean;
   }>({
     enabled: false, diasSemana: [], hora: 8, minuto: 0,
     estados: [], destinatarios: [], asunto: '', mensaje: '',
+    filtrarSemanaActual: true,
   });
 
   const emailInputRef   = useRef<HTMLInputElement>(null);
@@ -461,7 +463,7 @@ export default function PriorizarPage() {
     setLoadingAuto(true);
     try {
       const cfg = await requerimientosApi.getSchedule();
-      if (cfg) setAutoConfig({ enabled: cfg.enabled ?? false, diasSemana: cfg.diasSemana ?? [], hora: cfg.hora ?? 8, minuto: cfg.minuto ?? 0, estados: cfg.estados ?? [], destinatarios: cfg.destinatarios ?? [], asunto: cfg.asunto ?? '', mensaje: cfg.mensaje ?? '' });
+      if (cfg) setAutoConfig({ enabled: cfg.enabled ?? false, diasSemana: cfg.diasSemana ?? [], hora: cfg.hora ?? 8, minuto: cfg.minuto ?? 0, estados: cfg.estados ?? [], destinatarios: cfg.destinatarios ?? [], asunto: cfg.asunto ?? '', mensaje: cfg.mensaje ?? '', filtrarSemanaActual: cfg.filtrarSemanaActual ?? true });
     } catch {
       toast.error('No se pudo cargar la configuración guardada');
     } finally { setLoadingAuto(false); }
@@ -487,10 +489,11 @@ export default function PriorizarPage() {
     try {
       // Pass current form values directly — no prior DB save required
       const res = await requerimientosApi.runScheduleNow({
-        destinatarios: autoConfig.destinatarios,
-        estados:       autoConfig.estados,
-        asunto:        autoConfig.asunto,
-        mensaje:       autoConfig.mensaje,
+        destinatarios:       autoConfig.destinatarios,
+        estados:             autoConfig.estados,
+        asunto:              autoConfig.asunto,
+        mensaje:             autoConfig.mensaje,
+        filtrarSemanaActual: autoConfig.filtrarSemanaActual,
       });
       toast.success(`Prueba enviada · ${res.enviados} requerimientos a ${res.destinatarios} destinatario${res.destinatarios !== 1 ? 's' : ''}`);
     } catch (err: any) {
@@ -2379,6 +2382,26 @@ export default function PriorizarPage() {
                   ? <ToggleRight className="w-9 h-9 text-emerald-400" />
                   : <ToggleLeft className="w-9 h-9" style={{ color: 'var(--text-muted)' }} />}
               </button>
+            </div>
+
+            {/* Toggle: filtrar por semana actual */}
+            <div className="flex items-start gap-3 p-3 rounded-xl"
+              style={{ background: autoConfig.filtrarSemanaActual ? 'rgba(167,139,250,0.08)' : (isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.04)'), border: `1px solid ${autoConfig.filtrarSemanaActual ? 'rgba(167,139,250,0.3)' : 'transparent'}` }}>
+              <button onClick={() => setAutoConfig(p => ({ ...p, filtrarSemanaActual: !p.filtrarSemanaActual }))}>
+                {autoConfig.filtrarSemanaActual
+                  ? <ToggleRight className="w-8 h-8 text-violet-400" />
+                  : <ToggleLeft className="w-8 h-8" style={{ color: 'var(--text-muted)' }} />}
+              </button>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: autoConfig.filtrarSemanaActual ? '#a78bfa' : 'var(--text-secondary)' }}>
+                  Solo tickets gestionados esta semana
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {autoConfig.filtrarSemanaActual
+                    ? 'El correo incluirá únicamente los tickets que tuvieron una gestión registrada de lunes a domingo de la semana actual.'
+                    : 'El correo incluirá todos los tickets (sin filtro por fecha de gestión).'}
+                </p>
+              </div>
             </div>
 
             {/* Días de la semana */}

@@ -67,6 +67,10 @@ export class EnviarCorreoRequerimientosDto {
   @ApiPropertyOptional() @IsOptional() @IsString() area?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() prioridad?: string;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) estadosActual?: string[];
+
+  // Filtrar por gestiones registradas en un rango de fechas (YYYY-MM-DD)
+  @ApiPropertyOptional() @IsOptional() @IsString() gestionDesde?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() gestionHasta?: string;
 }
 
 export class UpdateRequerimientoDto {

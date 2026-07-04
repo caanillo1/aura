@@ -15,6 +15,8 @@ export interface EmailScheduleConfig {
   mensaje?: string;
   area?: string;
   prioridad?: string;
+  /** Si true, filtra solo los tickets que tuvieron una gestión durante la semana en curso */
+  filtrarSemanaActual?: boolean;
 }
 
 const CONFIG_KEY = 'email_auto_schedule';
@@ -125,6 +127,21 @@ export class EmailSchedulerService implements OnModuleInit {
     cfg: EmailScheduleConfig,
   ): Promise<{ enviados: number; destinatarios: number }> {
     this.logger.log(`Ejecutando envío automático company=${companyId}`);
+
+    // Calcular rango lun–dom de la semana en curso si el filtro está activo
+    let gestionDesde: string | undefined;
+    let gestionHasta: string | undefined;
+    if (cfg.filtrarSemanaActual) {
+      const now  = new Date();
+      const day  = now.getDay() === 0 ? 6 : now.getDay() - 1; // lun=0 ... dom=6
+      const lun  = new Date(now); lun.setDate(now.getDate() - day); lun.setHours(0,0,0,0);
+      const dom  = new Date(lun); dom.setDate(lun.getDate() + 6);
+      const iso  = (d: Date) => d.toISOString().split('T')[0];
+      gestionDesde = iso(lun);
+      gestionHasta = iso(dom);
+      this.logger.log(`Filtro semana activo: ${gestionDesde} → ${gestionHasta}`);
+    }
+
     return this.requerimientosService.enviarCorreo(companyId, {
       destinatarios:  cfg.destinatarios,
       asunto:         cfg.asunto,
@@ -132,6 +149,8 @@ export class EmailSchedulerService implements OnModuleInit {
       area:           cfg.area || undefined,
       prioridad:      cfg.prioridad || undefined,
       estadosActual:  cfg.estados.length > 0 ? cfg.estados : undefined,
+      gestionDesde,
+      gestionHasta,
     });
   }
 }

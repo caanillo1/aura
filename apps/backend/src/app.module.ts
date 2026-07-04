@@ -25,6 +25,7 @@ import { VisitsModule } from './visits/visits.module';
 import { FaqModule }       from './faq/faq.module';
 import { SesionesModule }  from './sesiones/sesiones.module';
 import { InformesModule }  from './informes/informes.module';
+import { ChatModule }      from './chat/chat.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthModule } from './health/health.module';
@@ -55,6 +56,7 @@ import { HealthModule } from './health/health.module';
     FaqModule,
     SesionesModule,
     InformesModule,
+    ChatModule,
     HealthModule,
   ],
   controllers: [AppController],

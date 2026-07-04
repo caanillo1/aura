@@ -871,6 +871,15 @@ export const informesApi = {
     api.post('/informes/generar-analisis').then(r => r.data),
 };
 
+export const chatApi = {
+  sendMessage: (body: {
+    mensaje: string;
+    historial: { role: 'user' | 'assistant'; content: string }[];
+    contexto?: { pagina?: string; entityId?: string; entityTipo?: string };
+  }): Promise<{ respuesta: string; intent: string }> =>
+    api.post('/chat/message', body).then(r => r.data),
+};
+
 export const publicSesionesApi = {
   getRsvp: (token: string) =>
     fetch(`${PUBLIC_API}/public/sesiones/rsvp/${token}`).then(r => r.json()),

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { CommandPalette } from '@/components/ui/CommandPalette';
+import { AuraChat } from '@/components/ui/AuraChat';
 import { Toaster } from 'sonner';
 import { usersApi } from '@/lib/api';
 
@@ -104,6 +105,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+      <AuraChat />
       <Toaster richColors position="top-right" />
     </div>
   );

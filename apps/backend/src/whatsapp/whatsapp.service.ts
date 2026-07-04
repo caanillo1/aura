@@ -24,6 +24,7 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
   private connectedPhone: string | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private msgStore = new Map<string, any>();
+  private cachedWaVersion: [number, number, number] | null = null;
 
   async onModuleInit() {
     await this.connect();
@@ -133,13 +134,17 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
       this.status = 'connecting';
       const { state, saveCreds } = await useMultiFileAuthState(this.sessionDir);
 
-      let version: [number, number, number] = [2, 3000, 1023141645];
-      try {
-        const result = await fetchLatestBaileysVersion();
-        version = result.version;
-        this.logger.log(`Versión WA: ${version.join('.')}`);
-      } catch {
-        this.logger.warn(`No se pudo obtener versión de WA, usando versión de respaldo ${version.join('.')}`);
+      // Cache version to avoid HTTP call on every reconnect attempt
+      let version: [number, number, number] = this.cachedWaVersion ?? [2, 3000, 1023141645];
+      if (!this.cachedWaVersion) {
+        try {
+          const result = await fetchLatestBaileysVersion();
+          this.cachedWaVersion = result.version;
+          version = result.version;
+          this.logger.log(`Versión WA: ${version.join('.')}`);
+        } catch {
+          this.logger.warn(`No se pudo obtener versión de WA, usando versión de respaldo ${version.join('.')}`);
+        }
       }
 
       this.msgStore.clear();
@@ -195,7 +200,8 @@ export class WhatsAppService implements OnModuleInit, OnModuleDestroy {
 
           if (shouldReconnect) {
             this.status = 'connecting';
-            this.reconnectTimer = setTimeout(() => this.connect(), 5000);
+            // 30s backoff when no valid session — reduces event loop load vs 5s default
+            this.reconnectTimer = setTimeout(() => this.connect(), 30_000);
           } else {
             // Sesión cerrada desde el celular — borrar archivos y reconectar con QR nuevo
             await fs.rm(this.sessionDir, { recursive: true, force: true }).catch(() => {});

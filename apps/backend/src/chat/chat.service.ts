@@ -90,8 +90,12 @@ export class ChatService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(
-          { model: 'llama-3.3-70b-versatile', messages, temperature: 0.4, max_tokens: 1024 },
-          // BigInt-safe replacer: converts any BigInt to number
+          {
+            model: process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile',
+            messages,
+            temperature: 0.4,
+            max_tokens: 1024,
+          },
           (_, v) => (typeof v === 'bigint' ? Number(v) : v),
         ),
       });
@@ -445,10 +449,10 @@ Si la pregunta es ambigua, pide aclaraciones o indica qué información tienes d
       intent === 'dashboard' ? DASHBOARD_CONTEXT :
       intent === 'proyectos' ? PROYECTOS_CONTEXT : '';
 
+    // No indentation → saves ~25% tokens vs pretty-print
     const datosJson = JSON.stringify(
       datos,
       (_, v) => (typeof v === 'bigint' ? Number(v) : v),
-      2,
     );
 
     this.logger.debug(`buildSystemPrompt intent=${intent} datosJson=${datosJson.length} chars`);

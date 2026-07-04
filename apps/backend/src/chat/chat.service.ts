@@ -77,28 +77,50 @@ export class ChatService {
       const datos = await this.fetchData(companyId, intent, mensaje);
       const systemPrompt = this.buildSystemPrompt(intent, datos);
 
+      // Keep last 4 messages only — reduces token usage by ~1500 tokens vs 10 messages
       const messages = [
         { role: 'system', content: systemPrompt },
-        ...historial.slice(-10),
+        ...historial.slice(-4),
         { role: 'user', content: mensaje },
       ];
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
+      const groqBody = JSON.stringify(
+        {
+          model: process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile',
+          messages,
+          temperature: 0.4,
+          max_tokens: 1024,
         },
-        body: JSON.stringify(
-          {
-            model: process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile',
-            messages,
-            temperature: 0.4,
-            max_tokens: 1024,
-          },
-          (_, v) => (typeof v === 'bigint' ? Number(v) : v),
-        ),
+        (_, v) => (typeof v === 'bigint' ? Number(v) : v),
+      );
+
+      const groqFetch = () => fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: groqBody,
       });
+
+      let response = await groqFetch();
+
+      // TPM rate limit → wait the suggested seconds and retry once
+      if (!response.ok && response.status === 429) {
+        const errText = await response.text();
+        this.logger.error(`Groq error (429): ${errText}`);
+        const isTPM = errText.includes('tokens per minute');
+        if (isTPM) {
+          const waitMatch = errText.match(/try again in ([\d.]+)s/);
+          const waitMs = waitMatch ? Math.ceil(parseFloat(waitMatch[1]) * 1000) + 500 : 7000;
+          this.logger.warn(`TPM rate limit, retrying in ${waitMs}ms...`);
+          await new Promise(r => setTimeout(r, waitMs));
+          response = await groqFetch();
+        } else {
+          // TPD (daily) exhausted — no point retrying
+          return {
+            respuesta: 'Se agotó la cuota diaria del servicio de IA. El chat estará disponible nuevamente mañana.',
+            intent,
+          };
+        }
+      }
 
       if (!response.ok) {
         const err = await response.text();
@@ -206,11 +228,11 @@ export class ChatService {
         GROUP BY status
       `,
       this.prisma.$queryRaw<any[]>`
-        SELECT TOP 100 o.osNumber, o.status, o.product, c.businessName AS cliente
+        SELECT TOP 50 o.osNumber, o.status, o.product, c.businessName AS cliente
         FROM OrdenesServicio o
         JOIN Clientes c ON o.clientId = c.id
         WHERE o.companyId = ${companyId}
-        ORDER BY o.osNumber
+        ORDER BY o.osNumber DESC
       `,
     ]);
     return { tipo: 'resumen_general', estadisticas: stats, ordenes: todos };
@@ -256,8 +278,8 @@ export class ChatService {
       }
     }
 
-    // General mode: compact summaries only (no unbounded activity list to avoid exceeding AI context)
-    const [proyectoStats, actividadStats, avancePorCliente, implementadores, proyectos] = await Promise.all([
+    // General mode: aggregated stats only — no lists to minimize token usage
+    const [proyectoStats, actividadStats, avancePorCliente, implementadores] = await Promise.all([
       // Project counts + avg progress by status
       this.prisma.$queryRaw<any[]>`
         SELECT p.status, CAST(COUNT(*) AS INT) AS total,
@@ -292,9 +314,9 @@ export class ChatService {
         GROUP BY c.businessName
         ORDER BY avancePromedio DESC
       `,
-      // Implementer ranking (answers "quién tiene más actividades")
+      // Top 10 implementers by activity count
       this.prisma.$queryRaw<any[]>`
-        SELECT ISNULL(u.firstName, '') + ' ' + ISNULL(u.lastName, '') AS implementador,
+        SELECT TOP 10 ISNULL(u.firstName, '') + ' ' + ISNULL(u.lastName, '') AS implementador,
           CAST(COUNT(*) AS INT) AS totalActividades,
           CAST(SUM(CASE WHEN a.status = 'pendiente'  THEN 1 ELSE 0 END) AS INT) AS pendientes,
           CAST(SUM(CASE WHEN a.status = 'en_proceso' THEN 1 ELSE 0 END) AS INT) AS enProceso,
@@ -311,17 +333,6 @@ export class ChatService {
         GROUP BY u.firstName, u.lastName
         ORDER BY totalActividades DESC
       `,
-      // Compact project list with progress (bounded)
-      this.prisma.$queryRaw<any[]>`
-        SELECT TOP 100 p.name AS proyecto, p.status,
-          CAST(p.progressPercent AS FLOAT) AS avance,
-          c.businessName AS cliente
-        FROM Proyectos p
-        JOIN OrdenesServicio o ON p.serviceOrderId = o.id
-        JOIN Clientes c ON o.clientId = c.id
-        WHERE o.companyId = ${companyId}
-        ORDER BY p.progressPercent DESC
-      `,
     ]);
     return {
       tipo: 'resumen_general',
@@ -329,8 +340,7 @@ export class ChatService {
       actividadStats,
       avancePorCliente,
       implementadores,
-      proyectos,
-      nota: 'Para ver actividades detalladas de un proyecto específico, menciona el nombre del proyecto o cliente.',
+      nota: 'Para ver proyectos o actividades específicas, menciona el nombre del proyecto o cliente.',
     };
   }
 
@@ -359,7 +369,7 @@ export class ChatService {
         GROUP BY estadoActual, prioridad
       `,
       this.prisma.$queryRaw<any[]>`
-        SELECT TOP 100 r.numero, r.estadoActual, r.prioridad, r.area, c.businessName AS cliente
+        SELECT TOP 50 r.numero, r.estadoActual, r.prioridad, r.area, c.businessName AS cliente
         FROM Requerimientos r
         JOIN Clientes c ON r.clientId = c.id
         WHERE r.companyId = ${companyId}
@@ -399,7 +409,7 @@ export class ChatService {
         GROUP BY a.type, a.status
       `,
       this.prisma.$queryRaw<any[]>`
-        SELECT TOP 50 a.type, a.numero, a.fecha, a.status, c.businessName AS cliente
+        SELECT TOP 30 a.type, a.numero, a.fecha, a.status, c.businessName AS cliente
         FROM Actas a
         JOIN Proyectos p ON a.projectId = p.id
         JOIN OrdenesServicio o ON p.serviceOrderId = o.id
@@ -449,11 +459,15 @@ Si la pregunta es ambigua, pide aclaraciones o indica qué información tienes d
       intent === 'dashboard' ? DASHBOARD_CONTEXT :
       intent === 'proyectos' ? PROYECTOS_CONTEXT : '';
 
-    // No indentation → saves ~25% tokens vs pretty-print
-    const datosJson = JSON.stringify(
+    // Compact JSON (no indentation) — cap at 4000 chars to stay within TPM limits
+    const MAX_DATA_CHARS = 4000;
+    let datosJson = JSON.stringify(
       datos,
       (_, v) => (typeof v === 'bigint' ? Number(v) : v),
     );
+    if (datosJson.length > MAX_DATA_CHARS) {
+      datosJson = datosJson.slice(0, MAX_DATA_CHARS) + '...(datos truncados)';
+    }
 
     this.logger.debug(`buildSystemPrompt intent=${intent} datosJson=${datosJson.length} chars`);
 

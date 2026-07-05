@@ -45,20 +45,20 @@ const PROJECT_STATUS_LABEL: Record<string, string> = {
   cancelado: 'Cancelados', pendiente: 'Pendientes de Inicio',
 };
 const PROJECT_STATUS_COLOR: Record<string, string> = {
-  activo: '#34d399', completado: '#60a5fa', pausado: '#fbbf24',
-  cancelado: '#f87171', pendiente: '#a78bfa',
+  activo: '#86efac', completado: '#93c5fd', pausado: '#fde68a',
+  cancelado: '#fca5a5', pendiente: '#c4b5fd',
 };
 const ACTIVITY_STATUS_LABEL: Record<string, string> = {
   pendiente: 'Pendientes', en_proceso: 'En Proceso', completado: 'Finalizadas',
   cancelado: 'Canceladas', vencida: 'Vencidas',
 };
 const ACTIVITY_STATUS_COLOR: Record<string, string> = {
-  pendiente: '#60a5fa', en_proceso: '#fbbf24', completado: '#34d399',
-  cancelado: '#6b7280', vencida: '#f87171',
+  pendiente: '#93c5fd', en_proceso: '#fde68a', completado: '#86efac',
+  cancelado: '#d1d5db', vencida: '#fca5a5',
 };
 const TICKET_STATUS_COLOR: Record<string, string> = {
-  Elaborado: '#f87171', 'En revisión': '#fbbf24', Aprobado: '#a78bfa',
-  'En desarrollo': '#60a5fa', Resuelto: '#34d399', Cancelado: '#6b7280',
+  Elaborado: '#fca5a5', 'En revisión': '#fde68a', Aprobado: '#c4b5fd',
+  'En desarrollo': '#93c5fd', Resuelto: '#86efac', Cancelado: '#d1d5db',
 };
 const ACTA_TYPE_LABEL: Record<string, string> = {
   inicio: 'Inicio', visita: 'Visita', capacitacion: 'Capacitación',
@@ -565,12 +565,12 @@ export default function DashboardPage() {
           pendingActasSignature, upcomingActivities, ticketsByStatus, projectRisks } = data;
 
   const kpiDefs = [
-    { key: 'activeClients',     label: 'Clientes Activos',       icon: Building2,     color: '#34d399', data: kpis.activeClients     },
-    { key: 'activeProjects',    label: 'Proyectos Activos',      icon: FolderKanban,  color: '#60a5fa', data: kpis.activeProjects     },
-    { key: 'pendingActivities', label: 'Actividades Pendientes', icon: ClipboardList, color: '#f59e0b', data: kpis.pendingActivities  },
-    { key: 'openTickets',       label: 'Tickets Abiertos',       icon: Ticket,        color: '#f87171', data: kpis.openTickets        },
-    { key: 'pendingActas',      label: 'Actas Pendientes',       icon: FileSignature, color: '#a78bfa', data: kpis.pendingActas       },
-    { key: 'overdueActivities', label: 'Actividades Vencidas',   icon: AlertTriangle, color: '#ef4444', data: kpis.overdueActivities  },
+    { key: 'activeClients',     label: 'Clientes Activos',       icon: Building2,     color: '#86efac', data: kpis.activeClients     },
+    { key: 'activeProjects',    label: 'Proyectos Activos',      icon: FolderKanban,  color: '#93c5fd', data: kpis.activeProjects     },
+    { key: 'pendingActivities', label: 'Actividades Pendientes', icon: ClipboardList, color: '#fde68a', data: kpis.pendingActivities  },
+    { key: 'openTickets',       label: 'Tickets Abiertos',       icon: Ticket,        color: '#fca5a5', data: kpis.openTickets        },
+    { key: 'pendingActas',      label: 'Actas Pendientes',       icon: FileSignature, color: '#c4b5fd', data: kpis.pendingActas       },
+    { key: 'overdueActivities', label: 'Actividades Vencidas',   icon: AlertTriangle, color: '#fdba74', data: kpis.overdueActivities  },
   ] as const;
 
   const hasFilters = filters.clientId || filters.agentId || filters.dateFrom || filters.dateTo;
@@ -797,7 +797,7 @@ export default function DashboardPage() {
         <SectionCard title="Avance por Cliente" href="/implementacion/ordenes" delay={0.12}>
           {clientProgress.length === 0
             ? <Empty msg="Sin proyectos en curso" />
-            : <HBarChart data={clientProgress.map(c => ({ label: c.client, value: Math.round(c.progress) }))} color="#34d399" />
+            : <HBarChart data={clientProgress.map(c => ({ label: c.client, value: Math.round(c.progress) }))} color="#86efac" />
           }
         </SectionCard>
 
@@ -829,14 +829,14 @@ export default function DashboardPage() {
                   return (
                     <div key={i} className="flex items-center gap-3">
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                        style={{ background: 'linear-gradient(135deg,#2563EB,#6366F1)' }}>
+                        style={{ background: 'linear-gradient(135deg,#93c5fd,#c4b5fd)' }}>
                         {initials}
                       </div>
                       <span className="text-xs w-28 truncate shrink-0" style={{ color: 'var(--text-secondary)' }}>{iw.name}</span>
                       <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
                         <motion.div initial={{ width: 0 }} animate={{ width: `${(iw.count / max) * 100}%` }}
                           transition={{ duration: 0.7, ease: 'easeOut' }}
-                          className="h-full rounded-full" style={{ background: '#60a5fa' }} />
+                          className="h-full rounded-full" style={{ background: '#93c5fd' }} />
                       </div>
                       <span className="text-xs font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>{iw.count}</span>
                     </div>

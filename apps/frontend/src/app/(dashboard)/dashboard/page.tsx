@@ -49,16 +49,16 @@ const PROJECT_STATUS_COLOR: Record<string, string> = {
   cancelado: '#fca5a5', pendiente: '#c4b5fd',
 };
 const ACTIVITY_STATUS_LABEL: Record<string, string> = {
-  pendiente: 'Pendientes', en_proceso: 'En Proceso', completado: 'Finalizadas',
-  cancelado: 'Canceladas', vencida: 'Vencidas',
+  pendiente: 'Pendientes', en_progreso: 'En Progreso', completado: 'Finalizadas',
+  cancelado: 'Canceladas', vencida: 'Vencidas', bloqueado: 'Bloqueadas',
 };
 const ACTIVITY_STATUS_COLOR: Record<string, string> = {
-  pendiente: '#93c5fd', en_proceso: '#fde68a', completado: '#86efac',
-  cancelado: '#d1d5db', vencida: '#fca5a5',
+  pendiente: '#93c5fd', en_progreso: '#fde68a', completado: '#86efac',
+  cancelado: '#d1d5db', vencida: '#fca5a5', bloqueado: '#fdba74',
 };
 const TICKET_STATUS_COLOR: Record<string, string> = {
-  Elaborado: '#fca5a5', 'En revisión': '#fde68a', Aprobado: '#c4b5fd',
-  'En desarrollo': '#93c5fd', Resuelto: '#86efac', Cancelado: '#d1d5db',
+  Elaborado: '#93c5fd', Priorizado: '#c4b5fd', Repriorizado: '#fde68a',
+  Entregado: '#86efac', Devuelto: '#fdba74', Negado: '#fca5a5',
 };
 const ACTA_TYPE_LABEL: Record<string, string> = {
   inicio: 'Inicio', visita: 'Visita', capacitacion: 'Capacitación',

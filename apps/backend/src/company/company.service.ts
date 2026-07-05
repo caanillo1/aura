@@ -143,15 +143,31 @@ export class CompanyService {
 
     const osScope   = { companyId, ...(clientId && { clientId }) };
     const projScope = { serviceOrder: osScope };
+
+    // Para proyectos/OS: filtrar por el rol del agente en la orden de servicio
+    // (líder clínico, líder financiero, o implementador asignado)
+    const osAgentFilter = agentId
+      ? { OR: [
+          { clinicalLeaderId: agentId },
+          { financialLeaderId: agentId },
+          { implementers: { some: { userId: agentId } } },
+        ]}
+      : {};
+    const osScopeFiltered  = { ...osScope, ...osAgentFilter };
+    const projScopeFiltered = { serviceOrder: osScopeFiltered };
+
+    // actScope usa projScope base (no filtrado por líder) porque las actividades
+    // ya filtran por assignedToId — así se ven actividades de Keiber en proyectos
+    // donde él no es líder pero sí tiene tareas asignadas.
     const actScope  = { phase: { projectModule: { project: projScope } }, ...(agentId && { assignedToId: agentId }) };
     const reqScope  = { companyId, ...(clientId && { clientId }), ...(agentId && { agenteId: agentId }) };
-    const actaScope = { project: projScope };
+    const actaScope = { project: projScopeFiltered };
 
-    const reqWhere      = { ...reqScope,  ...(createdAtRange && { createdAt: createdAtRange }) };
-    const projectWhere  = { ...projScope, ...(createdAtRange && { createdAt: createdAtRange }) };
-    const activityWhere = { ...actScope,  ...(createdAtRange && { createdAt: createdAtRange }) };
-    const actaWhere     = { ...actaScope, ...(createdAtRange && { createdAt: createdAtRange }) };
-    const osHistWhere   = { serviceOrder: osScope, ...(createdAtRange && { createdAt: createdAtRange }) };
+    const reqWhere      = { ...reqScope,         ...(createdAtRange && { createdAt: createdAtRange }) };
+    const projectWhere  = { ...projScopeFiltered, ...(createdAtRange && { createdAt: createdAtRange }) };
+    const activityWhere = { ...actScope,          ...(createdAtRange && { createdAt: createdAtRange }) };
+    const actaWhere     = { ...actaScope,         ...(createdAtRange && { createdAt: createdAtRange }) };
+    const osHistWhere   = { serviceOrder: osScopeFiltered, ...(createdAtRange && { createdAt: createdAtRange }) };
 
     const [
       activeClients, activeProjects, pendingActivities, openTickets, pendingActas, overdueActivities,
@@ -209,21 +225,21 @@ export class CompanyService {
       this.prisma.activity.groupBy({ by: ['status'], where: activityWhere, _count: { id: true } }),
       // ── Avance por cliente ────────────────────────────────────────────────
       this.prisma.serviceOrder.findMany({
-        where: osScope,
+        where: osScopeFiltered,
         select: { client: { select: { businessName: true } }, project: { select: { progressPercent: true } } },
         take: 6, orderBy: { createdAt: 'desc' },
       }),
       // ── Carga de trabajo por implementador ────────────────────────────────
       // Sin filtro de fecha → backlog completo de proyectos activos.
-      // Con filtro de fecha → actividades cuya plannedEndDate cae en el rango
-      // (no createdAt, que no refleja carga sino antigüedad del registro).
+      // Con filtro de fecha → actividades cuya plannedEndDate cae en el rango.
+      // assignedToId se construye una sola vez para evitar que { not: null }
+      // sobreescriba el filtro por agente específico.
       this.prisma.activity.groupBy({
         by: ['assignedToId'],
         where: {
-          phase: { projectModule: { project: { ...projScope, status: 'activo' } } },
-          ...(agentId && { assignedToId: agentId }),
+          phase: { projectModule: { project: { ...projScopeFiltered, status: 'activo' } } },
           status: { in: ['pendiente', 'en_proceso'] },
-          assignedToId: { not: null },
+          assignedToId: agentId ? agentId : { not: null },
           ...(createdAtRange && { plannedEndDate: createdAtRange }),
         },
         _count: { id: true }, orderBy: { _count: { id: 'desc' } }, take: 8,

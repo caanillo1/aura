@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import * as bcrypt from 'bcrypt';
 
@@ -230,20 +231,33 @@ export class CompanyService {
         take: 6, orderBy: { createdAt: 'desc' },
       }),
       // ── Carga de trabajo por implementador ────────────────────────────────
-      // Sin filtro de fecha → backlog completo de proyectos activos.
-      // Con filtro de fecha → actividades cuya plannedEndDate cae en el rango.
-      // assignedToId se construye una sola vez para evitar que { not: null }
-      // sobreescriba el filtro por agente específico.
-      this.prisma.activity.groupBy({
-        by: ['assignedToId'],
-        where: {
-          phase: { projectModule: { project: { ...projScopeFiltered, status: 'activo' } } },
-          status: { in: ['pendiente', 'en_proceso'] },
-          assignedToId: agentId ? agentId : { not: null },
-          ...(createdAtRange && { plannedEndDate: createdAtRange }),
-        },
-        _count: { id: true }, orderBy: { _count: { id: 'desc' } }, take: 8,
-      }),
+      // Cuenta proyectos activos por implementador (clínico, financiero o
+      // ImplementadoresOS), que es la medida real de carga, no el conteo de
+      // actividades asignadas que varía según granularidad del proyecto.
+      this.prisma.$queryRaw<{ userId: string; firstName: string; lastName: string; projectCount: number }[]>`
+        SELECT TOP 8
+          u.id        AS userId,
+          u.firstName AS firstName,
+          u.lastName  AS lastName,
+          CAST(COUNT(DISTINCT p.id) AS INT) AS projectCount
+        FROM Usuarios u
+        JOIN OrdenesServicio os ON (
+             os.clinicalLeaderId  = u.id
+          OR os.financialLeaderId = u.id
+          OR EXISTS (
+               SELECT 1 FROM ImplementadoresOS io
+               WHERE io.serviceOrderId = os.id AND io.userId = u.id
+             )
+        )
+        JOIN Proyectos p ON p.serviceOrderId = os.id AND p.status = 'activo'
+        WHERE os.companyId = ${companyId}
+          ${clientId ? Prisma.sql`AND os.clientId = ${clientId}` : Prisma.empty}
+          ${agentId  ? Prisma.sql`AND u.id = ${agentId}`         : Prisma.empty}
+          ${createdAtRange?.gte ? Prisma.sql`AND p.createdAt >= ${createdAtRange.gte}` : Prisma.empty}
+          ${createdAtRange?.lte ? Prisma.sql`AND p.createdAt <= ${createdAtRange.lte}` : Prisma.empty}
+        GROUP BY u.id, u.firstName, u.lastName
+        ORDER BY projectCount DESC
+      `,
       // ── Actas pendientes de firma: todas las no borrador ──────────────────
       this.prisma.acta.findMany({
         where: {
@@ -294,12 +308,7 @@ export class CompanyService {
       }),
     ]);
 
-    // ── Resolver nombres de implementadores ────────────────────────────────────
-    const implementerIds = implementerWorkload.map(i => i.assignedToId!).filter(Boolean);
-    const implementerUsers = implementerIds.length
-      ? await this.prisma.user.findMany({ where: { id: { in: implementerIds } }, select: { id: true, firstName: true, lastName: true } })
-      : [];
-    const implementerMap = Object.fromEntries(implementerUsers.map(u => [u.id, u]));
+    // implementerWorkload ya trae nombres desde el $queryRaw — no se necesita resolver
 
     // ── Deltas este mes ────────────────────────────────────────────────────────
     const clientsThisMonth = await this.prisma.client.count({ where: { companyId, isActive: true, createdAt: { gte: startOfMonth } } });
@@ -321,10 +330,8 @@ export class CompanyService {
         .filter(so => so.project)
         .map(so => ({ client: so.client.businessName, progress: Number(so.project!.progressPercent) })),
       implementerWorkload: implementerWorkload.map(iw => ({
-        name: implementerMap[iw.assignedToId!]
-          ? `${implementerMap[iw.assignedToId!].firstName} ${implementerMap[iw.assignedToId!].lastName}`
-          : 'Sin asignar',
-        count: iw._count.id,
+        name: `${iw.firstName} ${iw.lastName}`,
+        count: iw.projectCount,
       })),
       pendingActasSignature: actasPendingSignature.map(a => ({
         id: a.id,

@@ -258,11 +258,15 @@ export class CompanyService {
         GROUP BY u.id, u.firstName, u.lastName
         ORDER BY projectCount DESC
       `,
-      // ── Actas pendientes de firma: todas las no borrador ──────────────────
+      // ── Actas pendientes de firma: no borrador Y con al menos un firmante sin firmar
       this.prisma.acta.findMany({
         where: {
           ...actaWhere,
           status: { not: 'borrador' },
+          OR: [
+            { firmantes: { some: { signedAt: null } } },
+            { firmantes: { none: {} } },
+          ],
         },
         select: {
           id: true, type: true, numero: true, fecha: true,

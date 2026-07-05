@@ -12,7 +12,7 @@ import {
 import Link from 'next/link';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { io } from 'socket.io-client';
-import { companyApi, clientsApi, usersApi } from '@/lib/api';
+import { companyApi, clientsApi, usersApi, actasApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -479,6 +479,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // filters: estado de la UI (actualiza en cada tecla)
   // appliedFilters: estado que dispara el API (debounced 600ms)
@@ -875,10 +876,22 @@ export default function DashboardPage() {
                     </span>
                     <div className="flex gap-1">
                       <button className="p-1 rounded-lg hover:bg-green-500/10 transition-colors" title="WhatsApp">
-                        <Send className="w-3 h-3" style={{ color: '#34d399' }} />
+                        <Send className="w-3 h-3" style={{ color: '#86efac' }} />
                       </button>
-                      <button className="p-1 rounded-lg hover:bg-blue-500/10 transition-colors" title="Email">
-                        <Mail className="w-3 h-3" style={{ color: '#60a5fa' }} />
+                      <button
+                        className="p-1 rounded-lg hover:bg-blue-500/10 transition-colors disabled:opacity-40"
+                        title="Reenviar correo de firma"
+                        disabled={sendingEmail === a.id}
+                        onClick={async () => {
+                          setSendingEmail(a.id);
+                          try { await actasApi.resendEmail(a.id); } catch {}
+                          setSendingEmail(null);
+                        }}
+                      >
+                        {sendingEmail === a.id
+                          ? <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#93c5fd' }} />
+                          : <Mail className="w-3 h-3" style={{ color: '#93c5fd' }} />
+                        }
                       </button>
                     </div>
                   </div>

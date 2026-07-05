@@ -214,8 +214,9 @@ export class CompanyService {
         take: 6, orderBy: { createdAt: 'desc' },
       }),
       // ── Carga de trabajo por implementador ────────────────────────────────
-      // Usa actScope (sin filtro de fecha) para mostrar el backlog real actual,
-      // restringido a proyectos activos únicamente.
+      // Sin filtro de fecha → backlog completo de proyectos activos.
+      // Con filtro de fecha → actividades cuya plannedEndDate cae en el rango
+      // (no createdAt, que no refleja carga sino antigüedad del registro).
       this.prisma.activity.groupBy({
         by: ['assignedToId'],
         where: {
@@ -223,6 +224,7 @@ export class CompanyService {
           ...(agentId && { assignedToId: agentId }),
           status: { in: ['pendiente', 'en_proceso'] },
           assignedToId: { not: null },
+          ...(createdAtRange && { plannedEndDate: createdAtRange }),
         },
         _count: { id: true }, orderBy: { _count: { id: 'desc' } }, take: 8,
       }),

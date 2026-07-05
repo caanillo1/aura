@@ -214,10 +214,17 @@ export class CompanyService {
         take: 6, orderBy: { createdAt: 'desc' },
       }),
       // ── Carga de trabajo por implementador ────────────────────────────────
+      // Usa actScope (sin filtro de fecha) para mostrar el backlog real actual,
+      // restringido a proyectos activos únicamente.
       this.prisma.activity.groupBy({
         by: ['assignedToId'],
-        where: { ...activityWhere, status: { in: ['pendiente', 'en_proceso'] }, assignedToId: { not: null } },
-        _count: { id: true }, orderBy: { _count: { id: 'desc' } }, take: 5,
+        where: {
+          phase: { projectModule: { project: { ...projScope, status: 'activo' } } },
+          ...(agentId && { assignedToId: agentId }),
+          status: { in: ['pendiente', 'en_proceso'] },
+          assignedToId: { not: null },
+        },
+        _count: { id: true }, orderBy: { _count: { id: 'desc' } }, take: 8,
       }),
       // ── Actas pendientes de firma: todas las no borrador ──────────────────
       this.prisma.acta.findMany({

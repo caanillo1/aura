@@ -480,7 +480,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // filters: estado de la UI (actualiza en cada tecla)
+  // appliedFilters: estado que dispara el API (debounced 600ms)
   const [filters, setFilters] = useState({ clientId: '', agentId: '', dateFrom: '', dateTo: '' });
+  const [appliedFilters, setAppliedFilters] = useState(filters);
   const [clients, setClients] = useState<{ id: string; businessName: string }[]>([]);
   const [agents, setAgents]   = useState<{ id: string; firstName: string; lastName: string }[]>([]);
   const { theme } = useTheme();
@@ -491,19 +494,25 @@ export default function DashboardPage() {
     usersApi.listAgents({ limit: 100 }).then((r: any) => setAgents(r.data ?? [])).catch(() => {});
   }, []);
 
+  // Propaga filters → appliedFilters solo cuando el usuario deja de escribir
+  useEffect(() => {
+    const t = setTimeout(() => setAppliedFilters(filters), 600);
+    return () => clearTimeout(t);
+  }, [filters]);
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
     try {
       const params = {
-        clientId: filters.clientId || undefined,
-        agentId:  filters.agentId  || undefined,
-        dateFrom: filters.dateFrom || undefined,
-        dateTo:   filters.dateTo   || undefined,
+        clientId: appliedFilters.clientId || undefined,
+        agentId:  appliedFilters.agentId  || undefined,
+        dateFrom: appliedFilters.dateFrom || undefined,
+        dateTo:   appliedFilters.dateTo   || undefined,
       };
       setData(await companyApi.getDashboard(params));
     } catch { /* silently fail */ }
     finally { setLoading(false); setRefreshing(false); }
-  }, [filters]);
+  }, [appliedFilters]);
 
   const loadRef = useRef(load);
   useEffect(() => { loadRef.current = load; }, [load]);
@@ -687,10 +696,10 @@ export default function DashboardPage() {
 
       {/* ── AI Insight ── */}
       <AiInsightCard filters={{
-        clientId: filters.clientId || undefined,
-        agentId:  filters.agentId  || undefined,
-        dateFrom: filters.dateFrom || undefined,
-        dateTo:   filters.dateTo   || undefined,
+        clientId: appliedFilters.clientId || undefined,
+        agentId:  appliedFilters.agentId  || undefined,
+        dateFrom: appliedFilters.dateFrom || undefined,
+        dateTo:   appliedFilters.dateTo   || undefined,
       }} />
 
       {/* ── KPI Cards ── */}

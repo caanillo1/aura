@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate, buildMeta } from '../common/dto/pagination.dto';
 import { CreateRequerimientoDto, AddGestionDto, RequerimientoFilterDto, EnviarCorreoRequerimientosDto, CreateBulkRequerimientosDto, BulkGestionDto, UpdateRequerimientoDto } from './dto/requerimiento.dto';
@@ -460,13 +461,21 @@ export class RequerimientosService {
     if (dto.gestionDesde || dto.gestionHasta) {
       const desde = dto.gestionDesde ? new Date(dto.gestionDesde + 'T00:00:00') : new Date('2000-01-01');
       const hasta = dto.gestionHasta ? new Date(dto.gestionHasta + 'T23:59:59') : new Date('2099-12-31');
-      const rows = await this.prisma.$queryRaw<{ requerimientoId: string }[]>`
-        SELECT DISTINCT requerimientoId
-        FROM RequerimientoGestiones
-        WHERE createdAt >= ${desde} AND createdAt <= ${hasta}
-      `;
+      // Filtrar por el estado de la gestión (no solo por fecha) para que solo
+      // aparezcan tickets que realmente recibieron ese estado en la semana.
+      const rows = dto.estadosActual?.length
+        ? await this.prisma.$queryRaw<{ requerimientoId: string }[]>`
+            SELECT DISTINCT requerimientoId
+            FROM RequerimientoGestiones
+            WHERE createdAt >= ${desde} AND createdAt <= ${hasta}
+              AND estado IN (${Prisma.join(dto.estadosActual)})
+          `
+        : await this.prisma.$queryRaw<{ requerimientoId: string }[]>`
+            SELECT DISTINCT requerimientoId
+            FROM RequerimientoGestiones
+            WHERE createdAt >= ${desde} AND createdAt <= ${hasta}
+          `;
       reqIdsFiltrados = rows.map(r => r.requerimientoId);
-      // Si no hay ninguna gestión en ese rango, devolver vacío directamente
       if (reqIdsFiltrados.length === 0) {
         return { enviados: 0, destinatarios: dto.destinatarios.length };
       }

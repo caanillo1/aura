@@ -21,6 +21,7 @@ export interface EmailScheduleConfig {
 
 const CONFIG_KEY = 'email_auto_schedule';
 const JOB_PREFIX = 'email_schedule_';
+const TIMEZONE   = process.env.TZ_SCHEDULER ?? 'America/Bogota';
 
 @Injectable()
 export class EmailSchedulerService implements OnModuleInit {
@@ -33,15 +34,27 @@ export class EmailSchedulerService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    const configs = await this.prisma.$queryRaw<{ companyId: string; configValue: string | null }[]>`
-      SELECT companyId, configValue FROM ConfiguracionSistema WHERE configKey = ${CONFIG_KEY}
-    `;
+    let configs: { companyId: string; configValue: string | null }[] = [];
+    try {
+      configs = await this.prisma.$queryRaw`
+        SELECT companyId, configValue FROM ConfiguracionSistema WHERE configKey = ${CONFIG_KEY}
+      `;
+    } catch (err) {
+      this.logger.error(`Error cargando configuraciones de scheduler: ${err?.message}`);
+      return;
+    }
     for (const row of configs) {
-      if (row.configValue) {
-        try {
-          const cfg: EmailScheduleConfig = JSON.parse(row.configValue);
-          if (cfg.enabled) this.registerCron(row.companyId, cfg);
-        } catch { /* config inválida */ }
+      if (!row.configValue) continue;
+      try {
+        const cfg: EmailScheduleConfig = JSON.parse(row.configValue);
+        const companyId = row.companyId?.toString?.() ?? String(row.companyId);
+        if (cfg.enabled && cfg.diasSemana?.length > 0 && cfg.destinatarios?.length > 0) {
+          this.registerCron(companyId, cfg);
+        } else {
+          this.logger.log(`Scheduler company=${companyId}: omitido (enabled=${cfg.enabled}, días=${cfg.diasSemana?.length ?? 0}, destinatarios=${cfg.destinatarios?.length ?? 0})`);
+        }
+      } catch (err) {
+        this.logger.error(`Config de scheduler inválida para company=${row.companyId}: ${err?.message}`);
       }
     }
   }
@@ -98,15 +111,16 @@ export class EmailSchedulerService implements OnModuleInit {
 
   private registerCron(companyId: string, cfg: EmailScheduleConfig) {
     const cronExpr = this.buildCronExpression(cfg);
-    const tz       = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    this.logger.log(`Registrando cron [${JOB_PREFIX}${companyId}]: ${cronExpr} timezone=${tz}`);
+    this.logger.log(`Registrando cron [${JOB_PREFIX}${companyId}]: ${cronExpr} timezone=${TIMEZONE}`);
     const job = new CronJob(cronExpr, () => {
-      this.executeScheduledSend(companyId, cfg).catch(err =>
-        this.logger.error(`Error en envío automático company=${companyId}: ${err?.message}`),
-      );
-    }, null, false, tz);
+      this.logger.log(`Cron disparado company=${companyId}, ejecutando envío...`);
+      this.executeScheduledSend(companyId, cfg)
+        .then(r => this.logger.log(`Envío completado company=${companyId}: ${r.enviados} tickets → ${r.destinatarios} destinatarios`))
+        .catch(err => this.logger.error(`Error en envío automático company=${companyId}: ${err?.message ?? err}`));
+    }, null, false, TIMEZONE);
     this.schedulerRegistry.addCronJob(`${JOB_PREFIX}${companyId}`, job);
     job.start();
+    this.logger.log(`Cron activo. Próxima ejecución: ${job.nextDate().toISO()}`);
   }
 
   private removeCron(companyId: string) {

@@ -487,7 +487,7 @@ model Activity {
   id               String               @id @default(uuid()) @db.UniqueIdentifier
   phaseId          String               @db.UniqueIdentifier
   code             String               @db.NVarChar(30)
-  name             String               @db.NVarChar(300)
+  name             String               @db.NVarChar(Max)
   description      String?              @db.NVarChar(Max)
   assignedToId     String?              @db.UniqueIdentifier
   assigneeType     String?              @db.NVarChar(20)
@@ -910,8 +910,8 @@ model ActaCompromiso {
   id                   String         @id @default(uuid()) @db.UniqueIdentifier
   actaId               String         @db.UniqueIdentifier
   numero               Int?
-  compromiso           String         @db.NVarChar(500)
-  responsable          String?        @db.NVarChar(200)
+  compromiso           String         @db.NVarChar(Max)
+  responsable          String?        @db.NVarChar(500)
   estado               String         @default("pendiente") @db.NVarChar(30)
   assignedToId         String?        @db.UniqueIdentifier
   clientStaffId        String?        @db.UniqueIdentifier
@@ -949,8 +949,8 @@ model ActaParticipante {
 model ActaAccion {
   id          String    @id @default(uuid()) @db.UniqueIdentifier
   actaId      String    @db.UniqueIdentifier
-  accion      String    @db.NVarChar(500)
-  responsable String?   @db.NVarChar(200)
+  accion      String    @db.NVarChar(Max)
+  responsable String?   @db.NVarChar(500)
   fechaLimite DateTime? @db.Date
   acta        Acta      @relation(fields: [actaId], references: [id], onDelete: Cascade)
 

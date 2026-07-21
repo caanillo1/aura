@@ -642,90 +642,95 @@ export function PlanTrabajoDocument({ data }: { data: PlanTrabajoData }) {
                 </View>
               </View>
 
-              {/* Activity rows */}
-              {modTasks.map((t: any, ti: number) => {
-                const startD  = toDate(t.plannedStartDate);
-                const endD    = toDate(t.plannedEndDate);
-                const barColor = BAR[t.status as keyof typeof BAR] ?? BAR.pendiente;
-                const barX    = startD ? Math.max(0, dateToX(startD)) : null;
-                const barW    = (startD && endD)
-                  ? Math.max(dateToX(endD) - dateToX(startD), colW * 0.3)
-                  : null;
-                const isOdd   = ti % 2 !== 0;
-                const rowBg   = isOdd ? N.gray50 : N.white;
+              {/* Activity rows (relative wrapper so the week grid can be drawn once per module) */}
+              <View style={{ position: 'relative' }}>
+                {modTasks.map((t: any, ti: number) => {
+                  const startD  = toDate(t.plannedStartDate);
+                  const endD    = toDate(t.plannedEndDate);
+                  const barColor = BAR[t.status as keyof typeof BAR] ?? BAR.pendiente;
+                  const barX    = startD ? Math.max(0, dateToX(startD)) : null;
+                  const barW    = (startD && endD)
+                    ? Math.max(dateToX(endD) - dateToX(startD), colW * 0.3)
+                    : null;
+                  const isOdd   = ti % 2 !== 0;
+                  const rowBg   = isOdd ? N.gray50 : N.white;
 
-                return (
-                  <View key={t.id} style={{ flexDirection: 'row', height: G.rowH }}>
-                    {/* Activity label */}
-                    <View style={{
-                      width: G.leftW, height: G.rowH,
-                      backgroundColor: rowBg,
-                      borderBottomWidth: 0.5, borderBottomColor: N.gray100,
-                      borderRightWidth: 0.5,  borderRightColor: N.gray200,
-                      justifyContent: 'center', paddingHorizontal: 8, paddingLeft: 16,
-                    }}>
-                      <Text style={{ fontSize: 6.5, color: N.gray700 }}>
-                        {t.taskName}
-                      </Text>
-                    </View>
+                  return (
+                    <View key={t.id} style={{ flexDirection: 'row', height: G.rowH }}>
+                      {/* Activity label */}
+                      <View style={{
+                        width: G.leftW, height: G.rowH,
+                        backgroundColor: rowBg,
+                        borderBottomWidth: 0.5, borderBottomColor: N.gray100,
+                        borderRightWidth: 0.5,  borderRightColor: N.gray200,
+                        justifyContent: 'center', paddingHorizontal: 8, paddingLeft: 16,
+                      }}>
+                        <Text style={{ fontSize: 6.5, color: N.gray700 }}>
+                          {t.taskName}
+                        </Text>
+                      </View>
 
-                    {/* Timeline area */}
-                    <View style={{
-                      width: GANTT_TL_W, height: G.rowH,
-                      backgroundColor: rowBg,
-                      borderBottomWidth: 0.5, borderBottomColor: N.gray100,
-                      position: 'relative',
-                    }}>
-                      {/* Week column separators */}
-                      {ganttWeeks.map((_, wi) => (
-                        <View key={wi} style={{
-                          position: 'absolute', left: wi * colW, top: 0, bottom: 0,
-                          width: 0.5, backgroundColor: N.gray100,
-                        }} />
-                      ))}
-
-                      {/* Today vertical line */}
-                      {todayX >= 0 && todayX <= GANTT_TL_W && (
-                        <View style={{
-                          position: 'absolute', left: todayX, top: 0, bottom: 0,
-                          width: 1.5, backgroundColor: '#ef4444', opacity: 0.65,
-                        }} />
-                      )}
-
-                      {/* Planned bar */}
-                      {barX !== null && barW !== null && barX < GANTT_TL_W && (
-                        <View style={{
-                          position: 'absolute',
-                          left: barX,
-                          width: Math.min(barW, GANTT_TL_W - barX),
-                          top: Math.floor(G.rowH * 0.2),
-                          height: Math.floor(G.rowH * 0.6),
-                          backgroundColor: barColor,
-                          borderRadius: 2,
-                          opacity: t.status === 'completado' ? 1 : 0.82,
-                        }} />
-                      )}
-
-                      {/* Execution date dot (if available and within range) */}
-                      {t.executionDate && (() => {
-                        const exD = toDate(t.executionDate);
-                        if (!exD) return null;
-                        const exX = dateToX(exD);
-                        if (exX < 0 || exX > GANTT_TL_W) return null;
-                        return (
+                      {/* Timeline area */}
+                      <View style={{
+                        width: GANTT_TL_W, height: G.rowH,
+                        backgroundColor: rowBg,
+                        borderBottomWidth: 0.5, borderBottomColor: N.gray100,
+                        position: 'relative',
+                      }}>
+                        {/* Planned bar */}
+                        {barX !== null && barW !== null && barX < GANTT_TL_W && (
                           <View style={{
-                            position: 'absolute', left: exX - 3,
-                            top: Math.floor(G.rowH * 0.5) - 3,
-                            width: 6, height: 6, borderRadius: 3,
-                            backgroundColor: '#059669',
-                            borderWidth: 1, borderColor: '#ffffff',
+                            position: 'absolute',
+                            left: barX,
+                            width: Math.min(barW, GANTT_TL_W - barX),
+                            top: Math.floor(G.rowH * 0.2),
+                            height: Math.floor(G.rowH * 0.6),
+                            backgroundColor: barColor,
+                            borderRadius: 2,
+                            opacity: t.status === 'completado' ? 1 : 0.82,
                           }} />
-                        );
-                      })()}
+                        )}
+
+                        {/* Execution date dot (if available and within range) */}
+                        {t.executionDate && (() => {
+                          const exD = toDate(t.executionDate);
+                          if (!exD) return null;
+                          const exX = dateToX(exD);
+                          if (exX < 0 || exX > GANTT_TL_W) return null;
+                          return (
+                            <View style={{
+                              position: 'absolute', left: exX - 3,
+                              top: Math.floor(G.rowH * 0.5) - 3,
+                              width: 6, height: 6, borderRadius: 3,
+                              backgroundColor: '#059669',
+                              borderWidth: 1, borderColor: '#ffffff',
+                            }} />
+                          );
+                        })()}
+                      </View>
                     </View>
-                  </View>
-                );
-              })}
+                  );
+                })}
+
+                {/* Shared week grid + today line, drawn once per module instead of once per row */}
+                <View style={{
+                  position: 'absolute', top: 0, left: G.leftW, width: GANTT_TL_W,
+                  height: modTasks.length * G.rowH,
+                }}>
+                  {ganttWeeks.map((_, wi) => (
+                    <View key={wi} style={{
+                      position: 'absolute', left: wi * colW, top: 0, bottom: 0,
+                      width: 0.5, backgroundColor: N.gray100,
+                    }} />
+                  ))}
+                  {todayX >= 0 && todayX <= GANTT_TL_W && (
+                    <View style={{
+                      position: 'absolute', left: todayX, top: 0, bottom: 0,
+                      width: 1.5, backgroundColor: '#ef4444', opacity: 0.65,
+                    }} />
+                  )}
+                </View>
+              </View>
             </React.Fragment>
           ))}
 

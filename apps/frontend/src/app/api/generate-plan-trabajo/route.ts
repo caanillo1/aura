@@ -4,7 +4,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { PlanTrabajoDocument } from '@/lib/pdf/PlanTrabajoDocument';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
